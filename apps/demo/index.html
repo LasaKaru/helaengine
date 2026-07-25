@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HelaEngine — runtime demo</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f6f3f'/%3E%3Cpath d='M16 6l9 5.5v9L16 26l-9-5.5v-9z' fill='none' stroke='%23cfe8d4' stroke-width='2.2' stroke-linejoin='round'/%3E%3C/svg%3E"
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #10131a;
+        color: #e8ecf4;
+      }
+      #viewport {
+        position: fixed;
+        inset: 0;
+      }
+      #hud {
+        position: fixed;
+        top: 16px;
+        left: 16px;
+        padding: 14px 16px;
+        max-width: 320px;
+        border-radius: 10px;
+        background: rgb(16 19 26 / 78%);
+        border: 1px solid rgb(255 255 255 / 12%);
+        backdrop-filter: blur(8px);
+        font-size: 13px;
+        line-height: 1.5;
+        pointer-events: none;
+      }
+      #hud h1 {
+        margin: 0 0 6px;
+        font-size: 15px;
+        letter-spacing: 0.02em;
+      }
+      #hud dl {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 2px 12px;
+        margin: 8px 0 0;
+      }
+      #hud dt {
+        color: #97a3b8;
+      }
+      #hud dd {
+        margin: 0;
+        font-variant-numeric: tabular-nums;
+      }
+      #hud .hint {
+        margin: 10px 0 0;
+        color: #97a3b8;
+      }
+      #error {
+        position: fixed;
+        inset: 0;
+        display: none;
+        place-content: center;
+        padding: 32px;
+        background: #10131a;
+      }
+      #error pre {
+        max-width: 720px;
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid #6b2b2b;
+        background: #1b1113;
+        color: #ffb4b4;
+        overflow: auto;
+        white-space: pre-wrap;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="viewport"></div>
+
+    <div id="hud">
+      <h1>HelaEngine runtime</h1>
+      <div>Rendering <code>demo-scene.json</code> — no React, no store, just the engine.</div>
+      <dl>
+        <dt>Scene</dt>
+        <dd id="stat-scene">—</dd>
+        <dt>Objects</dt>
+        <dd id="stat-objects">—</dd>
+        <dt>Draw calls</dt>
+        <dd id="stat-calls">—</dd>
+        <dt>FPS</dt>
+        <dd id="stat-fps">—</dd>
+        <dt>Engine</dt>
+        <dd id="stat-version">—</dd>
+      </dl>
+      <p class="hint">Drag to orbit · scroll to zoom</p>
+    </div>
+
+    <div id="error"><pre id="error-body"></pre></div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "id": "tree_pine_01",
+      "name": "Pine Tree",
+      "category": "trees",
+      "tags": ["conifer", "forest"],
+      "placeholderSize": [1.2, 4.5, 1.2],
+      "placeholderColor": "#2f6f3f"
+    },
+    {
+      "id": "tree_oak_01",
+      "name": "Oak Tree",
+      "category": "trees",
+      "tags": ["broadleaf", "forest"],
+      "placeholderSize": [2.2, 5.5, 2.2],
+      "placeholderColor": "#4a8f45"
+    },
+    {
+      "id": "rock_boulder_01",
+      "name": "Boulder",
+      "category": "rocks",
+      "tags": ["stone", "scatter"],
+      "placeholderSize": [2, 1.4, 1.8],
+      "placeholderColor": "#8a8880"
+    },
+    {
+      "id": "building_hut_01",
+      "name": "Thatched Hut",
+      "category": "buildings",
+      "tags": ["village", "shelter"],
+      "placeholderSize": [6, 4, 6],
+      "placeholderColor": "#b08a5a"
+    },
+    {
+      "id": "enemy_goblin_01",
+      "name": "Goblin",
+      "category": "enemies",
+      "tags": ["humanoid", "melee"],
+      "placeholderSize": [0.8, 1.7, 0.8],
+      "placeholderColor": "#a83f3f"
+    }
+  ]
+}
