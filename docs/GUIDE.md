@@ -159,18 +159,18 @@ Even if starting solo, structure work as if these lanes exist — makes future h
 
 **Sprint 1: Repo, schema, and engine skeleton**
 
-- [ ] Monorepo setup (Turborepo or Nx): `/apps/editor`, `/packages/engine`, `/apps/api`, `/packages/schema`
-- [ ] Define scene.json schema formally using **Zod** (single source of truth — generates both TS types and runtime validators)
-- [ ] `/packages/engine`: bare Three.js loader that takes scene.json and renders terrain + static objects (no editor yet)
-- [ ] CI: lint + typecheck + unit test pipeline on PR (GitHub Actions)
+- [x] Monorepo setup (Turborepo or Nx): `/apps/editor`, `/packages/engine`, `/apps/api`, `/packages/schema`
+- [x] Define scene.json schema formally using **Zod** (single source of truth — generates both TS types and runtime validators)
+- [x] `/packages/engine`: bare Three.js loader that takes scene.json and renders terrain + static objects (no editor yet)
+- [x] CI: lint + typecheck + unit test pipeline on PR (GitHub Actions)
 - **DoD:** `npm run demo` renders a hardcoded scene.json with 3 trees and a terrain plane, in a plain HTML page, zero React.
 
 **Sprint 2: Asset pipeline v0**
 
-- [ ] Blender → GLB export convention/checklist doc (naming, scale, pivot at origin, LOD tiers)
-- [ ] `gltf-transform` ingest script: Draco compress geometry, KTX2 compress textures, output manifest entry
-- [ ] Asset manifest schema (Zod) + local JSON manifest file with 10 starter assets (trees, rocks, 1 building, 1 enemy)
-- [ ] Thumbnail generation script (headless Three.js render → PNG)
+- [x] Blender → GLB export convention/checklist doc (naming, scale, pivot at origin, LOD tiers)
+- [x] `gltf-transform` ingest script: Draco compress geometry, KTX2 compress textures, output manifest entry
+- [x] Asset manifest schema (Zod) + local JSON manifest file with 10 starter assets (trees, rocks, 1 building, 1 enemy)
+- [x] Thumbnail generation script (headless Three.js render → PNG)
 - **DoD:** Running `pnpm ingest-assets` on a folder of GLBs produces compressed GLBs + manifest.json + thumbnails automatically.
 
 ---
@@ -179,9 +179,9 @@ Even if starting solo, structure work as if these lanes exist — makes future h
 
 **Sprint 3: Editor shell + viewport**
 
-- [ ] React app scaffold, r3f Canvas, OrbitControls, grid helper, basic lighting rig
-- [ ] Zustand store: `sceneStore` mirroring the scene.json schema exactly
-- [ ] Render loop reads `sceneStore.objects` and instantiates via `/packages/engine` loader (proves editor and runtime share code)
+- [x] React app scaffold, r3f Canvas, OrbitControls, grid helper, basic lighting rig
+- [x] Zustand store: `sceneStore` mirroring the scene.json schema exactly
+- [x] Render loop reads `sceneStore.objects` and instantiates via `/packages/engine` loader (proves editor and runtime share code)
 - **DoD:** Empty scene renders in browser; store can be mutated from Redux devtools and viewport updates live.
 
 **Sprint 4: Asset library panel + drag-drop placement**

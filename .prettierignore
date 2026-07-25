@@ -4,5 +4,5 @@ dist
 coverage
 pnpm-lock.yaml
 
-apps/demo/public/assets
+generated
 raw-assets

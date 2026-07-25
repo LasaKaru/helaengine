@@ -9,7 +9,10 @@ export const pipelineRoot = path.resolve(here, '..');
 /** Hand-authored `.glb` sources. These are the artefacts under version control. */
 export const rawAssetsDir = path.join(repoRoot, 'raw-assets');
 
-/** Generated output, served by the demo app. Not committed. */
-export const outputDir = path.join(repoRoot, 'apps/demo/public/assets');
+/**
+ * Generated output. Not committed, and shared by every app that needs assets — the demo and the
+ * editor both serve it through the same dev-server plugin rather than keeping private copies.
+ */
+export const outputDir = path.join(repoRoot, 'generated/assets');
 
 export const metadataFile = path.join(here, 'asset-metadata.json');

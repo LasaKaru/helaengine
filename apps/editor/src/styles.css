@@ -1,0 +1,282 @@
+:root {
+  color-scheme: dark;
+
+  --bg: #0f1218;
+  --panel: #161b24;
+  --panel-raised: #1c2230;
+  --border: #262e3d;
+  --text: #e6eaf2;
+  --text-dim: #8d99ae;
+  --accent: #4a8f45;
+  --warn: #d98b3a;
+
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  font-size: 14px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---- Layout ---- */
+
+.editor {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100%;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 260px 1fr 300px;
+  min-height: 0;
+}
+
+@media (width < 1100px) {
+  .workspace {
+    grid-template-columns: 200px 1fr 240px;
+  }
+}
+
+/* ---- Top bar ---- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 14px;
+  height: 48px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.brand-mark {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--accent);
+}
+
+.project-name input {
+  padding: 6px 10px;
+  width: 220px;
+  color: inherit;
+  font: inherit;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.project-name input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.topbar-meta {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.topbar-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.topbar-actions button {
+  padding: 6px 14px;
+  color: inherit;
+  font: inherit;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.topbar-actions button:disabled {
+  color: var(--text-dim);
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+/* ---- Rails ---- */
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow-y: auto;
+  background: var(--panel);
+}
+
+.rail-left {
+  border-right: 1px solid var(--border);
+}
+
+.rail-right {
+  border-left: 1px solid var(--border);
+}
+
+.panel {
+  padding: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel h2 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.panel-hint {
+  margin: 0;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.category-list,
+.object-list {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.category-list li,
+.object-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 5px;
+  background: var(--panel-raised);
+}
+
+.category-list li span:first-child {
+  text-transform: capitalize;
+}
+
+.count,
+.object-asset {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.object-label,
+.object-asset {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Viewport ---- */
+
+.viewport {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+.viewport canvas {
+  display: block;
+  touch-action: none;
+}
+
+.viewport-stats {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  display: flex;
+  gap: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgb(15 18 24 / 78%);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.viewport-stats .warn {
+  color: var(--warn);
+}
+
+/* ---- Full-screen states ---- */
+
+.fullscreen-message {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  height: 100%;
+  padding: 32px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.fullscreen-message.error {
+  color: #ffb4b4;
+}
+
+.fullscreen-message h1 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--text);
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 3px solid rgb(255 255 255 / 14%);
+  border-top-color: var(--accent);
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 3s;
+  }
+}

@@ -349,3 +349,49 @@ describe('SceneLoader model preloading', () => {
     loaded.dispose();
   });
 });
+
+describe('SceneLoader.loadInto', () => {
+  it('populates a scene it does not own', () => {
+    const host = new THREE.Scene();
+    const loaded = makeLoader().loadInto(host, makeScene([{ id: 'o1', assetId: 'tree_pine_02' }]));
+
+    expect(loaded.threeScene).toBe(host);
+    expect(host.getObjectByName('terrain')).toBeDefined();
+    expect(host.getObjectByName('o1')).toBeDefined();
+
+    loaded.dispose();
+  });
+
+  it('leaves pre-existing children alone on dispose', () => {
+    // react-three-fiber owns the editor's scene and puts its own helpers in it. Tearing a scene
+    // document down must not take those with it.
+    const host = new THREE.Scene();
+    const hostOwned = new THREE.Object3D();
+    hostOwned.name = 'r3f-grid';
+    host.add(hostOwned);
+
+    const loaded = makeLoader().loadInto(host, makeScene([{ id: 'o1', assetId: 'tree_pine_02' }]));
+    expect(host.children.length).toBeGreaterThan(1);
+
+    loaded.dispose();
+
+    expect(host.children).toEqual([hostOwned]);
+    expect(host.background).toBeNull();
+    expect(host.fog).toBeNull();
+  });
+
+  it('swaps cleanly when the same host is reloaded', () => {
+    const host = new THREE.Scene();
+    const loader = makeLoader();
+
+    const first = loader.loadInto(host, makeScene([{ id: 'o1', assetId: 'tree_pine_02' }]));
+    first.dispose();
+    const second = loader.loadInto(host, makeScene([{ id: 'o2', assetId: 'rock_small_01' }]));
+
+    expect(host.getObjectByName('o1')).toBeUndefined();
+    expect(host.getObjectByName('o2')).toBeDefined();
+
+    second.dispose();
+    expect(host.children).toHaveLength(0);
+  });
+});

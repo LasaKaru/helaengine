@@ -7,8 +7,8 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 2 (Phase 0 — Foundations). The engine, scene schema and asset pipeline are in
-place; there is no editor and no backend yet, deliberately.
+**Status:** Sprint 3 (Phase 1 — Editor MVP). The engine, scene schema, asset pipeline and editor
+shell are in place. There is no backend yet, deliberately.
 
 ---
 
@@ -16,13 +16,24 @@ place; there is no editor and no backend yet, deliberately.
 
 ```bash
 pnpm install
-pnpm ingest-assets   # compress raw-assets/ -> apps/demo/public/assets/
-pnpm demo            # -> http://localhost:5173
+pnpm ingest-assets   # compress raw-assets/ -> generated/assets/
+pnpm editor          # -> http://localhost:5174   the editor
+pnpm demo            # -> http://localhost:5173   framework-free runtime harness
 ```
 
-`ingest-assets` has to run before the demo shows models: the compressed GLBs, thumbnails and
-`manifest.json` are generated output and are not committed. The demo renders
-`apps/demo/public/demo-scene.json` — a village of 15 objects drawn from 10 models.
+`ingest-assets` has to run first: the compressed GLBs, thumbnails and `manifest.json` are generated
+output and are not committed. Both apps serve the same `generated/assets/` directory rather than
+keeping private copies.
+
+The editor is a shell so far — a viewport, a live scene document, and panels that report real state.
+Placing objects by hand arrives in Sprint 4; until then `window.helaengine` in the browser console
+drives it:
+
+```js
+helaengine.addObject('building_hut_01', [0, 0, 0], 25);
+helaengine.assetIds();
+helaengine.store.getState().scene;
+```
 
 Other commands:
 
@@ -31,6 +42,7 @@ pnpm lint             # includes the engine-isolation boundary rule
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm e2e              # editor end-to-end suite (Playwright)
 pnpm generate-assets  # regenerate the stand-in raw .glb sources
 ```
 
@@ -47,7 +59,7 @@ packages/engine        Vanilla Three.js runtime. No React, no store, no DOM assu
 tools/asset-pipeline   Ingest: raw GLBs in, compressed GLBs + thumbnails + manifest out.
 raw-assets/            Hand-authored .glb sources. The artefacts under version control.
 apps/demo              Framework-free harness rendering a scene document. Proves the engine stands alone.
-apps/editor            Empty until Sprint 3 (React + react-three-fiber).
+apps/editor            The editor: React + react-three-fiber shell around the engine.
 apps/api               Empty until Sprint 16 (NestJS + Postgres).
 docs/                  GUIDE, DEVELOPMENT-PLAN, SPRINT, ASSET-CONVENTIONS — the plan of record.
 ```
@@ -57,6 +69,12 @@ docs/                  GUIDE, DEVELOPMENT-PLAN, SPRINT, ASSET-CONVENTIONS — th
 **1. The engine never imports the editor.** `packages/engine` runs inside exported projects, where
 React and Zustand do not exist. An import of either breaks every export, silently and late. This is
 enforced by a lint rule, not by discipline — see the `packages/engine` block in `eslint.config.js`.
+
+In the editor this shows up as `EngineBridge`: it reads the scene document from the store and calls
+`SceneLoader.loadInto` on react-three-fiber's scene. It would be shorter to emit a `<mesh>` per
+object and let React reconcile it — and that placement logic would then be unexportable, because the
+exported project has no React. r3f owns the canvas and the loop; the engine owns everything about
+what is in the world.
 
 **2. Every editable property has a field in the schema.** No hidden state in a component, no
 gameplay value that only exists at runtime. If the editor can change it, `scene.json` records it, or

@@ -1,10 +1,11 @@
 import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 import { serveGeneratedAssets } from '../../tools/vite/serve-generated-assets.js';
 
 export default defineConfig({
-  plugins: [serveGeneratedAssets()],
+  plugins: [react(), serveGeneratedAssets()],
   server: {
-    port: 5173,
+    port: 5174,
     host: true,
   },
   build: {

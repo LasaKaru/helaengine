@@ -98,17 +98,21 @@ export class LoadedScene {
   readonly objects: ReadonlyMap<string, THREE.Object3D>;
   readonly missingAssetIds: readonly string[];
   readonly #disposables: DisposableResource[];
+  /** Exactly the nodes this load added to `threeScene`, so teardown touches nothing else. */
+  readonly #added: THREE.Object3D[];
 
   constructor(init: {
     threeScene: THREE.Scene;
     objects: Map<string, THREE.Object3D>;
     missingAssetIds: string[];
     disposables: DisposableResource[];
+    added: THREE.Object3D[];
   }) {
     this.threeScene = init.threeScene;
     this.objects = init.objects;
     this.missingAssetIds = init.missingAssetIds;
     this.#disposables = init.disposables;
+    this.#added = init.added;
   }
 
   /**
@@ -134,7 +138,14 @@ export class LoadedScene {
       disposable.dispose();
     }
     this.#disposables.length = 0;
-    this.threeScene.clear();
+
+    // Removing only what was added — rather than `scene.clear()` — matters when the scene is
+    // owned by someone else, as it is under react-three-fiber in the editor.
+    for (const node of this.#added) this.threeScene.remove(node);
+    this.#added.length = 0;
+
+    this.threeScene.background = null;
+    this.threeScene.fog = null;
   }
 }
 
@@ -205,15 +216,31 @@ export class SceneLoader {
     this.#modelSource?.dispose();
   }
 
+  /** Builds a fresh `THREE.Scene` from a document. */
   load(scene: Scene): LoadedScene {
-    const threeScene = new THREE.Scene();
+    return this.loadInto(new THREE.Scene(), scene);
+  }
+
+  /**
+   * Populates an existing `THREE.Scene` instead of creating one.
+   *
+   * The editor's viewport is hosted by react-three-fiber, which owns its own scene and render
+   * loop. Rather than nesting a second scene inside it — which would silently drop background and
+   * fog, since Three only reads those from the root — the editor hands its scene here. Same code
+   * path, same result, no editor-specific branch inside the engine.
+   */
+  loadInto(threeScene: THREE.Scene, scene: Scene): LoadedScene {
     threeScene.name = scene.name;
     const disposables: DisposableResource[] = [];
     const objects = new Map<string, THREE.Object3D>();
     const missingAssetIds: string[] = [];
+    const added: THREE.Object3D[] = [];
 
-    this.#applyEnvironment(threeScene, scene.environment, disposables);
-    threeScene.add(this.#buildTerrain(scene.terrain, disposables));
+    this.#applyEnvironment(threeScene, scene.environment, disposables, added);
+
+    const terrain = this.#buildTerrain(scene.terrain, disposables);
+    threeScene.add(terrain);
+    added.push(terrain);
 
     // Identical assets share one geometry/material pair; instancing proper arrives in Sprint 12.
     const materialCache = new Map<string, THREE.Material>();
@@ -224,9 +251,10 @@ export class SceneLoader {
       const mesh = this.#buildObject(object, entry, geometryCache, materialCache, disposables);
       objects.set(object.id, mesh);
       threeScene.add(mesh);
+      added.push(mesh);
     }
 
-    return new LoadedScene({ threeScene, objects, missingAssetIds, disposables });
+    return new LoadedScene({ threeScene, objects, missingAssetIds, disposables, added });
   }
 
   #resolveEntry(object: SceneObject, missingAssetIds: string[]): AssetManifestEntry {
@@ -298,6 +326,7 @@ export class SceneLoader {
     threeScene: THREE.Scene,
     environment: Environment,
     disposables: DisposableResource[],
+    added: THREE.Object3D[],
   ): void {
     const background = new THREE.Color(environment.background);
     threeScene.background = background;
@@ -314,6 +343,7 @@ export class SceneLoader {
     const ambientLight = new THREE.AmbientLight(0xffffff, ambient);
     ambientLight.name = 'ambient';
     threeScene.add(ambientLight);
+    added.push(ambientLight);
     disposables.push(ambientLight);
 
     const sunLight = new THREE.DirectionalLight(new THREE.Color(sun.color), sun.intensity);
@@ -336,6 +366,7 @@ export class SceneLoader {
     sunLight.shadow.camera.bottom = -100;
     threeScene.add(sunLight);
     threeScene.add(sunLight.target);
+    added.push(sunLight, sunLight.target);
     disposables.push(sunLight);
   }
 }

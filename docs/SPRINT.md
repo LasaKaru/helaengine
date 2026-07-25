@@ -4,6 +4,8 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
+**Progress:** Sprints 1–3 complete. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+
 ---
 
 ## PHASE 0 — FOUNDATIONS
@@ -16,16 +18,16 @@
 
 **Tasks:**
 
-- [ ] Set up monorepo with Turborepo or Nx: `/apps/editor` (empty for now), `/packages/engine`, `/packages/schema`, `/apps/api` (empty for now)
-- [ ] Configure shared TypeScript config, ESLint, Prettier across packages
-- [ ] Install and configure `eslint-plugin-boundaries` (or similar) with a rule: `/packages/engine` must never import from `/apps/editor` or any React package — enforce this from commit #1
-- [ ] Define the scene schema in `/packages/schema` using Zod: `SceneSchema`, `ObjectSchema`, `TransformSchema`, `TerrainSchema`, `EnvironmentSchema` (start minimal — position/rotation/scale + assetId only, expand in later sprints)
-- [ ] Generate TypeScript types from Zod schemas (`z.infer<>`) — single source of truth for types across engine, editor, and future backend
-- [ ] `/packages/engine`: build `SceneLoader` class — takes parsed scene.json, instantiates a Three.js `Scene`, `PerspectiveCamera`, basic `WebGLRenderer`, adds a ground plane, iterates `objects[]` and places placeholder meshes (boxes) at correct transform
-- [ ] Write a hardcoded `demo-scene.json` (3-5 objects) by hand
-- [ ] Build a bare `index.html` + `main.js` in a `/apps/demo` folder that imports the engine package and renders `demo-scene.json` with zero build tooling beyond a simple dev server (Vite in library mode, or plain ES modules + import maps)
-- [ ] Set up GitHub Actions CI: install deps, typecheck, lint, run unit tests on every PR
-- [ ] Write initial unit tests for `SceneLoader` (Vitest) — does it place objects at correct world coordinates given a schema
+- [x] Set up monorepo with Turborepo or Nx: `/apps/editor` (empty for now), `/packages/engine`, `/packages/schema`, `/apps/api` (empty for now)
+- [x] Configure shared TypeScript config, ESLint, Prettier across packages
+- [x] Install and configure `eslint-plugin-boundaries` (or similar) with a rule: `/packages/engine` must never import from `/apps/editor` or any React package — enforce this from commit #1
+- [x] Define the scene schema in `/packages/schema` using Zod: `SceneSchema`, `ObjectSchema`, `TransformSchema`, `TerrainSchema`, `EnvironmentSchema` (start minimal — position/rotation/scale + assetId only, expand in later sprints)
+- [x] Generate TypeScript types from Zod schemas (`z.infer<>`) — single source of truth for types across engine, editor, and future backend
+- [x] `/packages/engine`: build `SceneLoader` class — takes parsed scene.json, instantiates a Three.js `Scene`, `PerspectiveCamera`, basic `WebGLRenderer`, adds a ground plane, iterates `objects[]` and places placeholder meshes (boxes) at correct transform
+- [x] Write a hardcoded `demo-scene.json` (3-5 objects) by hand
+- [x] Build a bare `index.html` + `main.js` in a `/apps/demo` folder that imports the engine package and renders `demo-scene.json` with zero build tooling beyond a simple dev server (Vite in library mode, or plain ES modules + import maps)
+- [x] Set up GitHub Actions CI: install deps, typecheck, lint, run unit tests on every PR
+- [x] Write initial unit tests for `SceneLoader` (Vitest) — does it place objects at correct world coordinates given a schema
 
 **Tech notes:**
 
@@ -46,14 +48,14 @@
 
 **Tasks:**
 
-- [ ] Write the Blender export convention doc: unit scale (1 unit = 1 meter), pivot at object base/origin, max poly budget per asset tier (e.g., <2k tris for props, <8k for buildings), naming convention (`category_name_variant.glb`), texture atlas guidance for low-poly style
-- [ ] Source or model 10 starter assets: 3 tree variants, 2 rocks, 1 building, 1 enemy (rigged if animated, static if not), 1 terrain texture set, 2 misc props
-- [ ] Install and script `gltf-transform` CLI pipeline: `gltf-transform optimize` with Draco geometry compression + KTX2/Basis texture compression as a Node script (`scripts/ingest-assets.ts`)
-- [ ] Define `AssetManifestEntry` schema in Zod: `{ id, category, tags[], glbPath, thumbnailPath, defaultScale, colliderType, polyCount }`
-- [ ] Write a headless thumbnail generator: spin up Three.js + `WebGLRenderer` in a headless/offscreen context (e.g., via `node-canvas` + `gl`, or Puppeteer screenshot of a local render page) to produce a PNG thumbnail per asset automatically
-- [ ] Script `pnpm ingest-assets ./raw-assets ./public/assets` that: reads raw GLBs → compresses → writes thumbnail → appends manifest.json entry
-- [ ] Extend `SceneLoader` (from Sprint 1) to actually load real GLBs via `GLTFLoader` + `DRACOLoader`/`KTX2Loader`, replacing the placeholder boxes, using `assetId` to look up manifest entries
-- [ ] Add loading state handling (promise-based async load, basic loading spinner in demo page)
+- [x] Write the Blender export convention doc: unit scale (1 unit = 1 meter), pivot at object base/origin, max poly budget per asset tier (e.g., <2k tris for props, <8k for buildings), naming convention (`category_name_variant.glb`), texture atlas guidance for low-poly style
+- [x] Source or model 10 starter assets: 3 tree variants, 2 rocks, 1 building, 1 enemy (rigged if animated, static if not), 1 terrain texture set, 2 misc props
+- [x] Install and script `gltf-transform` CLI pipeline: `gltf-transform optimize` with Draco geometry compression + KTX2/Basis texture compression as a Node script (`scripts/ingest-assets.ts`)
+- [x] Define `AssetManifestEntry` schema in Zod: `{ id, category, tags[], glbPath, thumbnailPath, defaultScale, colliderType, polyCount }`
+- [x] Write a headless thumbnail generator: spin up Three.js + `WebGLRenderer` in a headless/offscreen context (e.g., via `node-canvas` + `gl`, or Puppeteer screenshot of a local render page) to produce a PNG thumbnail per asset automatically
+- [x] Script `pnpm ingest-assets ./raw-assets ./public/assets` that: reads raw GLBs → compresses → writes thumbnail → appends manifest.json entry
+- [x] Extend `SceneLoader` (from Sprint 1) to actually load real GLBs via `GLTFLoader` + `DRACOLoader`/`KTX2Loader`, replacing the placeholder boxes, using `assetId` to look up manifest entries
+- [x] Add loading state handling (promise-based async load, basic loading spinner in demo page)
 
 **Tech notes:**
 
@@ -78,13 +80,13 @@
 
 **Tasks:**
 
-- [ ] Scaffold `/apps/editor`: React + Vite + TypeScript
-- [ ] Install react-three-fiber + drei; set up `<Canvas>` with `OrbitControls`, `Grid` helper, basic three-point lighting rig (key/fill/ambient)
-- [ ] Set up Zustand `sceneStore` mirroring the Zod scene schema exactly (start with `objects[]`, `terrain`, `environment`)
-- [ ] Build a thin r3f wrapper component `<EngineBridge>` that reads `sceneStore` state and calls into `/packages/engine`'s `SceneLoader`/object-spawning logic — critical: the _logic_ for instantiating objects lives in the engine package, r3f is just the render-loop host
-- [ ] Verify: mutate `sceneStore` from Redux DevTools (Zustand supports devtools middleware) and confirm viewport updates live without manual refresh
-- [ ] Basic top bar UI shell (logo, project name placeholder, save button placeholder) and empty side panel containers (asset library, inspector — populated in later sprints)
-- [ ] Set up Vitest + React Testing Library for component tests; Playwright scaffold for e2e (even if only 1 smoke test exists so far)
+- [x] Scaffold `/apps/editor`: React + Vite + TypeScript
+- [x] Install react-three-fiber + drei; set up `<Canvas>` with `OrbitControls`, `Grid` helper, basic three-point lighting rig (key/fill/ambient)
+- [x] Set up Zustand `sceneStore` mirroring the Zod scene schema exactly (start with `objects[]`, `terrain`, `environment`)
+- [x] Build a thin r3f wrapper component `<EngineBridge>` that reads `sceneStore` state and calls into `/packages/engine`'s `SceneLoader`/object-spawning logic — critical: the _logic_ for instantiating objects lives in the engine package, r3f is just the render-loop host
+- [x] Verify: mutate `sceneStore` from Redux DevTools (Zustand supports devtools middleware) and confirm viewport updates live without manual refresh
+- [x] Basic top bar UI shell (logo, project name placeholder, save button placeholder) and empty side panel containers (asset library, inspector — populated in later sprints)
+- [x] Set up Vitest + React Testing Library for component tests; Playwright scaffold for e2e (even if only 1 smoke test exists so far)
 
 **Tech notes:**
 

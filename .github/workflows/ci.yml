@@ -52,3 +52,43 @@ jobs:
         run: pnpm ingest-assets
         env:
           SKIP_THUMBNAILS: '1'
+
+  e2e:
+    name: Editor end-to-end
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @helaengine/editor exec playwright install --with-deps chromium
+
+      # The editor has nothing to render without the asset library, and the library is generated
+      # output rather than something committed — so it is built here before the suite runs.
+      - name: Build asset library
+        run: pnpm ingest-assets
+        env:
+          SKIP_THUMBNAILS: '1'
+
+      - name: Run editor e2e suite
+        run: pnpm --filter @helaengine/editor e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: apps/editor/playwright-report/
+          retention-days: 7
