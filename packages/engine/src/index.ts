@@ -1,7 +1,14 @@
 export { SceneLoader, LoadedScene, MissingAssetError } from './SceneLoader.js';
-export type { SceneLoaderOptions } from './SceneLoader.js';
+export type {
+  SceneLoaderOptions,
+  PreloadReport,
+  PreloadFailure,
+  PreloadProgress,
+} from './SceneLoader.js';
 export { ManifestAssetResolver, MISSING_ASSET_ENTRY } from './assets.js';
 export type { AssetResolver } from './assets.js';
+export { GltfModelSource, disposeObjectTree } from './models.js';
+export type { ModelSource, GltfModelSourceOptions } from './models.js';
 export { OrbitCamera } from './OrbitCamera.js';
 export type { OrbitCameraOptions } from './OrbitCamera.js';
 export { Viewport } from './Viewport.js';

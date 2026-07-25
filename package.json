@@ -15,11 +15,14 @@
     "typecheck": "turbo run typecheck",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "generate-assets": "pnpm --filter @helaengine/asset-pipeline generate-raw",
+    "ingest-assets": "pnpm --filter @helaengine/asset-pipeline ingest"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "esbuild"
+      "esbuild",
+      "sharp"
     ]
   },
   "devDependencies": {

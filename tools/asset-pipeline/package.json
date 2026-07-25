@@ -1,0 +1,30 @@
+{
+  "name": "@helaengine/asset-pipeline",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Ingest pipeline: raw GLB sources in, compressed GLBs + thumbnails + manifest out.",
+  "scripts": {
+    "generate-raw": "tsx src/generate-raw-assets.ts",
+    "ingest": "tsx src/ingest-assets.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "^4.4.1",
+    "@gltf-transform/extensions": "^4.4.1",
+    "@gltf-transform/functions": "^4.4.1",
+    "@helaengine/schema": "workspace:*",
+    "draco3dgltf": "^1.5.7",
+    "three": "^0.172.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/three": "^0.172.0",
+    "playwright": "^1.62.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

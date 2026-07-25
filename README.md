@@ -7,8 +7,8 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 1 (Phase 0 — Foundations). Engine skeleton and scene schema are in place; there
-is no editor and no backend yet, deliberately.
+**Status:** Sprint 2 (Phase 0 — Foundations). The engine, scene schema and asset pipeline are in
+place; there is no editor and no backend yet, deliberately.
 
 ---
 
@@ -16,35 +16,40 @@ is no editor and no backend yet, deliberately.
 
 ```bash
 pnpm install
-pnpm demo        # → http://localhost:5173
+pnpm ingest-assets   # compress raw-assets/ -> apps/demo/public/assets/
+pnpm demo            # -> http://localhost:5173
 ```
 
-The demo page renders `apps/demo/public/demo-scene.json` — a hut, four trees, two boulders and a
-goblin, as placeholder boxes sized from the asset manifest. Real GLB models replace the boxes in
-Sprint 2; nothing else about the pipeline changes when they do.
+`ingest-assets` has to run before the demo shows models: the compressed GLBs, thumbnails and
+`manifest.json` are generated output and are not committed. The demo renders
+`apps/demo/public/demo-scene.json` — a village of 15 objects drawn from 10 models.
 
 Other commands:
 
 ```bash
-pnpm lint        # includes the engine-isolation boundary rule
+pnpm lint             # includes the engine-isolation boundary rule
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm generate-assets  # regenerate the stand-in raw .glb sources
 ```
 
-Requires Node 20+ and pnpm 10+.
+Requires Node 20+ and pnpm 10+. Thumbnail rendering needs a Chromium that Playwright can find; set
+`CHROMIUM_PATH` to point at one, or `SKIP_THUMBNAILS=1` to skip that stage.
 
 ---
 
 ## Layout
 
 ```
-packages/schema   The scene + asset schema, in Zod. The contract everything else agrees on.
-packages/engine   Vanilla Three.js runtime. No React, no store, no DOM assumptions in the loader.
-apps/demo         Framework-free harness that renders a scene document. Proves the engine stands alone.
-apps/editor       Empty until Sprint 3 (React + react-three-fiber).
-apps/api          Empty until Sprint 16 (NestJS + Postgres).
-docs/             GUIDE, DEVELOPMENT-PLAN, SPRINT, AI-PROTOTYPE-PLAN — the living plan of record.
+packages/schema        The scene + asset schema, in Zod. The contract everything else agrees on.
+packages/engine        Vanilla Three.js runtime. No React, no store, no DOM assumptions in the loader.
+tools/asset-pipeline   Ingest: raw GLBs in, compressed GLBs + thumbnails + manifest out.
+raw-assets/            Hand-authored .glb sources. The artefacts under version control.
+apps/demo              Framework-free harness rendering a scene document. Proves the engine stands alone.
+apps/editor            Empty until Sprint 3 (React + react-three-fiber).
+apps/api               Empty until Sprint 16 (NestJS + Postgres).
+docs/                  GUIDE, DEVELOPMENT-PLAN, SPRINT, ASSET-CONVENTIONS — the plan of record.
 ```
 
 ## The two rules that shape the codebase
@@ -68,6 +73,26 @@ runtime validators, so the editor, engine, exporter and (later) the API all vali
 - Documents carry a `version`, and `migrateScene()` walks a registered migration chain before
   validating. The registry is empty today; it exists so the first real migration is an addition
   rather than a retrofit across saved user projects.
+
+## Assets
+
+Raw `.glb` files in `raw-assets/` are the source of truth; everything under
+`apps/demo/public/assets/` is generated. `pnpm ingest-assets` dedupes and welds geometry, prunes
+unused data, applies Draco compression, renders a thumbnail per asset in headless Chromium, and
+writes `manifest.json`. It is idempotent — re-run it whenever sources or metadata change.
+
+`docs/ASSET-CONVENTIONS.md` is the authoring contract: metre scale, +Y up, pivot at the base, flat
+shading, per-category polygon budgets, and the `category_name_variant.glb` naming rule. The pipeline
+enforces what it can (budgets, pivot drift, absurd scale) and warns about the rest. When an asset
+looks wrong, fix the source file — never special-case it in engine code, because every exported
+project inherits engine code.
+
+The ten starter assets are **stand-ins generated in code** (`pnpm generate-assets`), not modelled
+art. They exist so the pipeline has real GLBs to chew on; Sprint 25 replaces them with commissioned
+assets, and nothing downstream has to change when it does.
+
+Texture compression (KTX2/Basis) is wired but inert: it needs `toktx` from KHRONOS KTX-Software on
+PATH, and the current assets are untextured. Ingest says so rather than skipping silently.
 
 ## Where this is going
 

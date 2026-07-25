@@ -68,6 +68,35 @@
         margin: 10px 0 0;
         color: #97a3b8;
       }
+      #loading {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        gap: 14px;
+        justify-items: center;
+        background: #10131a;
+        color: #97a3b8;
+        font-size: 14px;
+      }
+      #loading .spinner {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        border: 3px solid rgb(255 255 255 / 14%);
+        border-top-color: #4a8f45;
+        animation: spin 0.9s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #loading .spinner {
+          animation-duration: 3s;
+        }
+      }
       #error {
         position: fixed;
         inset: 0;
@@ -94,20 +123,32 @@
 
     <div id="hud">
       <h1>HelaEngine runtime</h1>
-      <div>Rendering <code>demo-scene.json</code> — no React, no store, just the engine.</div>
+      <div>
+        Rendering <code>demo-scene.json</code> with real Draco-compressed GLBs — no React, no store,
+        just the engine.
+      </div>
       <dl>
         <dt>Scene</dt>
         <dd id="stat-scene">—</dd>
         <dt>Objects</dt>
         <dd id="stat-objects">—</dd>
+        <dt>Models</dt>
+        <dd id="stat-models">—</dd>
         <dt>Draw calls</dt>
         <dd id="stat-calls">—</dd>
+        <dt>Triangles</dt>
+        <dd id="stat-tris">—</dd>
         <dt>FPS</dt>
         <dd id="stat-fps">—</dd>
         <dt>Engine</dt>
         <dd id="stat-version">—</dd>
       </dl>
       <p class="hint">Drag to orbit · scroll to zoom</p>
+    </div>
+
+    <div id="loading">
+      <div class="spinner"></div>
+      <div id="loading-label">Loading…</div>
     </div>
 
     <div id="error"><pre id="error-body"></pre></div>

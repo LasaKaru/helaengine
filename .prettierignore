@@ -3,3 +3,6 @@ dist
 .turbo
 coverage
 pnpm-lock.yaml
+
+apps/demo/public/assets
+raw-assets

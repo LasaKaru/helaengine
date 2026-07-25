@@ -39,6 +39,7 @@ export const MISSING_ASSET_ENTRY: AssetManifestEntry = {
   category: 'props',
   tags: [],
   defaultScale: [1, 1, 1],
-  placeholderSize: [1, 1, 1],
+  colliderType: 'none',
+  bounds: [1, 1, 1],
   placeholderColor: '#ff00ff',
 };

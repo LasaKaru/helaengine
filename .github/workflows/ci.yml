@@ -44,3 +44,11 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      # Exercises the real ingest path against the committed sources. Thumbnails are skipped
+      # because they need a browser; the compression, measurement and manifest stages are what
+      # regress, and they run here in full.
+      - name: Asset pipeline smoke test
+        run: pnpm ingest-assets
+        env:
+          SKIP_THUMBNAILS: '1'

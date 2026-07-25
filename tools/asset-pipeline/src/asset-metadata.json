@@ -1,0 +1,72 @@
+{
+  "tree_pine_01": {
+    "name": "Pine Tree",
+    "category": "trees",
+    "tags": ["conifer", "forest", "foliage"],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f"
+  },
+  "tree_pine_02": {
+    "name": "Tall Pine",
+    "category": "trees",
+    "tags": ["conifer", "forest", "foliage", "tall"],
+    "colliderType": "capsule",
+    "placeholderColor": "#27603a"
+  },
+  "tree_oak_01": {
+    "name": "Oak Tree",
+    "category": "trees",
+    "tags": ["broadleaf", "forest", "foliage"],
+    "colliderType": "capsule",
+    "placeholderColor": "#4a8f45"
+  },
+  "rock_boulder_01": {
+    "name": "Boulder",
+    "category": "rocks",
+    "tags": ["stone", "scatter", "large"],
+    "colliderType": "sphere",
+    "placeholderColor": "#8a8880"
+  },
+  "rock_shard_01": {
+    "name": "Rock Shard",
+    "category": "rocks",
+    "tags": ["stone", "scatter", "small"],
+    "colliderType": "sphere",
+    "placeholderColor": "#767470"
+  },
+  "building_hut_01": {
+    "name": "Thatched Hut",
+    "category": "buildings",
+    "tags": ["village", "shelter", "wood"],
+    "colliderType": "box",
+    "placeholderColor": "#b08a5a"
+  },
+  "enemy_goblin_01": {
+    "name": "Goblin",
+    "category": "enemies",
+    "tags": ["humanoid", "melee", "hostile"],
+    "colliderType": "capsule",
+    "placeholderColor": "#a83f3f"
+  },
+  "prop_barrel_01": {
+    "name": "Barrel",
+    "category": "props",
+    "tags": ["container", "village", "wood"],
+    "colliderType": "sphere",
+    "placeholderColor": "#8a6238"
+  },
+  "prop_crate_01": {
+    "name": "Crate",
+    "category": "props",
+    "tags": ["container", "village", "wood"],
+    "colliderType": "box",
+    "placeholderColor": "#9a7845"
+  },
+  "prop_fence_01": {
+    "name": "Fence Section",
+    "category": "props",
+    "tags": ["village", "wood", "barrier"],
+    "colliderType": "box",
+    "placeholderColor": "#8b6f4a"
+  }
+}

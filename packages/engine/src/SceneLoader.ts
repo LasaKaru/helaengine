@@ -7,16 +7,36 @@ import type {
   Terrain,
 } from '@helaengine/schema';
 import { MISSING_ASSET_ENTRY, type AssetResolver } from './assets.js';
+import type { ModelSource } from './models.js';
 
 const DEG2RAD = Math.PI / 180;
 
 export interface SceneLoaderOptions {
   resolver: AssetResolver;
+  /**
+   * Supplies GLB models. Without one, every object renders as a manifest-sized placeholder box —
+   * which is exactly what unit tests and the Sprint 1 demo want.
+   */
+  modelSource?: ModelSource;
   /** What to do when a scene references an unknown `assetId`. Default: 'placeholder'. */
   onMissingAsset?: 'placeholder' | 'throw';
   /** Sink for non-fatal load diagnostics. Default: `console.warn`. */
   warn?: (message: string) => void;
 }
+
+export interface PreloadFailure {
+  assetId: string;
+  glbPath: string;
+  reason: string;
+}
+
+export interface PreloadReport {
+  requested: number;
+  loaded: number;
+  failed: PreloadFailure[];
+}
+
+export type PreloadProgress = (completed: number, total: number) => void;
 
 export class MissingAssetError extends Error {
   constructor(
@@ -30,6 +50,43 @@ export class MissingAssetError extends Error {
 
 interface DisposableResource {
   dispose(): void;
+}
+
+/** Box standing in for an asset with no model — sized from the bounds the pipeline measured. */
+function placeholderGeometry(
+  entry: AssetManifestEntry,
+  cache: Map<string, THREE.BufferGeometry>,
+  disposables: DisposableResource[],
+): THREE.BufferGeometry {
+  const existing = cache.get(entry.id);
+  if (existing) return existing;
+
+  const [width, height, depth] = entry.bounds;
+  const geometry = new THREE.BoxGeometry(width, height, depth);
+  // Assets are authored with their pivot at the base (see the export conventions), so the
+  // placeholder shifts up by half its height and y=0 means "standing on the ground".
+  geometry.translate(0, height / 2, 0);
+  cache.set(entry.id, geometry);
+  disposables.push(geometry);
+  return geometry;
+}
+
+function placeholderMaterial(
+  entry: AssetManifestEntry,
+  cache: Map<string, THREE.Material>,
+  disposables: DisposableResource[],
+): THREE.Material {
+  const existing = cache.get(entry.placeholderColor);
+  if (existing) return existing;
+
+  const material = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(entry.placeholderColor),
+    roughness: 0.85,
+    metalness: 0,
+  });
+  cache.set(entry.placeholderColor, material);
+  disposables.push(material);
+  return material;
 }
 
 /**
@@ -92,11 +149,60 @@ export class SceneLoader {
   readonly #resolver: AssetResolver;
   readonly #onMissingAsset: 'placeholder' | 'throw';
   readonly #warn: (message: string) => void;
+  readonly #modelSource: ModelSource | null;
+  readonly #models = new Map<string, THREE.Object3D>();
 
   constructor(options: SceneLoaderOptions) {
     this.#resolver = options.resolver;
     this.#onMissingAsset = options.onMissingAsset ?? 'placeholder';
     this.#warn = options.warn ?? ((message) => console.warn(`[helaengine] ${message}`));
+    this.#modelSource = options.modelSource ?? null;
+  }
+
+  /**
+   * Fetches the models a scene needs, so that `load()` can stay synchronous.
+   *
+   * Keeping the load path synchronous matters more than it looks: it means `load()` can be called
+   * mid-frame, in a test, or from an editor action without any of them having to be async, and it
+   * keeps the "what does this scene look like" question separate from "have the bytes arrived".
+   * An asset that fails to download degrades to a placeholder rather than failing the whole scene.
+   */
+  async preload(scene: Scene, onProgress?: PreloadProgress): Promise<PreloadReport> {
+    const failed: PreloadFailure[] = [];
+    if (!this.#modelSource) return { requested: 0, loaded: 0, failed };
+
+    const wanted = new Map<string, string>();
+    for (const object of scene.objects) {
+      const entry = this.#resolver.get(object.assetId);
+      if (entry?.glbPath && !this.#models.has(entry.id)) wanted.set(entry.id, entry.glbPath);
+    }
+
+    const total = wanted.size;
+    let completed = 0;
+    onProgress?.(0, total);
+
+    await Promise.all(
+      [...wanted].map(async ([assetId, glbPath]) => {
+        try {
+          this.#models.set(assetId, await this.#modelSource!.load(assetId, glbPath));
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : String(error);
+          failed.push({ assetId, glbPath, reason });
+          this.#warn(`failed to load model for "${assetId}" (${glbPath}): ${reason}`);
+        } finally {
+          completed += 1;
+          onProgress?.(completed, total);
+        }
+      }),
+    );
+
+    return { requested: total, loaded: total - failed.length, failed };
+  }
+
+  /** Releases the models this loader preloaded. Loaded scenes hold clones and are unaffected. */
+  disposeModels(): void {
+    this.#models.clear();
+    this.#modelSource?.dispose();
   }
 
   load(scene: Scene): LoadedScene {
@@ -142,45 +248,32 @@ export class SceneLoader {
     materialCache: Map<string, THREE.Material>,
     disposables: DisposableResource[],
   ): THREE.Object3D {
-    let geometry = geometryCache.get(entry.id);
-    if (!geometry) {
-      const [width, height, depth] = entry.placeholderSize;
-      geometry = new THREE.BoxGeometry(width, height, depth);
-      // Assets are authored with their pivot at the base (see the Blender export convention), so
-      // the placeholder shifts up by half its height and y=0 means "standing on the ground".
-      geometry.translate(0, height / 2, 0);
-      geometryCache.set(entry.id, geometry);
-      disposables.push(geometry);
-    }
+    // A preloaded model wins; otherwise the manifest's measured bounds become a placeholder box.
+    // Clones share the source geometry and materials, so a hundred trees cost one of each.
+    const model = this.#models.get(entry.id);
+    const node = model
+      ? model.clone(true)
+      : new THREE.Mesh(
+          placeholderGeometry(entry, geometryCache, disposables),
+          placeholderMaterial(entry, materialCache, disposables),
+        );
 
-    let material = materialCache.get(entry.placeholderColor);
-    if (!material) {
-      material = new THREE.MeshStandardMaterial({
-        color: new THREE.Color(entry.placeholderColor),
-        roughness: 0.85,
-        metalness: 0,
-      });
-      materialCache.set(entry.placeholderColor, material);
-      disposables.push(material);
-    }
-
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.name = object.metadata.label ?? object.id;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    mesh.userData['objectId'] = object.id;
-    mesh.userData['assetId'] = object.assetId;
+    node.name = object.metadata.label ?? object.id;
+    node.castShadow = true;
+    node.receiveShadow = true;
+    node.userData['objectId'] = object.id;
+    node.userData['assetId'] = object.assetId;
 
     const { position, rotation, scale } = object.transform;
-    mesh.position.set(position[0], position[1], position[2]);
-    mesh.rotation.set(rotation[0] * DEG2RAD, rotation[1] * DEG2RAD, rotation[2] * DEG2RAD);
-    mesh.scale.set(
+    node.position.set(position[0], position[1], position[2]);
+    node.rotation.set(rotation[0] * DEG2RAD, rotation[1] * DEG2RAD, rotation[2] * DEG2RAD);
+    node.scale.set(
       scale[0] * entry.defaultScale[0],
       scale[1] * entry.defaultScale[1],
       scale[2] * entry.defaultScale[2],
     );
 
-    return mesh;
+    return node;
   }
 
   #buildTerrain(terrain: Terrain, disposables: DisposableResource[]): THREE.Object3D {
