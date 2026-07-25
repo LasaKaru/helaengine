@@ -5,6 +5,7 @@ import type {
   Scene,
   SceneObject,
   Terrain,
+  Vec3,
 } from '@helaengine/schema';
 import { MISSING_ASSET_ENTRY, type AssetResolver } from './assets.js';
 import type { ModelSource } from './models.js';
@@ -137,6 +138,37 @@ export class LoadedScene {
 
     const terrain = this.threeScene.getObjectByName('terrain');
     return terrain ? new THREE.Box3().setFromObject(terrain) : box;
+  }
+
+  /**
+   * Cheaply re-applies transforms from a scene document to the nodes already built.
+   *
+   * Rebuilding the whole scene on every document change is fine while edits are discrete, but a
+   * gizmo drag emits a change per frame — and a rebuild mid-drag destroys the very node the gizmo
+   * is attached to. This is the fast path for "same objects, different transforms"; callers must
+   * still rebuild when objects are added, removed or re-assigned to a different asset.
+   *
+   * Returns the number of nodes updated, so a caller can notice when it should have rebuilt.
+   */
+  syncTransforms(scene: Scene): number {
+    let updated = 0;
+    for (const object of scene.objects) {
+      const node = this.objects.get(object.id);
+      if (!node) continue;
+
+      const { position, rotation, scale } = object.transform;
+      const defaultScale = (node.userData['defaultScale'] as Vec3 | undefined) ?? [1, 1, 1];
+
+      node.position.set(position[0], position[1], position[2]);
+      node.rotation.set(rotation[0] * DEG2RAD, rotation[1] * DEG2RAD, rotation[2] * DEG2RAD);
+      node.scale.set(
+        scale[0] * defaultScale[0],
+        scale[1] * defaultScale[1],
+        scale[2] * defaultScale[2],
+      );
+      updated += 1;
+    }
+    return updated;
   }
 
   dispose(): void {
@@ -330,6 +362,9 @@ export class SceneLoader {
     node.receiveShadow = true;
     node.userData['objectId'] = object.id;
     node.userData['assetId'] = object.assetId;
+    // Kept on the node so `syncTransforms` can re-apply the manifest's default scale without
+    // going back to the resolver for every object on every frame of a drag.
+    node.userData['defaultScale'] = entry.defaultScale;
 
     const { position, rotation, scale } = object.transform;
     node.position.set(position[0], position[1], position[2]);

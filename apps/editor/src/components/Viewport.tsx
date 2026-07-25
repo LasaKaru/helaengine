@@ -1,12 +1,26 @@
-import { useCallback, useState } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { useCallback, useEffect, useState } from 'react';
+import { Canvas, useThree } from '@react-three/fiber';
 import { Grid, OrbitControls } from '@react-three/drei';
 import { useEditorStore } from '../store/editorStore';
 import type { LoadedScene, SceneLoader } from '@helaengine/engine';
-import { setLoadedScene } from '../devApi';
+import { setCamera, setLoadedScene } from '../devApi';
 import { EngineBridge } from './EngineBridge';
+import { MarqueeOverlay } from './Marquee';
 import { PlacementController } from './PlacementController';
 import { PlacementToolbar } from './PlacementToolbar';
+import { SelectionController } from './SelectionController';
+import { SelectionHighlight } from './SelectionHighlight';
+import { TransformGizmo } from './TransformGizmo';
+
+/** Publishes the r3f camera to the dev API. Dev/test tooling only; nothing renders. */
+function CameraReporter(): null {
+  const camera = useThree((state) => state.camera);
+  useEffect(() => {
+    setCamera(camera);
+    return () => setCamera(null);
+  }, [camera]);
+  return null;
+}
 
 interface ViewportProps {
   loader: SceneLoader;
@@ -22,6 +36,7 @@ export function Viewport({ loader }: ViewportProps): React.JSX.Element {
   const [stats, setStats] = useState({ objects: 0, missing: 0 });
   const [loadedScene, setLoaded] = useState<LoadedScene | null>(null);
   const dragging = useEditorStore((state) => state.drag !== null);
+  const gizmoActive = useEditorStore((state) => state.gizmoActive);
 
   const handleLoaded = useCallback((loaded: LoadedScene) => {
     setStats({ objects: loaded.objects.size, missing: loaded.missingAssetIds.length });
@@ -38,8 +53,12 @@ export function Viewport({ loader }: ViewportProps): React.JSX.Element {
         gl={{ antialias: true }}
         data-testid="viewport-canvas"
       >
+        <CameraReporter />
         <EngineBridge loader={loader} onLoaded={handleLoaded} />
         <PlacementController loader={loader} loadedScene={loadedScene} />
+        <SelectionController loadedScene={loadedScene} />
+        <SelectionHighlight loadedScene={loadedScene} />
+        <TransformGizmo />
         <Grid
           args={[200, 200]}
           cellSize={1}
@@ -57,9 +76,11 @@ export function Viewport({ loader }: ViewportProps): React.JSX.Element {
           dampingFactor={0.08}
           maxPolarAngle={Math.PI / 2.05}
           // Orbiting mid-drop would fight the ghost for the same pointer.
-          enabled={!dragging}
+          enabled={!dragging && !gizmoActive}
         />
       </Canvas>
+
+      <MarqueeOverlay />
 
       <div className="viewport-stats" role="status">
         <span>{stats.objects} objects</span>

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { DEFAULT_PLACEMENT, type PlacementOptions } from '../placement';
+import type { GizmoMode } from '../transform';
 
 export interface DragState {
   assetId: string;
@@ -9,6 +10,13 @@ export interface DragState {
   clientY: number;
   /** True once the pointer is over the viewport and the ghost has a surface to sit on. */
   overSurface: boolean;
+}
+
+export interface Marquee {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
 }
 
 /**
@@ -23,6 +31,11 @@ export interface EditorState {
   placement: PlacementOptions;
   assetSearch: string;
   assetCategory: string | null;
+  gizmoMode: GizmoMode;
+  /** True while a gizmo drag owns the pointer, so selection and orbit stay out of the way. */
+  gizmoActive: boolean;
+  marquee: Marquee | null;
+  shortcutsOpen: boolean;
 
   beginDrag(assetId: string, clientX: number, clientY: number): void;
   updateDrag(clientX: number, clientY: number, overSurface: boolean): void;
@@ -30,6 +43,10 @@ export interface EditorState {
   setPlacement(placement: Partial<PlacementOptions>): void;
   setAssetSearch(search: string): void;
   setAssetCategory(category: string | null): void;
+  setGizmoMode(mode: GizmoMode): void;
+  setGizmoActive(active: boolean): void;
+  setMarquee(marquee: Marquee | null): void;
+  setShortcutsOpen(open: boolean): void;
 }
 
 export const useEditorStore = create<EditorState>()(
@@ -39,6 +56,10 @@ export const useEditorStore = create<EditorState>()(
       placement: DEFAULT_PLACEMENT,
       assetSearch: '',
       assetCategory: null,
+      gizmoMode: 'translate',
+      gizmoActive: false,
+      marquee: null,
+      shortcutsOpen: false,
 
       beginDrag: (assetId, clientX, clientY) =>
         set({ drag: { assetId, clientX, clientY, overSurface: false } }, false, 'drag/begin'),
@@ -61,6 +82,10 @@ export const useEditorStore = create<EditorState>()(
 
       setAssetSearch: (assetSearch) => set({ assetSearch }, false, 'assets/search'),
       setAssetCategory: (assetCategory) => set({ assetCategory }, false, 'assets/category'),
+      setGizmoMode: (gizmoMode) => set({ gizmoMode }, false, 'gizmo/mode'),
+      setGizmoActive: (gizmoActive) => set({ gizmoActive }, false, 'gizmo/active'),
+      setMarquee: (marquee) => set({ marquee }, false, 'selection/marquee'),
+      setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }, false, 'ui/shortcuts'),
     }),
     { name: 'helaengine/editor' },
   ),

@@ -31,12 +31,10 @@ function makeGhostMaterial(): THREE.MeshStandardMaterial {
  * are pointer-driven, and mixing the two interaction models in one viewport produces subtly
  * different drag thresholds and cancel behaviour for no benefit.
  */
-export function PlacementController({
-  loader,
-  loadedScene,
-}: PlacementControllerProps): React.JSX.Element | null {
+export function PlacementController({ loader, loadedScene }: PlacementControllerProps): null {
   const camera = useThree((state) => state.camera);
   const domElement = useThree((state) => state.gl.domElement);
+  const threeScene = useThree((state) => state.scene);
 
   const drag = useEditorStore((state) => state.drag);
   const assetId = drag?.assetId ?? null;
@@ -45,14 +43,14 @@ export function PlacementController({
   const ghostRef = useRef<THREE.Object3D | null>(null);
   const hitRef = useRef<{ point: THREE.Vector3; normal: THREE.Vector3 } | null>(null);
 
-  // Build the ghost from the same node the real placement will use, so what the user lines up is
-  // what they get. Rebuilt whenever the dragged asset changes, disposed when the drag ends.
-  const preview = useMemo(
-    () => (assetId ? loader.createPreviewNode(assetId) : null),
-    [assetId, loader],
-  );
-
+  // The ghost is built from the same node a real placement will use, so what the user lines up is
+  // what they get. It is added straight to the scene rather than rendered as JSX: it is created
+  // and destroyed by a drag, not by React, and routing it through state would mean a re-render
+  // per drag just to hand r3f an object the effect already has.
   useEffect(() => {
+    if (!assetId) return;
+
+    const preview = loader.createPreviewNode(assetId);
     if (!preview) return;
 
     const material = makeGhostMaterial();
@@ -64,14 +62,17 @@ export function PlacementController({
       mesh.receiveShadow = false;
     });
     preview.node.visible = false;
+
     ghostRef.current = preview.node;
+    threeScene.add(preview.node);
 
     return () => {
       ghostRef.current = null;
+      threeScene.remove(preview.node);
       material.dispose();
       preview.dispose();
     };
-  }, [preview]);
+  }, [assetId, loader, threeScene]);
 
   useEffect(() => {
     if (!drag || !loadedScene) return;
@@ -158,6 +159,5 @@ export function PlacementController({
     };
   }, [drag, loadedScene, camera, domElement, raycaster]);
 
-  if (!preview) return null;
-  return <primitive object={preview.node} />;
+  return null;
 }

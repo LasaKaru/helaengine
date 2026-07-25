@@ -1,3 +1,4 @@
+import { Vector3, type Camera } from 'three';
 import type { LoadedScene } from '@helaengine/engine';
 import { SceneObjectSchema, type Vec3 } from '@helaengine/schema';
 import type { AssetLibrary } from './engine/assetLibrary';
@@ -12,6 +13,12 @@ export interface DevApi {
   viewportObjectIds(): string[];
   /** Per-object view of what the engine actually built, including whether a GLB or a placeholder. */
   viewportObjects(): Array<{ id: string; assetId: string; isModel: boolean }>;
+  /** World X of a node in the viewport — proves a transform edit reached Three.js, not just state. */
+  viewportObjectWorldX(objectId: string): number | null;
+  /** Whether a transform gizmo is currently attached in the scene. */
+  hasGizmo(): boolean;
+  /** Client-space coordinates of an object, for driving precise clicks in tests. */
+  projectObject(objectId: string): { x: number; y: number } | null;
 }
 
 declare global {
@@ -32,6 +39,13 @@ let currentLoadedScene: LoadedScene | null = null;
  */
 export function setLoadedScene(loaded: LoadedScene | null): void {
   currentLoadedScene = loaded;
+}
+
+let currentCamera: Camera | null = null;
+
+/** Records the viewport camera, so the dev API can project world points to screen coordinates. */
+export function setCamera(camera: Camera | null): void {
+  currentCamera = camera;
 }
 
 /**
@@ -72,6 +86,32 @@ export function exposeDevApi(library: AssetLibrary): void {
     },
 
     viewportObjectIds: () => [...(currentLoadedScene?.objects.keys() ?? [])],
+
+    viewportObjectWorldX: (objectId) =>
+      currentLoadedScene?.objects.get(objectId)?.getWorldPosition(new Vector3()).x ?? null,
+
+    hasGizmo: () =>
+      currentLoadedScene?.threeScene.getObjectByName('gizmo-proxy') !== undefined ||
+      currentLoadedScene?.threeScene.children.some((child) =>
+        child.type.startsWith('TransformControls'),
+      ) === true,
+
+    projectObject: (objectId) => {
+      const node = currentLoadedScene?.objects.get(objectId);
+      const canvas = document.querySelector('canvas');
+      if (!node || !canvas || !currentCamera) return null;
+
+      const rect = canvas.getBoundingClientRect();
+      const point = node.getWorldPosition(new Vector3());
+      // Aim a little above the origin: the pivot sits at an object's base, which projects onto the
+      // ground rather than onto the object itself.
+      point.y += 0.5;
+      point.project(currentCamera);
+      return {
+        x: rect.left + ((point.x + 1) / 2) * rect.width,
+        y: rect.top + ((1 - point.y) / 2) * rect.height,
+      };
+    },
 
     viewportObjects: () =>
       [...(currentLoadedScene?.objects.entries() ?? [])].map(([id, node]) => ({

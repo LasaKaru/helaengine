@@ -1,11 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useThree } from '@react-three/fiber';
 import type { LoadedScene, SceneLoader } from '@helaengine/engine';
+import type { Scene } from '@helaengine/schema';
 import { useSceneStore } from '../store/sceneStore';
 
 interface EngineBridgeProps {
   loader: SceneLoader;
   onLoaded?: (loaded: LoadedScene) => void;
+}
+
+/**
+ * Identifies the *shape* of a scene: which objects exist and what asset each uses.
+ *
+ * Transforms are deliberately excluded. A change to this key means nodes must be created or
+ * destroyed; anything else can be applied to the nodes already there.
+ */
+function structureKey(scene: Scene): string {
+  return scene.objects.map((object) => `${object.id}:${object.assetId}`).join('|');
 }
 
 /**
@@ -24,6 +35,7 @@ export function EngineBridge({ loader, onLoaded }: EngineBridgeProps): null {
   const threeScene = useThree((state) => state.scene);
   const scene = useSceneStore((state) => state.scene);
   const [modelEpoch, setModelEpoch] = useState(0);
+  const loadedRef = useRef<LoadedScene | null>(null);
 
   // Models are fetched separately from scene construction so that `loadInto` stays synchronous.
   // Anything not yet downloaded renders as a placeholder on the first pass; when new models do
@@ -40,14 +52,27 @@ export function EngineBridge({ loader, onLoaded }: EngineBridgeProps): null {
     };
   }, [loader, scene]);
 
+  const structure = useMemo(() => structureKey(scene), [scene]);
+
+  // Full rebuild, but only when objects are added, removed or re-assigned.
   useEffect(() => {
-    // Sprint 3 rebuilds the whole scene on any document change. That is fine at this size and
-    // keeps the bridge honest; incremental diffing arrives with the transform gizmos in Sprint 5,
-    // when dragging makes rebuild-per-frame actually expensive.
     const loaded = loader.loadInto(threeScene, scene);
+    loadedRef.current = loaded;
     onLoaded?.(loaded);
-    return () => loaded.dispose();
-  }, [loader, threeScene, scene, onLoaded, modelEpoch]);
+    return () => {
+      loadedRef.current = null;
+      loaded.dispose();
+    };
+    // `scene` is intentionally absent: rebuilding on every transform edit would destroy the node
+    // a gizmo is attached to, mid-drag, sixty times a second. Transform-only changes take the
+    // incremental path below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loader, threeScene, structure, onLoaded, modelEpoch]);
+
+  // Transform-only changes: update the existing nodes in place.
+  useEffect(() => {
+    loadedRef.current?.syncTransforms(scene);
+  }, [scene]);
 
   return null;
 }

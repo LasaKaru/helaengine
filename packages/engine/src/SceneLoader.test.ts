@@ -395,3 +395,62 @@ describe('SceneLoader.loadInto', () => {
     expect(host.children).toHaveLength(0);
   });
 });
+
+describe('LoadedScene.syncTransforms', () => {
+  function sceneWith(position: [number, number, number], rotationY = 0, scale = 1) {
+    return parseScene({
+      sceneId: 'scene_test',
+      version: 1,
+      objects: [
+        {
+          id: 'obj_0001',
+          assetId: 'rock_small_01',
+          transform: { position, rotation: [0, rotationY, 0], scale: [scale, scale, scale] },
+        },
+      ],
+    });
+  }
+
+  it('moves existing nodes without rebuilding them', () => {
+    const loader = makeLoader();
+    const loaded = loader.load(sceneWith([0, 0, 0]));
+    const node = loaded.objects.get('obj_0001')!;
+
+    const updated = loaded.syncTransforms(sceneWith([5, 1, -3], 90));
+
+    expect(updated).toBe(1);
+    // Same node object: this is the whole point — a gizmo attached to it stays attached.
+    expect(loaded.objects.get('obj_0001')).toBe(node);
+    expect(node.position.toArray()).toEqual([5, 1, -3]);
+    expect(node.rotation.y).toBeCloseTo(Math.PI / 2, 10);
+
+    loaded.dispose();
+  });
+
+  it('keeps applying the asset default scale', () => {
+    // rock_small_01 has a default scale of 2, so an instance scale of 3 must land at 6.
+    const loaded = makeLoader().load(sceneWith([0, 0, 0]));
+    loaded.syncTransforms(sceneWith([0, 0, 0], 0, 3));
+
+    expect(loaded.objects.get('obj_0001')!.scale.toArray()).toEqual([6, 6, 6]);
+    loaded.dispose();
+  });
+
+  it('skips objects it has no node for rather than throwing', () => {
+    const loaded = makeLoader().load(sceneWith([0, 0, 0]));
+
+    const updated = loaded.syncTransforms(
+      parseScene({
+        sceneId: 'scene_test',
+        version: 1,
+        objects: [
+          { id: 'obj_0001', assetId: 'rock_small_01' },
+          { id: 'obj_0002', assetId: 'rock_small_01' },
+        ],
+      }),
+    );
+
+    expect(updated).toBe(1);
+    loaded.dispose();
+  });
+});

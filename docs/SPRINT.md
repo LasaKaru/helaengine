@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–4 complete. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–5 complete. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -127,13 +127,13 @@
 
 **Tasks:**
 
-- [ ] Wire up drei's `<TransformControls>` to the currently-selected object; support translate/rotate/scale modes
-- [ ] Decide and implement keybind scheme (document choice: Blender-style G/R/S or Unity-style W/E/R) — add a keybind reference panel/modal in the UI
-- [ ] Build click-to-select (raycast against object meshes, not just terrain) with visual selection outline/highlight (e.g., outline post-processing pass or simple bounding-box helper)
-- [ ] Build Inspector panel: numeric X/Y/Z fields for position/rotation/scale bound two-way to `sceneStore`, with drag-to-scrub number inputs (common editor UX pattern)
-- [ ] Implement multi-select: shift-click to add to selection, marquee/box-select (drag on empty canvas draws a selection rectangle, raycasts/projects all objects inside it)
-- [ ] Group transform: when multiple objects selected, gizmo operates on the group's pivot, applying deltas to all selected objects' transforms
-- [ ] Implement Duplicate (Ctrl+D — offsets position slightly) and Delete (Del key, with confirmation for multi-select of 5+ objects to prevent accidental mass-delete)
+- [x] Wire up drei's `<TransformControls>` to the currently-selected object; support translate/rotate/scale modes
+- [x] Decide and implement keybind scheme — **chose Unity/PlayCanvas-style W/E/R**, documented in `apps/editor/src/useShortcuts.ts` and surfaced in an in-app reference modal (`?`). Rationale: the audience is browser-game makers, most of whom meet Unity or PlayCanvas before Blender.
+- [x] Build click-to-select (raycast against object meshes, not just terrain) with visual selection outline/highlight (e.g., outline post-processing pass or simple bounding-box helper)
+- [x] Build Inspector panel: numeric X/Y/Z fields for position/rotation/scale bound two-way to `sceneStore`, with drag-to-scrub number inputs (common editor UX pattern)
+- [x] Implement multi-select: shift-click to add to selection, marquee/box-select (drag on empty canvas draws a selection rectangle, raycasts/projects all objects inside it)
+- [x] Group transform: when multiple objects selected, gizmo operates on the group's pivot, applying deltas to all selected objects' transforms
+- [x] Implement Duplicate (Ctrl+D — offsets position slightly) and Delete (Del key, with confirmation for multi-select of 5+ objects to prevent accidental mass-delete)
 
 **Tech notes:**
 

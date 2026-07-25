@@ -193,9 +193,9 @@ Even if starting solo, structure work as if these lanes exist — makes future h
 
 **Sprint 5: Transform gizmos + inspector**
 
-- [ ] `TransformControls` (drei) wired to selected object; move/rotate/scale modes with keybinds (G/R/S like Blender, or W/E/R like Unity — pick one, document it)
-- [ ] Inspector side panel: numeric transform fields, snap-to-grid toggle, duplicate/delete
-- [ ] Multi-select (marquee + shift-click) and group transform
+- [x] `TransformControls` (drei) wired to selected object; move/rotate/scale modes with keybinds (G/R/S like Blender, or W/E/R like Unity — pick one, document it)
+- [x] Inspector side panel: numeric transform fields, snap-to-grid toggle, duplicate/delete
+- [x] Multi-select (marquee + shift-click) and group transform
 - **DoD:** Full parity with "basic editor" expectation — place, select, transform, delete, duplicate all work with mouse + keyboard.
 
 **Sprint 6: Undo/redo + scene graph tree**

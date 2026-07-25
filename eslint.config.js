@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
+import reactHooks from 'eslint-plugin-react-hooks';
 
 /**
  * The rule that matters most here is the `/packages/engine` boundary at the bottom of this file.
@@ -30,6 +31,15 @@ export default tseslint.config(
       ],
       eqeqeq: ['error', 'smart'],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
+    },
+  },
+  {
+    // The rules-of-hooks and dependency checks earn their keep in the editor: a stale dependency
+    // array is what made the viewport render placeholder boxes forever in Sprint 3.
+    files: ['apps/editor/**/*.{ts,tsx}'],
+    plugins: { 'react-hooks': reactHooks },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
     },
   },
   {

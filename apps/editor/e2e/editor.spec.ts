@@ -163,3 +163,136 @@ test.describe('drag to place', () => {
     await expect(page.locator('[data-asset-id="enemy_goblin_01"]')).toBeVisible();
   });
 });
+
+/**
+ * Selection and transforms. These need a real raycast against real geometry and a real gizmo, so
+ * they live here rather than in the component tests.
+ */
+test.describe('selection and transforms', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.waitForFunction(() => window.helaengine !== undefined);
+    await page.evaluate(() => {
+      window.helaengine!.addObject('building_hut_01', [0, 0, 0]);
+      // Off the camera-to-origin line, so it never occludes the hut when clicking.
+      window.helaengine!.addObject('tree_pine_01', [-9, 0, 7]);
+    });
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.viewportObjectIds().length))
+      .toBe(2);
+  });
+
+  test('clicking an object selects it and fills the inspector', async ({ page }) => {
+    // Projected rather than guessed: the object's own screen position is the only reliable target.
+    const point = (await page.evaluate(() => window.helaengine!.projectObject('obj_0001')))!;
+    await page.mouse.click(point.x, point.y);
+
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.store.getState().selectedIds))
+      .toEqual(['obj_0001']);
+    await expect(page.getByRole('region', { name: 'Inspector' })).toContainText('building_hut_01');
+    await expect(page.getByLabel('Position X')).toBeVisible();
+  });
+
+  test('clicking empty space clears the selection', async ({ page }) => {
+    await page.evaluate(() => window.helaengine!.store.getState().select(['obj_0001']));
+    const canvasBox = (await page.locator('canvas').boundingBox())!;
+
+    await page.mouse.click(
+      canvasBox.x + canvasBox.width * 0.12,
+      canvasBox.y + canvasBox.height * 0.9,
+    );
+
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.store.getState().selectedIds))
+      .toEqual([]);
+  });
+
+  test('shift-clicking in the scene list extends the selection', async ({ page }) => {
+    const list = page.getByRole('region', { name: 'Scene' });
+    await list.getByRole('button').first().click();
+    await list
+      .getByRole('button')
+      .nth(1)
+      .click({ modifiers: ['Shift'] });
+
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.store.getState().selectedIds))
+      .toEqual(['obj_0001', 'obj_0002']);
+    await expect(page.getByRole('region', { name: 'Inspector' })).toContainText(
+      '2 objects selected',
+    );
+  });
+
+  test('editing a numeric field moves the object in the viewport', async ({ page }) => {
+    await page.getByRole('region', { name: 'Scene' }).getByRole('button').first().click();
+
+    const field = page.getByLabel('Position X');
+    await field.fill('12.5');
+    await field.press('Enter');
+
+    await expect
+      .poll(async () =>
+        page.evaluate(
+          () => window.helaengine!.store.getState().scene.objects[0]!.transform.position[0],
+        ),
+      )
+      .toBe(12.5);
+
+    // The node itself moved, not just the document — this is the incremental sync path.
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.viewportObjectWorldX('obj_0001')))
+      .toBeCloseTo(12.5, 3);
+  });
+
+  test('W / E / R switch the transform mode', async ({ page }) => {
+    await page.getByRole('region', { name: 'Scene' }).getByRole('button').first().click();
+
+    await page.keyboard.press('e');
+    await expect(page.getByRole('button', { name: 'rotate' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    await page.keyboard.press('r');
+    await expect(page.getByRole('button', { name: 'scale' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  test('Ctrl+D duplicates and Delete removes', async ({ page }) => {
+    await page.getByRole('region', { name: 'Scene' }).getByRole('button').first().click();
+
+    await page.keyboard.press('Control+d');
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.viewportObjectIds().length))
+      .toBe(3);
+
+    await page.keyboard.press('Delete');
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.viewportObjectIds().length))
+      .toBe(2);
+  });
+
+  test('the shortcuts modal opens with ? and closes with Escape', async ({ page }) => {
+    await page.keyboard.press('?');
+    await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeHidden();
+  });
+
+  test('the gizmo appears for a selection and survives a transform edit', async ({ page }) => {
+    await page.getByRole('region', { name: 'Scene' }).getByRole('button').first().click();
+
+    // A gizmo attached to a node that gets rebuilt on every edit would vanish here. It must not.
+    await expect.poll(async () => page.evaluate(() => window.helaengine!.hasGizmo())).toBe(true);
+
+    const field = page.getByLabel('Position Z');
+    await field.fill('4');
+    await field.press('Enter');
+
+    await expect.poll(async () => page.evaluate(() => window.helaengine!.hasGizmo())).toBe(true);
+  });
+});

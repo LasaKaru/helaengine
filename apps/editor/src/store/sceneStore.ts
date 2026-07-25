@@ -29,11 +29,15 @@ export interface SceneState {
   addObject(object: SceneObject): void;
   removeObject(objectId: string): void;
   setTransform(objectId: string, transform: Partial<Transform>): void;
+  setTransforms(updates: Array<{ id: string; transform: Transform }>): void;
   setPosition(objectId: string, position: Vec3): void;
+  removeObjects(objectIds: string[]): void;
+  duplicateObjects(objectIds: string[], offset?: Vec3): string[];
   setTerrain(terrain: Partial<Terrain>): void;
   setEnvironment(environment: Partial<Environment>): void;
   setName(name: string): void;
   select(objectIds: string[]): void;
+  toggleSelected(objectId: string): void;
   clearSelection(): void;
 }
 
@@ -91,6 +95,77 @@ export const useSceneStore = create<SceneState>()(
           'object/setTransform',
         ),
 
+      setTransforms: (updates) =>
+        set(
+          (state) => {
+            // One store write for the whole selection: a group drag would otherwise emit a
+            // separate update per object per frame.
+            const byId = new Map(updates.map((update) => [update.id, update.transform]));
+            for (const object of state.scene.objects) {
+              const transform = byId.get(object.id);
+              if (transform) object.transform = transform;
+            }
+          },
+          false,
+          'object/setTransforms',
+        ),
+
+      removeObjects: (objectIds) =>
+        set(
+          (state) => {
+            const doomed = new Set(objectIds);
+            state.scene.objects = state.scene.objects.filter((item) => !doomed.has(item.id));
+            state.selectedIds = state.selectedIds.filter((id) => !doomed.has(id));
+          },
+          false,
+          'object/removeMany',
+        ),
+
+      duplicateObjects: (objectIds, offset = [1, 0, 1]) => {
+        const created: string[] = [];
+        set(
+          (state) => {
+            const wanted = new Set(objectIds);
+            const sources = state.scene.objects.filter((item) => wanted.has(item.id));
+
+            for (const source of sources) {
+              // Ids are allocated against the growing list, so duplicating a multi-selection
+              // cannot hand two copies the same id.
+              const id = nextObjectId(state.scene);
+              const { position, rotation, scale } = source.transform;
+
+              // Built field by field rather than with `structuredClone`: `source` is an Immer
+              // draft, and structured cloning a proxy throws DataCloneError.
+              state.scene.objects.push({
+                id,
+                assetId: source.assetId,
+                transform: {
+                  position: [
+                    position[0] + offset[0],
+                    position[1] + offset[1],
+                    position[2] + offset[2],
+                  ],
+                  rotation: [...rotation],
+                  scale: [...scale],
+                },
+                metadata: {
+                  ...source.metadata,
+                  ...(source.metadata.label ? { label: `${source.metadata.label} copy` } : {}),
+                },
+              });
+              created.push(id);
+            }
+
+            // Duplicating moves the selection onto the copies, so the next drag moves what was
+            // just made rather than the originals.
+            state.selectedIds = created;
+          },
+          false,
+          'object/duplicate',
+        );
+        return created;
+      },
+
       setPosition: (objectId, position) =>
         set(
           (state) => {
@@ -129,6 +204,17 @@ export const useSceneStore = create<SceneState>()(
         ),
 
       select: (objectIds) => set({ selectedIds: objectIds }, false, 'selection/set'),
+
+      toggleSelected: (objectId) =>
+        set(
+          (state) => {
+            state.selectedIds = state.selectedIds.includes(objectId)
+              ? state.selectedIds.filter((id) => id !== objectId)
+              : [...state.selectedIds, objectId];
+          },
+          false,
+          'selection/toggle',
+        ),
       clearSelection: () => set({ selectedIds: [] }, false, 'selection/clear'),
     })),
     { name: 'helaengine/scene' },

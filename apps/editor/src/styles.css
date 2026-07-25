@@ -462,3 +462,231 @@ body,
   color: var(--text);
   border-color: var(--accent);
 }
+
+/* ---- Selection ---- */
+
+.marquee {
+  position: fixed;
+  z-index: 5;
+  border: 1px solid var(--accent);
+  background: rgb(143 214 148 / 12%);
+  pointer-events: none;
+}
+
+.object-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  background: var(--panel-raised);
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.object-row:hover {
+  border-color: var(--border);
+}
+
+.object-row.selected {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.object-list li {
+  display: block;
+  padding: 0;
+  background: none;
+}
+
+/* ---- Inspector ---- */
+
+.inspector-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  margin: 0 0 12px;
+  font-size: 12px;
+}
+
+.inspector-meta dt {
+  color: var(--text-dim);
+}
+
+.inspector-meta dd {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gizmo-modes {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.gizmo-modes button {
+  flex: 1;
+  padding: 5px 6px;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  text-transform: capitalize;
+  background: var(--panel-raised);
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.gizmo-modes button.active {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.vector-row {
+  margin-bottom: 10px;
+}
+
+.vector-title {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.vector-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.number-field {
+  display: flex;
+  align-items: center;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.number-field.disabled {
+  opacity: 0.5;
+}
+
+.number-scrub {
+  padding: 0 5px;
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: ew-resize;
+  user-select: none;
+  touch-action: none;
+}
+
+.number-field input {
+  width: 100%;
+  min-width: 0;
+  padding: 5px 4px;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  background: none;
+  border: none;
+}
+
+.number-field input:focus-visible {
+  outline: 1px solid var(--accent);
+}
+
+.number-suffix {
+  padding-right: 5px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.inspector-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.inspector-actions button {
+  flex: 1;
+  padding: 6px;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.inspector-actions button.danger:hover {
+  color: #ffb4b4;
+  border-color: #7d3b3b;
+}
+
+/* ---- Modal ---- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-content: center;
+  background: rgb(8 10 14 / 70%);
+}
+
+.modal {
+  min-width: 340px;
+  max-width: 480px;
+  padding: 20px 22px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.modal h2 {
+  margin: 0 0 14px;
+  font-size: 15px;
+}
+
+.shortcut-list {
+  margin: 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.shortcut-list > div {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.shortcut-list dt {
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 12px;
+}
+
+.shortcut-list dd {
+  margin: 0;
+  color: var(--text-dim);
+}
+
+.modal button {
+  padding: 6px 14px;
+  color: inherit;
+  font: inherit;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}

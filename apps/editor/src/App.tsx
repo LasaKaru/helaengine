@@ -4,6 +4,8 @@ import { exposeDevApi } from './devApi';
 import { AssetLibraryPanel } from './components/AssetLibraryPanel';
 import { DragChip } from './components/DragChip';
 import { InspectorPanel } from './components/Panels';
+import { ShortcutsModal } from './components/ShortcutsModal';
+import { useShortcuts } from './useShortcuts';
 import { TopBar } from './components/TopBar';
 import { Viewport } from './components/Viewport';
 
@@ -14,6 +16,7 @@ type LoadState =
 
 export function App(): React.JSX.Element {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
+  useShortcuts();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -61,6 +64,7 @@ export function App(): React.JSX.Element {
         <InspectorPanel />
       </div>
       <DragChip />
+      <ShortcutsModal />
     </div>
   );
 }
