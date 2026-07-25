@@ -1,4 +1,3 @@
-import type { AssetManifest } from '@helaengine/schema';
 import { useSceneStore } from '../store/sceneStore';
 
 interface PanelProps {
@@ -13,36 +12,6 @@ function Panel({ title, hint, children }: PanelProps): React.JSX.Element {
       <h2>{title}</h2>
       {children ?? <p className="panel-hint">{hint}</p>}
     </section>
-  );
-}
-
-/**
- * Left rail. The asset library proper — search, category tabs, virtualised grid, drag to place —
- * is Sprint 4. For now it reports what the manifest actually contains, which is enough to prove
- * the editor is reading the pipeline's output rather than a hardcoded list.
- */
-export function AssetPanel({ manifest }: { manifest: AssetManifest }): React.JSX.Element {
-  const categories = new Map<string, number>();
-  for (const asset of manifest.assets) {
-    categories.set(asset.category, (categories.get(asset.category) ?? 0) + 1);
-  }
-
-  return (
-    <aside className="rail rail-left">
-      <Panel title="Assets" hint="">
-        <p className="panel-hint">
-          {manifest.assets.length} assets loaded. Browsing and drag-to-place arrive in Sprint 4.
-        </p>
-        <ul className="category-list">
-          {[...categories].map(([category, count]) => (
-            <li key={category}>
-              <span>{category}</span>
-              <span className="count">{count}</span>
-            </li>
-          ))}
-        </ul>
-      </Panel>
-    </aside>
   );
 }
 

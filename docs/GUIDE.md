@@ -186,9 +186,9 @@ Even if starting solo, structure work as if these lanes exist — makes future h
 
 **Sprint 4: Asset library panel + drag-drop placement**
 
-- [ ] Asset panel UI: category tabs, search, thumbnail grid (virtualized list — react-window, for hundreds of assets)
-- [ ] Drag from panel → raycast against terrain on drop → snap to surface → push new object into `sceneStore`
-- [ ] Ghost/preview mesh while dragging
+- [x] Asset panel UI: category tabs, search, thumbnail grid (virtualized list — react-window, for hundreds of assets)
+- [x] Drag from panel → raycast against terrain on drop → snap to surface → push new object into `sceneStore`
+- [x] Ghost/preview mesh while dragging
 - **DoD:** User can drag 5 different asset types onto terrain and see them appear correctly oriented to surface normal.
 
 **Sprint 5: Transform gizmos + inspector**

@@ -4,7 +4,10 @@ export type {
   PreloadReport,
   PreloadFailure,
   PreloadProgress,
+  PreviewNode,
 } from './SceneLoader.js';
+export { pickTerrain, pickObject } from './picking.js';
+export type { SurfaceHit } from './picking.js';
 export { ManifestAssetResolver, MISSING_ASSET_ENTRY } from './assets.js';
 export type { AssetResolver } from './assets.js';
 export { GltfModelSource, disposeObjectTree } from './models.js';

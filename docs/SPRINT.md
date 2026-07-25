@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–3 complete. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–4 complete. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -104,12 +104,12 @@
 
 **Tasks:**
 
-- [ ] Build Asset Library side panel: category tabs (Trees, Rocks, Buildings, Enemies, Props), search input, virtualized grid (react-window or react-virtuoso) showing thumbnail + name per manifest entry
-- [ ] Implement native HTML5 drag events (`dragstart` on asset card, `dragover`/`drop` on canvas) OR pointer-based drag (recommend pointer-based for consistency with the transform gizmos coming in Sprint 5 — avoids mixing two different interaction paradigms)
-- [ ] On drag-over-canvas: raycast from pointer through camera against the terrain mesh; show a semi-transparent "ghost" preview mesh at the hit point, oriented to surface normal
-- [ ] On drop: generate a new object ID (uuid), push a new entry into `sceneStore.objects[]` with position = hit point, rotation aligned to normal (or locked to Y-up if you prefer non-tilted placement — decide and document)
-- [ ] Add a "snap to grid" toggle (rounds position to nearest 0.5m/1m) and a "random rotation on place" toggle (useful for scattering foliage naturally)
-- [ ] Handle edge case: drop with no terrain hit (e.g., dropped in open sky) — either reject the drop or place at a default ground Y
+- [x] Build Asset Library side panel: category tabs (Trees, Rocks, Buildings, Enemies, Props), search input, virtualized grid (react-window or react-virtuoso) showing thumbnail + name per manifest entry
+- [x] Implement native HTML5 drag events (`dragstart` on asset card, `dragover`/`drop` on canvas) OR pointer-based drag (recommend pointer-based for consistency with the transform gizmos coming in Sprint 5 — avoids mixing two different interaction paradigms)
+- [x] On drag-over-canvas: raycast from pointer through camera against the terrain mesh; show a semi-transparent "ghost" preview mesh at the hit point, oriented to surface normal
+- [x] On drop: generate a new object ID (uuid), push a new entry into `sceneStore.objects[]` with position = hit point, rotation aligned to normal (or locked to Y-up if you prefer non-tilted placement — decide and document)
+- [x] Add a "snap to grid" toggle (rounds position to nearest 0.5m/1m) and a "random rotation on place" toggle (useful for scattering foliage naturally)
+- [x] Handle edge case: drop with no terrain hit (e.g., dropped in open sky) — either reject the drop or place at a default ground Y
 
 **Tech notes:**
 

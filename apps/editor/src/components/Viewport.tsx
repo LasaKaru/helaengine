@@ -1,9 +1,12 @@
 import { useCallback, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Grid, OrbitControls } from '@react-three/drei';
+import { useEditorStore } from '../store/editorStore';
 import type { LoadedScene, SceneLoader } from '@helaengine/engine';
 import { setLoadedScene } from '../devApi';
 import { EngineBridge } from './EngineBridge';
+import { PlacementController } from './PlacementController';
+import { PlacementToolbar } from './PlacementToolbar';
 
 interface ViewportProps {
   loader: SceneLoader;
@@ -17,14 +20,18 @@ interface ViewportProps {
  */
 export function Viewport({ loader }: ViewportProps): React.JSX.Element {
   const [stats, setStats] = useState({ objects: 0, missing: 0 });
+  const [loadedScene, setLoaded] = useState<LoadedScene | null>(null);
+  const dragging = useEditorStore((state) => state.drag !== null);
 
   const handleLoaded = useCallback((loaded: LoadedScene) => {
     setStats({ objects: loaded.objects.size, missing: loaded.missingAssetIds.length });
     setLoadedScene(loaded);
+    setLoaded(loaded);
   }, []);
 
   return (
     <div className="viewport">
+      <PlacementToolbar />
       <Canvas
         shadows
         camera={{ position: [18, 14, 18], fov: 55, near: 0.1, far: 2000 }}
@@ -32,6 +39,7 @@ export function Viewport({ loader }: ViewportProps): React.JSX.Element {
         data-testid="viewport-canvas"
       >
         <EngineBridge loader={loader} onLoaded={handleLoaded} />
+        <PlacementController loader={loader} loadedScene={loadedScene} />
         <Grid
           args={[200, 200]}
           cellSize={1}
@@ -48,6 +56,8 @@ export function Viewport({ loader }: ViewportProps): React.JSX.Element {
           enableDamping
           dampingFactor={0.08}
           maxPolarAngle={Math.PI / 2.05}
+          // Orbiting mid-drop would fight the ghost for the same pointer.
+          enabled={!dragging}
         />
       </Canvas>
 

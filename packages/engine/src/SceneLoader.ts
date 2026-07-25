@@ -38,6 +38,12 @@ export interface PreloadReport {
 
 export type PreloadProgress = (completed: number, total: number) => void;
 
+export interface PreviewNode {
+  node: THREE.Object3D;
+  /** Releases anything this preview allocated. Safe to call more than once. */
+  dispose(): void;
+}
+
 export class MissingAssetError extends Error {
   constructor(
     readonly assetId: string,
@@ -208,6 +214,39 @@ export class SceneLoader {
     );
 
     return { requested: total, loaded: total - failed.length, failed };
+  }
+
+  /**
+   * Builds a standalone node for an asset, outside any scene — the editor's drag ghost.
+   *
+   * It deliberately goes through the same path a real placement does, so the shape under the
+   * cursor is the shape that lands. The caller owns the result and must dispose whatever it
+   * creates; a preview built from a placeholder allocates its own geometry, while one built from
+   * a preloaded model shares the cached original's.
+   */
+  createPreviewNode(assetId: string): PreviewNode | null {
+    const entry = this.#resolver.get(assetId);
+    if (!entry) return null;
+
+    const model = this.#models.get(entry.id);
+    if (model) {
+      const node = model.clone(true);
+      node.scale.set(...entry.defaultScale);
+      return { node, dispose: () => {} };
+    }
+
+    const disposables: DisposableResource[] = [];
+    const node = new THREE.Mesh(
+      placeholderGeometry(entry, new Map(), disposables),
+      placeholderMaterial(entry, new Map(), disposables),
+    );
+    node.scale.set(...entry.defaultScale);
+    return {
+      node,
+      dispose: () => {
+        for (const disposable of disposables) disposable.dispose();
+      },
+    };
   }
 
   /** Releases the models this loader preloaded. Loaded scenes hold clones and are unaffected. */

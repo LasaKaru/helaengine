@@ -7,8 +7,8 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 3 (Phase 1 — Editor MVP). The engine, scene schema, asset pipeline and editor
-shell are in place. There is no backend yet, deliberately.
+**Status:** Sprint 4 (Phase 1 — Editor MVP). Assets can be dragged from the library onto the
+terrain. Selection and transform gizmos are next; there is no backend yet, deliberately.
 
 ---
 
@@ -25,9 +25,13 @@ pnpm demo            # -> http://localhost:5173   framework-free runtime harness
 output and are not committed. Both apps serve the same `generated/assets/` directory rather than
 keeping private copies.
 
-The editor is a shell so far — a viewport, a live scene document, and panels that report real state.
-Placing objects by hand arrives in Sprint 4; until then `window.helaengine` in the browser console
-drives it:
+In the editor, drag an asset from the left rail onto the terrain to place it. A translucent ghost
+follows the cursor and snaps to the surface under it; releasing off the terrain cancels rather than
+guessing a position. Snap-to-grid, random rotation and align-to-surface are in the toolbar over the
+viewport.
+
+Selecting and moving what you have placed arrives in Sprint 5. `window.helaengine` in the browser
+console drives the editor directly in the meantime:
 
 ```js
 helaengine.addObject('building_hut_01', [0, 0, 0], 25);

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { loadAssetLibrary, type AssetLibrary } from './engine/assetLibrary';
 import { exposeDevApi } from './devApi';
-import { AssetPanel, InspectorPanel } from './components/Panels';
+import { AssetLibraryPanel } from './components/AssetLibraryPanel';
+import { DragChip } from './components/DragChip';
+import { InspectorPanel } from './components/Panels';
 import { TopBar } from './components/TopBar';
 import { Viewport } from './components/Viewport';
 
@@ -54,10 +56,11 @@ export function App(): React.JSX.Element {
     <div className="editor">
       <TopBar />
       <div className="workspace">
-        <AssetPanel manifest={state.library.manifest} />
+        <AssetLibraryPanel manifest={state.library.manifest} />
         <Viewport loader={state.library.loader} />
         <InspectorPanel />
       </div>
+      <DragChip />
     </div>
   );
 }
