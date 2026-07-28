@@ -49,8 +49,6 @@ export function InspectorPanel(): React.JSX.Element {
   const selectedIds = useSceneStore((state) => state.selectedIds);
   const objects = useSceneStore((state) => state.scene.objects);
   const setTransform = useSceneStore((state) => state.setTransform);
-  const select = useSceneStore((state) => state.select);
-  const toggleSelected = useSceneStore((state) => state.toggleSelected);
   const duplicateObjects = useSceneStore((state) => state.duplicateObjects);
   const removeObjects = useSceneStore((state) => state.removeObjects);
   const gizmoMode = useEditorStore((state) => state.gizmoMode);
@@ -134,36 +132,6 @@ export function InspectorPanel(): React.JSX.Element {
               Delete
             </button>
           </div>
-        )}
-      </section>
-
-      <section className="panel" aria-label="Scene">
-        <h2>Scene</h2>
-        {objects.length === 0 ? (
-          <p className="panel-hint">This scene is empty.</p>
-        ) : (
-          <ul className="object-list">
-            {objects.map((object) => {
-              const isSelected = selectedIds.includes(object.id);
-              return (
-                <li key={object.id}>
-                  <button
-                    type="button"
-                    className={`object-row${isSelected ? ' selected' : ''}`}
-                    aria-pressed={isSelected}
-                    onClick={(event) => {
-                      // Shift-click in the list extends the selection, matching the viewport.
-                      if (event.shiftKey) toggleSelected(object.id);
-                      else select([object.id]);
-                    }}
-                  >
-                    <span className="object-label">{object.metadata.label ?? object.id}</span>
-                    <span className="object-asset">{object.assetId}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
         )}
       </section>
     </aside>

@@ -690,3 +690,141 @@ body,
   border-radius: 6px;
   cursor: pointer;
 }
+
+/* ---- Scene tree ---- */
+
+.panel-tree {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.tree {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  background: var(--panel-raised);
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.tree-row:hover {
+  border-color: var(--border);
+}
+
+.tree-row.selected {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.tree-row.drop-target {
+  border-color: var(--accent);
+  background: rgb(143 214 148 / 16%);
+}
+
+.tree-row .object-label {
+  flex: 1;
+}
+
+.tree-branch {
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  border-left: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  border-bottom-left-radius: 3px;
+  flex: none;
+}
+
+.tree-rename {
+  width: 100%;
+  padding: 5px 8px;
+  color: inherit;
+  font: inherit;
+  background: var(--panel-raised);
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+}
+
+.tree-root-drop {
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px dashed var(--border);
+  border-radius: 5px;
+  color: var(--text-dim);
+  font-size: 11px;
+  text-align: center;
+}
+
+.tree-root-drop.drop-target {
+  border-color: var(--accent);
+  background: rgb(143 214 148 / 12%);
+  color: var(--text);
+}
+
+.tree-hint {
+  margin-top: 10px;
+  font-size: 11px;
+}
+
+.tree-grip {
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1;
+  cursor: grab;
+  opacity: 0.6;
+  user-select: none;
+}
+
+.tree-grip:active {
+  cursor: grabbing;
+}
+
+.tree-row:hover .tree-grip {
+  opacity: 1;
+}
+
+.tree-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* The left rail splits its height between the asset library and the scene tree, each scrolling
+   independently, so neither can push the other around. */
+.rail-left {
+  display: grid;
+  grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
+  overflow: hidden;
+}
+
+.rail-left .panel-assets,
+.rail-left .panel-tree {
+  overflow-y: auto;
+}
+
+/* In a nested row the indent squeezes the label; let the asset id give up space first. */
+.tree-row .object-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tree-row .object-asset {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 11px;
+}

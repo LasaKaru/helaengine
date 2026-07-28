@@ -5,7 +5,6 @@ import type {
   Scene,
   SceneObject,
   Terrain,
-  Vec3,
 } from '@helaengine/schema';
 import { MISSING_ASSET_ENTRY, type AssetResolver } from './assets.js';
 import type { ModelSource } from './models.js';
@@ -96,6 +95,14 @@ function placeholderMaterial(
   return material;
 }
 
+/** Applies a document transform to a node. Rotation is authored in degrees, converted once here. */
+function applyTransform(node: THREE.Object3D, object: SceneObject): void {
+  const { position, rotation, scale } = object.transform;
+  node.position.set(position[0], position[1], position[2]);
+  node.rotation.set(rotation[0] * DEG2RAD, rotation[1] * DEG2RAD, rotation[2] * DEG2RAD);
+  node.scale.set(scale[0], scale[1], scale[2]);
+}
+
 /**
  * The result of loading one scene document. Owns every GPU resource it created, so a caller can
  * swap scenes without leaking geometries/materials — the single most common Three.js memory bug.
@@ -156,16 +163,7 @@ export class LoadedScene {
       const node = this.objects.get(object.id);
       if (!node) continue;
 
-      const { position, rotation, scale } = object.transform;
-      const defaultScale = (node.userData['defaultScale'] as Vec3 | undefined) ?? [1, 1, 1];
-
-      node.position.set(position[0], position[1], position[2]);
-      node.rotation.set(rotation[0] * DEG2RAD, rotation[1] * DEG2RAD, rotation[2] * DEG2RAD);
-      node.scale.set(
-        scale[0] * defaultScale[0],
-        scale[1] * defaultScale[1],
-        scale[2] * defaultScale[2],
-      );
+      applyTransform(node, object);
       updated += 1;
     }
     return updated;
@@ -319,10 +317,32 @@ export class SceneLoader {
 
     for (const object of scene.objects) {
       const entry = this.#resolveEntry(object, missingAssetIds);
-      const mesh = this.#buildObject(object, entry, geometryCache, materialCache, disposables);
-      objects.set(object.id, mesh);
-      threeScene.add(mesh);
-      added.push(mesh);
+      objects.set(
+        object.id,
+        this.#buildObject(object, entry, geometryCache, materialCache, disposables),
+      );
+    }
+
+    // Parenting is a second pass so declaration order in the document never matters — a child may
+    // appear before its parent. The schema has already rejected cycles and dangling parents, but
+    // the loader degrades to root placement rather than trusting that blindly.
+    for (const object of scene.objects) {
+      const node = objects.get(object.id);
+      if (!node) continue;
+
+      const parent = object.parentId === null ? null : objects.get(object.parentId);
+      if (object.parentId !== null && !parent) {
+        this.#warn(
+          `object "${object.id}" has unknown parentId "${object.parentId}"; placing at root`,
+        );
+      }
+
+      if (parent) {
+        parent.add(node);
+      } else {
+        threeScene.add(node);
+        added.push(node);
+      }
     }
 
     return new LoadedScene({ threeScene, objects, missingAssetIds, disposables, added });
@@ -350,31 +370,32 @@ export class SceneLoader {
     // A preloaded model wins; otherwise the manifest's measured bounds become a placeholder box.
     // Clones share the source geometry and materials, so a hundred trees cost one of each.
     const model = this.#models.get(entry.id);
-    const node = model
+    const visual = model
       ? model.clone(true)
       : new THREE.Mesh(
           placeholderGeometry(entry, geometryCache, disposables),
           placeholderMaterial(entry, materialCache, disposables),
         );
 
+    visual.castShadow = true;
+    visual.receiveShadow = true;
+    // The manifest's default scale lives on an inner node, not on the object node itself.
+    // Otherwise a scaled parent would silently multiply the size of everything nested under it —
+    // a rendering detail leaking into the scene graph.
+    visual.scale.set(...entry.defaultScale);
+    visual.name = `${object.id}:visual`;
+
+    const node = new THREE.Group();
     node.name = object.metadata.label ?? object.id;
-    node.castShadow = true;
-    node.receiveShadow = true;
     node.userData['objectId'] = object.id;
     node.userData['assetId'] = object.assetId;
-    // Kept on the node so `syncTransforms` can re-apply the manifest's default scale without
-    // going back to the resolver for every object on every frame of a drag.
-    node.userData['defaultScale'] = entry.defaultScale;
+    // Explicit rather than inferred from the node shape: tooling needs to distinguish a real model
+    // from a placeholder, and "does it have children" stopped being a reliable signal once every
+    // object became a group.
+    node.userData['hasModel'] = model !== undefined;
+    node.add(visual);
 
-    const { position, rotation, scale } = object.transform;
-    node.position.set(position[0], position[1], position[2]);
-    node.rotation.set(rotation[0] * DEG2RAD, rotation[1] * DEG2RAD, rotation[2] * DEG2RAD);
-    node.scale.set(
-      scale[0] * entry.defaultScale[0],
-      scale[1] * entry.defaultScale[1],
-      scale[2] * entry.defaultScale[2],
-    );
-
+    applyTransform(node, object);
     return node;
   }
 

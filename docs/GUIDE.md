@@ -200,9 +200,9 @@ Even if starting solo, structure work as if these lanes exist — makes future h
 
 **Sprint 6: Undo/redo + scene graph tree**
 
-- [ ] Command pattern middleware on Zustand (every mutation = invertible command) — do NOT use naive full-state snapshots at scale; use command diffs
-- [ ] Hierarchical scene graph panel (tree view), parent/child nesting (e.g., props attached to a building)
-- [ ] Keyboard shortcuts standardized (Ctrl+Z/Y, Ctrl+D duplicate, Del)
+- [x] Command pattern middleware on Zustand (every mutation = invertible command) — do NOT use naive full-state snapshots at scale; use command diffs
+- [x] Hierarchical scene graph panel (tree view), parent/child nesting (e.g., props attached to a building)
+- [x] Keyboard shortcuts standardized (Ctrl+Z/Y, Ctrl+D duplicate, Del)
 - **DoD:** 50+ consecutive undo/redo operations work without state corruption; scene tree reflects nesting correctly.
 
 **Sprint 7: Terrain tools**

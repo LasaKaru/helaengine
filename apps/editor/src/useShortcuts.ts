@@ -17,6 +17,9 @@ export const SHORTCUTS: Array<{ keys: string; description: string }> = [
   { keys: 'Click', description: 'Select object' },
   { keys: 'Shift + Click', description: 'Add to / remove from selection' },
   { keys: 'Drag on empty space', description: 'Marquee select' },
+  { keys: 'Ctrl/⌘ + Z', description: 'Undo' },
+  { keys: 'Ctrl/⌘ + Shift + Z', description: 'Redo' },
+  { keys: 'Ctrl/⌘ + Y', description: 'Redo (alternate)' },
   { keys: 'Ctrl/⌘ + D', description: 'Duplicate selection' },
   { keys: 'Ctrl/⌘ + A', description: 'Select all' },
   { keys: 'Delete / Backspace', description: 'Delete selection' },
@@ -56,6 +59,19 @@ export function useShortcuts(options: ShortcutOptions = {}): void {
       const editor = useEditorStore.getState();
       const selected = scene.selectedIds;
       const modifier = event.ctrlKey || event.metaKey;
+
+      if (modifier && event.key.toLowerCase() === 'z') {
+        event.preventDefault();
+        if (event.shiftKey) scene.redo();
+        else scene.undo();
+        return;
+      }
+
+      if (modifier && event.key.toLowerCase() === 'y') {
+        event.preventDefault();
+        scene.redo();
+        return;
+      }
 
       if (modifier && event.key.toLowerCase() === 'd') {
         event.preventDefault();

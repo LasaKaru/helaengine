@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–5 complete. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–6 complete. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -151,12 +151,12 @@
 
 **Tasks:**
 
-- [ ] Implement command-pattern middleware wrapping every `sceneStore` mutation: each command has `do()` and `undo()` — NOT full-state snapshots (snapshots get expensive/memory-heavy past a few hundred objects)
-- [ ] Wire Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) to a command history stack with a reasonable depth limit (e.g., 100 steps)
-- [ ] Build Scene Graph tree panel: hierarchical list view of all objects, supporting drag-to-reparent (e.g., attach a lamp prop as a child of a building object)
-- [ ] Update schema to support `parentId` on objects; ensure transforms are applied in parent-local space when nested, world space when root-level
-- [ ] Sync selection state bidirectionally between viewport clicks and scene graph tree clicks/highlights
-- [ ] Add rename-in-place for objects in the tree (double-click to edit label, stored as `metadata.label`, distinct from `assetId`)
+- [x] Implement command-pattern middleware wrapping every `sceneStore` mutation: each command has `do()` and `undo()` — NOT full-state snapshots (snapshots get expensive/memory-heavy past a few hundred objects)
+- [x] Wire Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) to a command history stack with a reasonable depth limit (e.g., 100 steps)
+- [x] Build Scene Graph tree panel: hierarchical list view of all objects, supporting drag-to-reparent (e.g., attach a lamp prop as a child of a building object)
+- [x] Update schema to support `parentId` on objects; ensure transforms are applied in parent-local space when nested, world space when root-level
+- [x] Sync selection state bidirectionally between viewport clicks and scene graph tree clicks/highlights
+- [x] Add rename-in-place for objects in the tree (double-click to edit label, stored as `metadata.label`, distinct from `assetId`)
 
 **Tech notes:**
 

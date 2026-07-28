@@ -31,6 +31,38 @@ export const SceneSchema = z
       }
       seen.add(object.id);
     }
+
+    const parentById = new Map(scene.objects.map((object) => [object.id, object.parentId]));
+
+    for (const [index, object] of scene.objects.entries()) {
+      if (object.parentId === null) continue;
+
+      if (!seen.has(object.parentId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['objects', index, 'parentId'],
+          message: `object "${object.id}" has parentId "${object.parentId}", which does not exist`,
+        });
+        continue;
+      }
+
+      // A cycle would make the scene graph unbuildable and hang any naive traversal, so it is
+      // rejected at the boundary rather than defended against in every consumer.
+      const visited = new Set<string>([object.id]);
+      let ancestor: string | null | undefined = object.parentId;
+      while (ancestor != null) {
+        if (visited.has(ancestor)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['objects', index, 'parentId'],
+            message: `object "${object.id}" is part of a parent cycle`,
+          });
+          break;
+        }
+        visited.add(ancestor);
+        ancestor = parentById.get(ancestor);
+      }
+    }
   });
 
 export type Scene = z.infer<typeof SceneSchema>;

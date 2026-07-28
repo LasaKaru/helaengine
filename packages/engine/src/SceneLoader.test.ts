@@ -63,7 +63,32 @@ describe('SceneLoader', () => {
       makeScene([{ id: 'obj_0001', assetId: 'rock_small_01', transform: { scale: [3, 3, 3] } }]),
     );
 
-    expect(loaded.objects.get('obj_0001')!.scale.toArray()).toEqual([6, 6, 6]);
+    // The object node carries the document's scale; the manifest default lives on an inner node,
+    // so the two multiply out to the effective world scale.
+    const node = loaded.objects.get('obj_0001')!;
+    expect(node.scale.toArray()).toEqual([3, 3, 3]);
+    node.updateWorldMatrix(true, true);
+    expect(
+      node.getObjectByName('obj_0001:visual')!.getWorldScale(new THREE.Vector3()).toArray(),
+    ).toEqual([6, 6, 6]);
+
+    loaded.dispose();
+  });
+
+  it('keeps an asset default scale off nested children', () => {
+    // A child of a scaled parent must inherit the parent's *document* scale, not the manifest
+    // default of the parent's asset — that is a rendering detail, not part of the scene graph.
+    const loaded = makeLoader().load(
+      makeScene([
+        { id: 'parent', assetId: 'rock_small_01' },
+        { id: 'child', assetId: 'tree_pine_02', parentId: 'parent' },
+      ]),
+    );
+
+    const child = loaded.objects.get('child')!;
+    child.updateWorldMatrix(true, true);
+    expect(child.getWorldScale(new THREE.Vector3()).toArray()).toEqual([1, 1, 1]);
+
     loaded.dispose();
   });
 
@@ -157,8 +182,8 @@ describe('SceneLoader', () => {
       ]),
     );
 
-    const first = loaded.objects.get('obj_0001') as THREE.Mesh;
-    const second = loaded.objects.get('obj_0002') as THREE.Mesh;
+    const first = loaded.objects.get('obj_0001')!.children[0] as THREE.Mesh;
+    const second = loaded.objects.get('obj_0002')!.children[0] as THREE.Mesh;
     expect(first.geometry).toBe(second.geometry);
 
     loaded.dispose();
@@ -255,7 +280,7 @@ describe('SceneLoader model preloading', () => {
     await loader.preload(scene);
     const loaded = loader.load(scene);
 
-    expect(loaded.objects.get('obj_0001')!.userData['fromModel']).toBe('tree_pine_02');
+    expect(loaded.objects.get('obj_0001')!.userData['hasModel']).toBe(true);
     loaded.dispose();
   });
 
@@ -264,7 +289,7 @@ describe('SceneLoader model preloading', () => {
       makeScene([{ id: 'obj_0001', assetId: 'tree_pine_02' }]),
     );
 
-    expect(loaded.objects.get('obj_0001')!.userData['fromModel']).toBeUndefined();
+    expect(loaded.objects.get('obj_0001')!.userData['hasModel']).toBe(false);
     loaded.dispose();
   });
 
@@ -306,8 +331,8 @@ describe('SceneLoader model preloading', () => {
     expect(report).toMatchObject({ requested: 2, loaded: 1 });
     expect(report.failed[0]).toMatchObject({ assetId: 'rock_small_01', reason: '404' });
     // The healthy asset still renders as a model, and the broken one still renders as something.
-    expect(loaded.objects.get('obj_0001')!.userData['fromModel']).toBe('tree_pine_02');
-    expect(loaded.objects.get('obj_0002')).toBeDefined();
+    expect(loaded.objects.get('obj_0001')!.userData['hasModel']).toBe(true);
+    expect(loaded.objects.get('obj_0002')!.userData['hasModel']).toBe(false);
 
     loaded.dispose();
   });
@@ -338,13 +363,15 @@ describe('SceneLoader model preloading', () => {
     await loader.preload(scene);
     const loaded = loader.load(scene);
 
-    const first = loaded.objects.get('obj_0001') as THREE.Mesh;
-    const second = loaded.objects.get('obj_0002') as THREE.Mesh;
+    const first = loaded.objects.get('obj_0001')!;
+    const second = loaded.objects.get('obj_0002')!;
     expect(first).not.toBe(second);
     expect(first.position.x).toBe(1);
     expect(second.position.x).toBe(9);
     // Clones share geometry with the source model — that is what makes 200 trees affordable.
-    expect(first.geometry).toBe(second.geometry);
+    expect((first.children[0] as THREE.Mesh).geometry).toBe(
+      (second.children[0] as THREE.Mesh).geometry,
+    );
 
     loaded.dispose();
   });
@@ -427,12 +454,18 @@ describe('LoadedScene.syncTransforms', () => {
     loaded.dispose();
   });
 
-  it('keeps applying the asset default scale', () => {
-    // rock_small_01 has a default scale of 2, so an instance scale of 3 must land at 6.
+  it('writes the document scale straight through', () => {
     const loaded = makeLoader().load(sceneWith([0, 0, 0]));
     loaded.syncTransforms(sceneWith([0, 0, 0], 0, 3));
 
-    expect(loaded.objects.get('obj_0001')!.scale.toArray()).toEqual([6, 6, 6]);
+    const node = loaded.objects.get('obj_0001')!;
+    expect(node.scale.toArray()).toEqual([3, 3, 3]);
+    // rock_small_01's default scale of 2 still applies, from the inner node.
+    node.updateWorldMatrix(true, true);
+    expect(
+      node.getObjectByName('obj_0001:visual')!.getWorldScale(new THREE.Vector3()).toArray(),
+    ).toEqual([6, 6, 6]);
+
     loaded.dispose();
   });
 
@@ -451,6 +484,103 @@ describe('LoadedScene.syncTransforms', () => {
     );
 
     expect(updated).toBe(1);
+    loaded.dispose();
+  });
+});
+
+describe('SceneLoader hierarchy', () => {
+  it('nests a child under its parent node', () => {
+    const loaded = makeLoader().load(
+      makeScene([
+        { id: 'building', assetId: 'tree_pine_02' },
+        { id: 'lamp', assetId: 'rock_small_01', parentId: 'building' },
+      ]),
+    );
+
+    expect(loaded.objects.get('lamp')!.parent).toBe(loaded.objects.get('building'));
+    loaded.dispose();
+  });
+
+  it('treats a nested transform as parent-local', () => {
+    const loaded = makeLoader().load(
+      makeScene([
+        { id: 'building', assetId: 'tree_pine_02', transform: { position: [10, 0, 0] } },
+        {
+          id: 'lamp',
+          assetId: 'rock_small_01',
+          parentId: 'building',
+          transform: { position: [2, 0, 0] },
+        },
+      ]),
+    );
+
+    const lamp = loaded.objects.get('lamp')!;
+    lamp.updateWorldMatrix(true, false);
+    // Local x=2 under a parent at x=10 puts the child at world x=12.
+    expect(lamp.getWorldPosition(new THREE.Vector3()).x).toBeCloseTo(12, 6);
+
+    loaded.dispose();
+  });
+
+  it('nests correctly even when a child is declared before its parent', () => {
+    const loaded = makeLoader().load(
+      makeScene([
+        { id: 'lamp', assetId: 'rock_small_01', parentId: 'building' },
+        { id: 'building', assetId: 'tree_pine_02' },
+      ]),
+    );
+
+    expect(loaded.objects.get('lamp')!.parent).toBe(loaded.objects.get('building'));
+    loaded.dispose();
+  });
+
+  it('adds only roots to the host scene, so a child is disposed with its parent', () => {
+    const host = new THREE.Scene();
+    const loaded = makeLoader().loadInto(
+      host,
+      makeScene([
+        { id: 'building', assetId: 'tree_pine_02' },
+        { id: 'lamp', assetId: 'rock_small_01', parentId: 'building' },
+      ]),
+    );
+
+    expect(host.children.filter((child) => child.userData['objectId'])).toHaveLength(1);
+
+    loaded.dispose();
+    expect(host.children).toHaveLength(0);
+  });
+
+  it('places an object at the root when its parent cannot be resolved', () => {
+    // The schema rejects dangling parents, but the loader is also fed hand-written and
+    // partially-migrated documents, so it degrades rather than throwing.
+    const warnings: string[] = [];
+    const loader = new SceneLoader({
+      resolver: new ManifestAssetResolver(manifest),
+      warn: (message) => warnings.push(message),
+    });
+
+    const scene = {
+      ...makeScene([{ id: 'lamp', assetId: 'rock_small_01' }]),
+      objects: [
+        {
+          id: 'lamp',
+          assetId: 'rock_small_01',
+          parentId: 'ghost',
+          transform: {
+            position: [0, 0, 0] as [number, number, number],
+            rotation: [0, 0, 0] as [number, number, number],
+            scale: [1, 1, 1] as [number, number, number],
+          },
+          metadata: {},
+        },
+      ],
+    };
+
+    const loaded = loader.loadInto(new THREE.Scene(), scene as never);
+
+    expect(loaded.objects.get('lamp')!.parent).toBe(loaded.threeScene);
+    expect(warnings.join(' ')).toContain('unknown parentId');
+
     loaded.dispose();
   });
 });

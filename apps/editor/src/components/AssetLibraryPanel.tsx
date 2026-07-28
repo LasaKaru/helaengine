@@ -3,6 +3,7 @@ import { Grid, type CellComponentProps } from 'react-window';
 import type { AssetManifest, AssetManifestEntry } from '@helaengine/schema';
 import { ASSET_BASE_URL } from '../engine/assetLibrary';
 import { useEditorStore } from '../store/editorStore';
+import { SceneTree } from './SceneTree';
 
 const CARD_HEIGHT = 116;
 const MIN_CARD_WIDTH = 96;
@@ -187,6 +188,13 @@ export function AssetLibraryPanel({ manifest }: { manifest: AssetManifest }): Re
           {visible.length} of {manifest.assets.length} · drag onto the terrain to place
         </p>
       </section>
+
+      {/*
+        The scene tree lives beside the asset library rather than under the inspector. When the two
+        shared a rail, selecting an object expanded the inspector and shifted every tree row
+        downward — enough to make the second click of a double-click land on the wrong row.
+      */}
+      <SceneTree />
     </aside>
   );
 }

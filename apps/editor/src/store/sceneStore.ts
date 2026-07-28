@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import { immer } from 'zustand/middleware/immer';
 import {
   CURRENT_SCENE_VERSION,
   SceneSchema,
@@ -11,6 +10,13 @@ import {
   type Transform,
   type Vec3,
 } from '@helaengine/schema';
+import {
+  commitToHistory,
+  EMPTY_HISTORY,
+  redo as redoHistory,
+  undo as undoHistory,
+  type History,
+} from './history';
 
 /**
  * The editor's working copy of the scene document.
@@ -19,23 +25,36 @@ import {
  * recomputable. Anything the user can change has to have a home in the schema, or it will not
  * survive save, load or export. Ephemeral UI state (what's selected, which panel is open) lives
  * beside the document rather than inside it, since none of it belongs in a saved file.
+ *
+ * Every mutation goes through `commit`, which records an Immer patch pair so the change can be
+ * undone. Actions that bypass it are invisible to undo — which is correct for selection, and a
+ * bug for anything else.
  */
 export interface SceneState {
   scene: Scene;
-  /** Ids of the currently selected objects. Editor-only; never serialised. */
+  /** Ids of the currently selected objects. Editor-only; never serialised, never undoable. */
   selectedIds: string[];
+  history: History;
 
   setScene(scene: Scene): void;
   addObject(object: SceneObject): void;
   removeObject(objectId: string): void;
-  setTransform(objectId: string, transform: Partial<Transform>): void;
-  setTransforms(updates: Array<{ id: string; transform: Transform }>): void;
-  setPosition(objectId: string, position: Vec3): void;
   removeObjects(objectIds: string[]): void;
   duplicateObjects(objectIds: string[], offset?: Vec3): string[];
+  setTransform(objectId: string, transform: Partial<Transform>): void;
+  setTransforms(updates: Array<{ id: string; transform: Transform }>, group?: string): void;
+  setPosition(objectId: string, position: Vec3): void;
+  setParent(objectId: string, parentId: string | null, localTransform?: Transform): void;
+  setLabel(objectId: string, label: string): void;
   setTerrain(terrain: Partial<Terrain>): void;
   setEnvironment(environment: Partial<Environment>): void;
   setName(name: string): void;
+
+  undo(): void;
+  redo(): void;
+  canUndo(): boolean;
+  canRedo(): boolean;
+
   select(objectIds: string[]): void;
   toggleSelected(objectId: string): void;
   clearSelection(): void;
@@ -50,95 +69,118 @@ export function createEmptyScene(name = 'Untitled scene'): Scene {
   });
 }
 
+function sameVec(a: Vec3, b: Vec3): boolean {
+  return a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
+}
+
+/**
+ * True when a transform is value-identical to another.
+ *
+ * Immer treats an assignment as a change even when the new array holds the same numbers, so
+ * without this a gizmo that ends where it started — or a field re-entered with the same value —
+ * leaves an undo step that does nothing when pressed.
+ */
+function sameTransform(a: Transform, b: Transform): boolean {
+  return (
+    sameVec(a.position, b.position) && sameVec(a.rotation, b.rotation) && sameVec(a.scale, b.scale)
+  );
+}
+
+/** Every descendant of an object, so deleting a parent takes its children with it. */
+export function collectDescendants(scene: Scene, objectIds: string[]): Set<string> {
+  const doomed = new Set(objectIds);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const object of scene.objects) {
+      if (object.parentId !== null && doomed.has(object.parentId) && !doomed.has(object.id)) {
+        doomed.add(object.id);
+        grew = true;
+      }
+    }
+  }
+  return doomed;
+}
+
+/** True when `candidateParentId` is `objectId` itself or sits beneath it. */
+export function wouldCreateCycle(
+  scene: Scene,
+  objectId: string,
+  candidateParentId: string | null,
+): boolean {
+  if (candidateParentId === null) return false;
+  if (candidateParentId === objectId) return true;
+
+  const parentById = new Map(scene.objects.map((object) => [object.id, object.parentId]));
+  let ancestor = parentById.get(candidateParentId) ?? null;
+  const seen = new Set<string>();
+  while (ancestor !== null && ancestor !== undefined) {
+    if (ancestor === objectId) return true;
+    if (seen.has(ancestor)) return true;
+    seen.add(ancestor);
+    ancestor = parentById.get(ancestor) ?? null;
+  }
+  return false;
+}
+
 export const useSceneStore = create<SceneState>()(
   devtools(
-    immer((set) => ({
-      scene: createEmptyScene(),
-      selectedIds: [],
+    (set, get) => {
+      /** Applies an undoable change to the document. */
+      const commit = (
+        label: string,
+        recipe: (draft: Scene) => void,
+        group: string | null = null,
+      ): void => {
+        const { scene, history } = get();
+        set(commitToHistory(scene, history, label, group, recipe), false, label);
+      };
 
-      setScene: (scene) =>
-        set(
-          (state) => {
-            state.scene = scene;
-            state.selectedIds = [];
-          },
-          false,
-          'scene/set',
-        ),
+      return {
+        scene: createEmptyScene(),
+        selectedIds: [],
+        history: EMPTY_HISTORY,
 
-      addObject: (object) =>
-        set(
-          (state) => {
-            state.scene.objects.push(object);
-          },
-          false,
-          'object/add',
-        ),
+        // Loading a whole document is a fresh start, not an edit: the history of the previous
+        // document does not describe this one, and applying its patches would corrupt it.
+        setScene: (scene) =>
+          set({ scene, selectedIds: [], history: EMPTY_HISTORY }, false, 'scene/set'),
 
-      removeObject: (objectId) =>
-        set(
-          (state) => {
-            state.scene.objects = state.scene.objects.filter((item) => item.id !== objectId);
-            state.selectedIds = state.selectedIds.filter((id) => id !== objectId);
-          },
-          false,
-          'object/remove',
-        ),
+        addObject: (object) =>
+          commit('object/add', (draft) => {
+            draft.objects.push(object);
+          }),
 
-      setTransform: (objectId, transform) =>
-        set(
-          (state) => {
-            const object = state.scene.objects.find((item) => item.id === objectId);
-            if (object) Object.assign(object.transform, transform);
-          },
-          false,
-          'object/setTransform',
-        ),
+        removeObject: (objectId) => get().removeObjects([objectId]),
 
-      setTransforms: (updates) =>
-        set(
-          (state) => {
-            // One store write for the whole selection: a group drag would otherwise emit a
-            // separate update per object per frame.
-            const byId = new Map(updates.map((update) => [update.id, update.transform]));
-            for (const object of state.scene.objects) {
-              const transform = byId.get(object.id);
-              if (transform) object.transform = transform;
-            }
-          },
-          false,
-          'object/setTransforms',
-        ),
+        removeObjects: (objectIds) => {
+          const doomed = collectDescendants(get().scene, objectIds);
+          commit('object/remove', (draft) => {
+            draft.objects = draft.objects.filter((item) => !doomed.has(item.id));
+          });
+          set(
+            (state) => ({ selectedIds: state.selectedIds.filter((id) => !doomed.has(id)) }),
+            false,
+            'selection/prune',
+          );
+        },
 
-      removeObjects: (objectIds) =>
-        set(
-          (state) => {
-            const doomed = new Set(objectIds);
-            state.scene.objects = state.scene.objects.filter((item) => !doomed.has(item.id));
-            state.selectedIds = state.selectedIds.filter((id) => !doomed.has(id));
-          },
-          false,
-          'object/removeMany',
-        ),
-
-      duplicateObjects: (objectIds, offset = [1, 0, 1]) => {
-        const created: string[] = [];
-        set(
-          (state) => {
+        duplicateObjects: (objectIds, offset = [1, 0, 1]) => {
+          const created: string[] = [];
+          commit('object/duplicate', (draft) => {
             const wanted = new Set(objectIds);
-            const sources = state.scene.objects.filter((item) => wanted.has(item.id));
+            const sources = draft.objects.filter((item) => wanted.has(item.id));
 
             for (const source of sources) {
-              // Ids are allocated against the growing list, so duplicating a multi-selection
-              // cannot hand two copies the same id.
-              const id = nextObjectId(state.scene);
+              const id = nextObjectId(draft);
               const { position, rotation, scale } = source.transform;
 
               // Built field by field rather than with `structuredClone`: `source` is an Immer
               // draft, and structured cloning a proxy throws DataCloneError.
-              state.scene.objects.push({
+              draft.objects.push({
                 id,
                 assetId: source.assetId,
+                parentId: source.parentId,
                 transform: {
                   position: [
                     position[0] + offset[0],
@@ -155,68 +197,126 @@ export const useSceneStore = create<SceneState>()(
               });
               created.push(id);
             }
+          });
 
-            // Duplicating moves the selection onto the copies, so the next drag moves what was
-            // just made rather than the originals.
-            state.selectedIds = created;
-          },
-          false,
-          'object/duplicate',
-        );
-        return created;
-      },
+          // Selecting the copies means the next drag moves what was just made, not the originals.
+          set({ selectedIds: created }, false, 'selection/duplicated');
+          return created;
+        },
 
-      setPosition: (objectId, position) =>
-        set(
-          (state) => {
-            const object = state.scene.objects.find((item) => item.id === objectId);
-            if (object) object.transform.position = position;
-          },
-          false,
-          'object/setPosition',
-        ),
+        setTransform: (objectId, transform) =>
+          commit('object/setTransform', (draft) => {
+            const object = draft.objects.find((item) => item.id === objectId);
+            if (!object) return;
+            const next = { ...object.transform, ...transform };
+            if (!sameTransform(object.transform, next)) object.transform = next;
+          }),
 
-      setTerrain: (terrain) =>
-        set(
-          (state) => {
-            Object.assign(state.scene.terrain, terrain);
-          },
-          false,
-          'terrain/set',
-        ),
+        setTransforms: (updates, group) =>
+          commit(
+            'object/setTransforms',
+            (draft) => {
+              // One store write for the whole selection: a group drag would otherwise emit a
+              // separate update per object per frame.
+              const byId = new Map(updates.map((update) => [update.id, update.transform]));
+              for (const object of draft.objects) {
+                const transform = byId.get(object.id);
+                if (transform && !sameTransform(object.transform, transform)) {
+                  object.transform = transform;
+                }
+              }
+            },
+            group ?? null,
+          ),
 
-      setEnvironment: (environment) =>
-        set(
-          (state) => {
-            Object.assign(state.scene.environment, environment);
-          },
-          false,
-          'environment/set',
-        ),
+        setPosition: (objectId, position) =>
+          commit('object/setPosition', (draft) => {
+            const object = draft.objects.find((item) => item.id === objectId);
+            if (object && !sameVec(object.transform.position, position)) {
+              object.transform.position = position;
+            }
+          }),
 
-      setName: (name) =>
-        set(
-          (state) => {
-            state.scene.name = name;
-          },
-          false,
-          'scene/setName',
-        ),
+        setParent: (objectId, parentId, localTransform) => {
+          if (wouldCreateCycle(get().scene, objectId, parentId)) return;
+          commit('object/setParent', (draft) => {
+            const object = draft.objects.find((item) => item.id === objectId);
+            if (!object) return;
+            object.parentId = parentId;
+            if (localTransform) object.transform = localTransform;
+          });
+        },
 
-      select: (objectIds) => set({ selectedIds: objectIds }, false, 'selection/set'),
+        setLabel: (objectId, label) =>
+          commit('object/setLabel', (draft) => {
+            const object = draft.objects.find((item) => item.id === objectId);
+            if (!object) return;
+            const trimmed = label.trim();
+            if (trimmed === '') delete object.metadata.label;
+            else object.metadata.label = trimmed;
+          }),
 
-      toggleSelected: (objectId) =>
-        set(
-          (state) => {
-            state.selectedIds = state.selectedIds.includes(objectId)
-              ? state.selectedIds.filter((id) => id !== objectId)
-              : [...state.selectedIds, objectId];
-          },
-          false,
-          'selection/toggle',
-        ),
-      clearSelection: () => set({ selectedIds: [] }, false, 'selection/clear'),
-    })),
+        setTerrain: (terrain) =>
+          commit('terrain/set', (draft) => {
+            Object.assign(draft.terrain, terrain);
+          }),
+
+        setEnvironment: (environment) =>
+          commit('environment/set', (draft) => {
+            Object.assign(draft.environment, environment);
+          }),
+
+        setName: (name) =>
+          commit('scene/setName', (draft) => {
+            draft.name = name;
+          }),
+
+        undo: () => {
+          const { scene, history } = get();
+          const result = undoHistory(scene, history);
+          const alive = new Set(result.scene.objects.map((object) => object.id));
+          set(
+            {
+              ...result,
+              // An undone creation leaves its object selected but gone; prune rather than leaving
+              // the inspector pointing at something that is not there.
+              selectedIds: get().selectedIds.filter((id) => alive.has(id)),
+            },
+            false,
+            'history/undo',
+          );
+        },
+
+        redo: () => {
+          const { scene, history } = get();
+          const result = redoHistory(scene, history);
+          const alive = new Set(result.scene.objects.map((object) => object.id));
+          set(
+            { ...result, selectedIds: get().selectedIds.filter((id) => alive.has(id)) },
+            false,
+            'history/redo',
+          );
+        },
+
+        canUndo: () => get().history.past.length > 0,
+        canRedo: () => get().history.future.length > 0,
+
+        select: (objectIds) => set({ selectedIds: objectIds }, false, 'selection/set'),
+
+        toggleSelected: (objectId) =>
+          set(
+            (state) => ({
+              selectedIds: state.selectedIds.includes(objectId)
+                ? state.selectedIds.filter((id) => id !== objectId)
+                : [...state.selectedIds, objectId],
+            }),
+            false,
+            'selection/toggle',
+          ),
+
+        clearSelection: () => set({ selectedIds: [] }, false, 'selection/clear'),
+      };
+    },
     { name: 'helaengine/scene' },
   ),
 );

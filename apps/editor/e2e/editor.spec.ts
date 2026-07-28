@@ -177,13 +177,23 @@ test.describe('selection and transforms', () => {
       // Off the camera-to-origin line, so it never occludes the hut when clicking.
       window.helaengine!.addObject('tree_pine_01', [-9, 0, 7]);
     });
+    // Waiting for the models, not just the object count: a click aimed at a hut that is still a
+    // placeholder box can miss, which made this flake under parallel load.
     await expect
-      .poll(async () => page.evaluate(() => window.helaengine!.viewportObjectIds().length))
-      .toBe(2);
+      .poll(async () =>
+        page.evaluate(() => window.helaengine!.viewportObjects().every((item) => item.isModel)),
+      )
+      .toBe(true);
   });
 
   test('clicking an object selects it and fills the inspector', async ({ page }) => {
     // Projected rather than guessed: the object's own screen position is the only reliable target.
+    // Polled because the projection needs both a built scene and a mounted camera, and a rebuild
+    // can briefly leave one of them unset.
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.projectObject('obj_0001') !== null))
+      .toBe(true);
+
     const point = (await page.evaluate(() => window.helaengine!.projectObject('obj_0001')))!;
     await page.mouse.click(point.x, point.y);
 
@@ -209,10 +219,9 @@ test.describe('selection and transforms', () => {
   });
 
   test('shift-clicking in the scene list extends the selection', async ({ page }) => {
-    const list = page.getByRole('region', { name: 'Scene' });
-    await list.getByRole('button').first().click();
-    await list
-      .getByRole('button')
+    await page.getByRole('treeitem').first().click();
+    await page
+      .getByRole('treeitem')
       .nth(1)
       .click({ modifiers: ['Shift'] });
 
@@ -225,7 +234,7 @@ test.describe('selection and transforms', () => {
   });
 
   test('editing a numeric field moves the object in the viewport', async ({ page }) => {
-    await page.getByRole('region', { name: 'Scene' }).getByRole('button').first().click();
+    await page.getByRole('treeitem').first().click();
 
     const field = page.getByLabel('Position X');
     await field.fill('12.5');
@@ -246,7 +255,7 @@ test.describe('selection and transforms', () => {
   });
 
   test('W / E / R switch the transform mode', async ({ page }) => {
-    await page.getByRole('region', { name: 'Scene' }).getByRole('button').first().click();
+    await page.getByRole('treeitem').first().click();
 
     await page.keyboard.press('e');
     await expect(page.getByRole('button', { name: 'rotate' })).toHaveAttribute(
@@ -262,7 +271,7 @@ test.describe('selection and transforms', () => {
   });
 
   test('Ctrl+D duplicates and Delete removes', async ({ page }) => {
-    await page.getByRole('region', { name: 'Scene' }).getByRole('button').first().click();
+    await page.getByRole('treeitem').first().click();
 
     await page.keyboard.press('Control+d');
     await expect
@@ -284,7 +293,7 @@ test.describe('selection and transforms', () => {
   });
 
   test('the gizmo appears for a selection and survives a transform edit', async ({ page }) => {
-    await page.getByRole('region', { name: 'Scene' }).getByRole('button').first().click();
+    await page.getByRole('treeitem').first().click();
 
     // A gizmo attached to a node that gets rebuilt on every edit would vanish here. It must not.
     await expect.poll(async () => page.evaluate(() => window.helaengine!.hasGizmo())).toBe(true);
@@ -294,5 +303,116 @@ test.describe('selection and transforms', () => {
     await field.press('Enter');
 
     await expect.poll(async () => page.evaluate(() => window.helaengine!.hasGizmo())).toBe(true);
+  });
+});
+
+/** Undo/redo and the scene tree — the flows that make experimenting in the editor safe. */
+test.describe('history and the scene tree', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.waitForFunction(() => window.helaengine !== undefined);
+    await page.evaluate(() => {
+      window.helaengine!.addObject('building_hut_01', [0, 0, 0]);
+      window.helaengine!.addObject('prop_barrel_01', [4, 0, 2]);
+    });
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.viewportObjectIds().length))
+      .toBe(2);
+  });
+
+  test('Ctrl+Z undoes and Ctrl+Shift+Z redoes', async ({ page }) => {
+    await page.keyboard.press('Control+z');
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.viewportObjectIds().length))
+      .toBe(1);
+
+    await page.keyboard.press('Control+Shift+z');
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.viewportObjectIds().length))
+      .toBe(2);
+  });
+
+  test('undo restores a deleted object into the viewport', async ({ page }) => {
+    await page.getByRole('treeitem').first().click();
+    await page.keyboard.press('Delete');
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.viewportObjectIds().length))
+      .toBe(1);
+
+    await page.keyboard.press('Control+z');
+
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.viewportObjectIds().length))
+      .toBe(2);
+  });
+
+  test('the toolbar buttons track what is undoable', async ({ page }) => {
+    const undoButton = page.getByRole('button', { name: 'Undo' });
+    const redoButton = page.getByRole('button', { name: 'Redo' });
+
+    await expect(undoButton).toBeEnabled();
+    await expect(redoButton).toBeDisabled();
+
+    await undoButton.click();
+    await expect(redoButton).toBeEnabled();
+  });
+
+  test('dragging a row onto another nests it and preserves world position', async ({ page }) => {
+    const worldBefore = await page.evaluate(() =>
+      window.helaengine!.viewportObjectWorldX('obj_0002'),
+    );
+
+    // The grip is what is draggable; the row itself stays clickable so rename still works.
+    const source = page.getByRole('treeitem').nth(1).locator('.tree-grip');
+    const target = page.getByRole('treeitem').first();
+    await source.dragTo(target);
+
+    // Nested in the document...
+    await expect
+      .poll(async () =>
+        page.evaluate(() => window.helaengine!.store.getState().scene.objects[1]!.parentId),
+      )
+      .toBe('obj_0001');
+    // ...and still exactly where it was on screen.
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.viewportObjectWorldX('obj_0002')))
+      .toBeCloseTo(worldBefore!, 3);
+  });
+
+  test('a nested row is indented under its parent', async ({ page }) => {
+    await page.evaluate(() =>
+      window.helaengine!.store.getState().setParent('obj_0002', 'obj_0001'),
+    );
+
+    await expect(page.getByRole('treeitem').nth(1)).toHaveAttribute('aria-level', '2');
+  });
+
+  test('deleting a parent takes its children with it, and undo brings both back', async ({
+    page,
+  }) => {
+    await page.evaluate(() =>
+      window.helaengine!.store.getState().setParent('obj_0002', 'obj_0001'),
+    );
+    await page.getByRole('treeitem').first().click();
+    await page.keyboard.press('Delete');
+
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.viewportObjectIds().length))
+      .toBe(0);
+
+    await page.keyboard.press('Control+z');
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.viewportObjectIds().length))
+      .toBe(2);
+  });
+
+  test('double-clicking a row renames it', async ({ page }) => {
+    await page.getByRole('treeitem').first().locator('.object-label').dblclick();
+
+    const input = page.getByLabel('Rename obj_0001');
+    await input.fill('Village hut');
+    await input.press('Enter');
+
+    await expect(page.getByRole('treeitem').first()).toContainText('Village hut');
   });
 });

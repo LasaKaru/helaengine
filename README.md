@@ -7,8 +7,8 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 5 (Phase 1 — Editor MVP). Place, select, transform, duplicate and delete all
-work. Undo/redo and the scene graph tree are next; there is no backend yet, deliberately.
+**Status:** Sprint 6 (Phase 1 — Editor MVP). Place, select, transform, nest, rename, undo and redo
+all work. Terrain sculpting and local save are next; there is no backend yet, deliberately.
 
 ---
 
@@ -33,6 +33,10 @@ viewport.
 Click to select, shift-click to extend, drag on empty space to marquee-select. The gizmo moves,
 rotates and scales the selection — **W/E/R** switch tools, Ctrl+D duplicates, Delete removes, and
 `?` lists every shortcut. The inspector's numeric fields can be typed into or dragged to scrub.
+
+The scene tree under the asset library nests objects: drag a row's grip onto another to parent it —
+the object keeps its world position — and double-click or press F2 to rename. Ctrl+Z / Ctrl+Shift+Z
+undo and redo up to 100 steps, with a whole gizmo drag counting as one.
 
 `window.helaengine` in the browser console drives the editor directly, which is handy for scripting
 a scene:

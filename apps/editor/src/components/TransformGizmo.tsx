@@ -57,6 +57,7 @@ export function TransformGizmo(): React.JSX.Element | null {
     transforms: Map<string, Transform>;
   } | null>(null);
 
+  const dragGroup = useRef<string | null>(null);
   const pivot = useMemo(() => selectionPivot(selected), [selected]);
   const single = selected.length === 1 ? selected[0] : null;
 
@@ -89,6 +90,8 @@ export function TransformGizmo(): React.JSX.Element | null {
 
   const beginDrag = (): void => {
     const state = useSceneStore.getState();
+    // One id for the whole drag, so sixty frames of updates collapse into a single undo step.
+    dragGroup.current = `gizmo:${Date.now()}`;
     dragStart.current = {
       pivot,
       transforms: new Map(
@@ -109,6 +112,7 @@ export function TransformGizmo(): React.JSX.Element | null {
 
   const endDrag = (): void => {
     dragStart.current = null;
+    dragGroup.current = null;
     useEditorStore.getState().setGizmoActive(false);
     proxy.position.set(pivot[0], pivot[1], pivot[2]);
     proxy.rotation.set(0, 0, 0);
@@ -131,23 +135,26 @@ export function TransformGizmo(): React.JSX.Element | null {
       const start = origin.transforms.get(single.id);
       if (!start) return;
 
-      store.setTransforms([
-        {
-          id: single.id,
-          transform: {
-            position:
-              mode === 'translate' && placement.snapToGrid
-                ? snapPosition(position, placement.gridSize)
-                : position,
-            rotation: [
-              tidy(normalizeAngle(node.rotation.x * RAD2DEG)),
-              tidy(normalizeAngle(node.rotation.y * RAD2DEG)),
-              tidy(normalizeAngle(node.rotation.z * RAD2DEG)),
-            ],
-            scale: [tidy(node.scale.x), tidy(node.scale.y), tidy(node.scale.z)],
+      store.setTransforms(
+        [
+          {
+            id: single.id,
+            transform: {
+              position:
+                mode === 'translate' && placement.snapToGrid
+                  ? snapPosition(position, placement.gridSize)
+                  : position,
+              rotation: [
+                tidy(normalizeAngle(node.rotation.x * RAD2DEG)),
+                tidy(normalizeAngle(node.rotation.y * RAD2DEG)),
+                tidy(normalizeAngle(node.rotation.z * RAD2DEG)),
+              ],
+              scale: [tidy(node.scale.x), tidy(node.scale.y), tidy(node.scale.z)],
+            },
           },
-        },
-      ]);
+        ],
+        dragGroup.current ?? undefined,
+      );
       return;
     }
 
@@ -161,9 +168,12 @@ export function TransformGizmo(): React.JSX.Element | null {
       scale: [tidy(proxy.scale.x), tidy(proxy.scale.y), tidy(proxy.scale.z)],
     };
 
+    // `applyGroupDelta` only reads ids and transforms; the rest of the shape is filled in so the
+    // helper can keep taking real scene objects rather than a bespoke tuple.
     const sources = [...origin.transforms].map(([id, transform]) => ({
       id,
       assetId: '',
+      parentId: null,
       transform,
       metadata: {},
     }));
@@ -180,7 +190,7 @@ export function TransformGizmo(): React.JSX.Element | null {
         : update,
     );
 
-    store.setTransforms(updated);
+    store.setTransforms(updated, dragGroup.current ?? undefined);
   };
 
   return (

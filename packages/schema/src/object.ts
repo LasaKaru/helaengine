@@ -10,6 +10,13 @@ import { IdSchema, TransformSchema } from './primitives.js';
 export const SceneObjectSchema = z.object({
   id: IdSchema,
   assetId: IdSchema,
+  /**
+   * Parent object id, or null for a root object.
+   *
+   * A nested object's `transform` is expressed in its parent's space, exactly as in a Three.js
+   * scene graph — moving a building carries its attached props along.
+   */
+  parentId: IdSchema.nullable().default(null),
   transform: TransformSchema.default({}),
   metadata: z
     .object({
