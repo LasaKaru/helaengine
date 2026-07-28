@@ -12,6 +12,7 @@ import { useSceneStore } from './store/sceneStore';
  * is the actual requirement — the choice matters far less than not changing it later.
  */
 export const SHORTCUTS: Array<{ keys: string; description: string }> = [
+  { keys: 'P', description: 'Play / stop behaviours' },
   { keys: '1 / 2 / 3', description: 'Select, Sculpt, Paint tool' },
   { keys: 'W', description: 'Move tool' },
   { keys: 'E', description: 'Rotate tool' },
@@ -98,6 +99,10 @@ export function useShortcuts(options: ShortcutOptions = {}): void {
       if (modifier) return;
 
       switch (event.key) {
+        case 'p':
+        case 'P':
+          editor.setPlaying(!editor.playing);
+          break;
         case '1':
           editor.setTool('select');
           break;

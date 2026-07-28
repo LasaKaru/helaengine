@@ -9,6 +9,7 @@ import { EngineBridge } from './EngineBridge';
 import { MarqueeOverlay } from './Marquee';
 import { PlacementController } from './PlacementController';
 import { PlacementToolbar } from './PlacementToolbar';
+import { BehaviorPreview, WaypointEditor } from './BehaviorPreview';
 import { SculptController } from './SculptController';
 import { SelectionController } from './SelectionController';
 import { SelectionHighlight } from './SelectionHighlight';
@@ -70,6 +71,8 @@ export function Viewport({ loader }: ViewportProps): React.JSX.Element {
   const dragging = useEditorStore((state) => state.drag !== null);
   const gizmoActive = useEditorStore((state) => state.gizmoActive);
   const tool = useEditorStore((state) => state.tool);
+  const playing = useEditorStore((state) => state.playing);
+  const editingWaypoints = useEditorStore((state) => state.editingWaypoints);
 
   const handleLoaded = useCallback((loaded: LoadedScene) => {
     setStats({ objects: loaded.objects.size, missing: loaded.missingAssetIds.length });
@@ -90,8 +93,10 @@ export function Viewport({ loader }: ViewportProps): React.JSX.Element {
         <ThumbnailReporter />
         <EngineBridge loader={loader} onLoaded={handleLoaded} />
         <PlacementController loader={loader} loadedScene={loadedScene} />
-        <SculptController loadedScene={loadedScene} />
-        {tool === 'select' && (
+        <BehaviorPreview loadedScene={loadedScene} />
+        <WaypointEditor loadedScene={loadedScene} />
+        {!playing && <SculptController loadedScene={loadedScene} />}
+        {tool === 'select' && !playing && !editingWaypoints && (
           <>
             <SelectionController loadedScene={loadedScene} />
             <SelectionHighlight loadedScene={loadedScene} />

@@ -7,6 +7,27 @@ export {
 export { TerrainField, LAYER_COUNT } from './TerrainField.js';
 export type { SculptMode, BrushOptions, TerrainFieldOptions } from './TerrainField.js';
 export { bytesToBase64, base64ToBytes } from './base64.js';
+export { BehaviorRuntime } from './BehaviorRuntime.js';
+export type { BehaviorRuntimeOptions, BehaviorProblem } from './BehaviorRuntime.js';
+export {
+  BehaviorRegistry,
+  behaviorRegistry,
+  UnknownBehaviorError,
+  InvalidBehaviorParamsError,
+} from './behaviors/BehaviorRegistry.js';
+export type {
+  Behavior,
+  BehaviorDefinition,
+  GameObject,
+  BehaviorContext,
+} from './behaviors/Behavior.js';
+export {
+  PatrolBehavior,
+  PatrolParamsSchema,
+  patrolDefinition,
+} from './behaviors/PatrolBehavior.js';
+export type { PatrolParams } from './behaviors/PatrolBehavior.js';
+export { registerBuiltinBehaviors } from './behaviors/builtins.js';
 export type {
   SceneLoaderOptions,
   PreloadReport,

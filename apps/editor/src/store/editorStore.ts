@@ -57,6 +57,10 @@ export interface EditorState {
   gizmoActive: boolean;
   marquee: Marquee | null;
   shortcutsOpen: boolean;
+  /** True while behaviours are running in the viewport. */
+  playing: boolean;
+  /** `objectId:index` of the behaviour whose waypoints are being edited, if any. */
+  editingWaypoints: string | null;
 
   beginDrag(assetId: string, clientX: number, clientY: number): void;
   updateDrag(clientX: number, clientY: number, overSurface: boolean): void;
@@ -70,6 +74,8 @@ export interface EditorState {
   setGizmoActive(active: boolean): void;
   setMarquee(marquee: Marquee | null): void;
   setShortcutsOpen(open: boolean): void;
+  setPlaying(playing: boolean): void;
+  setEditingWaypoints(key: string | null): void;
 }
 
 export const useEditorStore = create<EditorState>()(
@@ -85,6 +91,8 @@ export const useEditorStore = create<EditorState>()(
       gizmoActive: false,
       marquee: null,
       shortcutsOpen: false,
+      playing: false,
+      editingWaypoints: null,
 
       beginDrag: (assetId, clientX, clientY) =>
         set({ drag: { assetId, clientX, clientY, overSurface: false } }, false, 'drag/begin'),
@@ -114,6 +122,11 @@ export const useEditorStore = create<EditorState>()(
       setGizmoActive: (gizmoActive) => set({ gizmoActive }, false, 'gizmo/active'),
       setMarquee: (marquee) => set({ marquee }, false, 'selection/marquee'),
       setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }, false, 'ui/shortcuts'),
+      setPlaying: (playing) =>
+        // Leaving waypoint editing on during play would keep clicks adding points to a moving path.
+        set({ playing, ...(playing ? { editingWaypoints: null } : {}) }, false, 'play/set'),
+      setEditingWaypoints: (editingWaypoints) =>
+        set({ editingWaypoints }, false, 'waypoints/editing'),
     }),
     { name: 'helaengine/editor' },
   ),

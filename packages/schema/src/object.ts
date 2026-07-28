@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BehaviorSchema } from './behavior.js';
 import { IdSchema, TransformSchema } from './primitives.js';
 
 /**
@@ -18,6 +19,8 @@ export const SceneObjectSchema = z.object({
    */
   parentId: IdSchema.nullable().default(null),
   transform: TransformSchema.default({}),
+  /** Gameplay attached to this object, in the order it should be applied. */
+  behaviors: z.array(BehaviorSchema).max(32).default([]),
   metadata: z
     .object({
       label: z.string().max(200).optional(),

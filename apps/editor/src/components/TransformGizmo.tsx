@@ -175,6 +175,7 @@ export function TransformGizmo(): React.JSX.Element | null {
       assetId: '',
       parentId: null,
       transform,
+      behaviors: [],
       metadata: {},
     }));
 

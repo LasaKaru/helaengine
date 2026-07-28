@@ -225,9 +225,9 @@ Even if starting solo, structure work as if these lanes exist — makes future h
 
 **Sprint 9: Behavior system architecture**
 
-- [ ] Behavior plugin registry in `/packages/engine`: `registerBehavior('patrol', PatrolBehavior)`
-- [ ] Each behavior = class with `onInit(obj, params)`, `onUpdate(obj, dt)`, `onEvent(obj, evt)`
-- [ ] Editor: "Add Behavior" dropdown on inspector, dynamic property form generated from a JSON-schema-per-behavior (so new behaviors auto-generate UI, no manual form coding per type)
+- [x] Behavior plugin registry in `/packages/engine`: `registerBehavior('patrol', PatrolBehavior)`
+- [x] Each behavior = class with `onInit(obj, params)`, `onUpdate(obj, dt)`, `onEvent(obj, evt)`
+- [x] Editor: "Add Behavior" dropdown on inspector, dynamic property form generated from a JSON-schema-per-behavior (so new behaviors auto-generate UI, no manual form coding per type)
 - **DoD:** Attaching "patrol" to an object in the editor produces correct waypoint movement in the live preview, and the exact same behavior code runs identically outside React.
 
 **Sprint 10: Physics integration (Rapier)**

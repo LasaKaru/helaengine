@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–8 complete — Phase 1 (Editor MVP) done. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–9 complete. Phase 1 (Editor MVP) done; Phase 2 under way. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -223,13 +223,13 @@
 
 **Tasks:**
 
-- [ ] Design the `Behavior` base interface in `/packages/engine`: `onInit(gameObject, params)`, `onUpdate(gameObject, deltaTime)`, `onEvent(gameObject, eventName, payload)`, `onDestroy(gameObject)`
-- [ ] Build a `BehaviorRegistry` (simple `Map<string, BehaviorClass>`) with a `registerBehavior(typeName, class)` function
-- [ ] Implement first behavior: `PatrolBehavior` (moves object along a list of waypoints, looping or ping-pong mode, configurable speed)
-- [ ] Extend scene schema: `objects[].behaviors[]` array, each entry `{ type: string, params: Record<string, unknown> }`
-- [ ] Define a **per-behavior params schema** (Zod) so the editor can auto-generate a property form (e.g., `PatrolParamsSchema = z.object({ waypoints: z.array(Vec3Schema), speed: z.number() })`) — this is what lets you add new behaviors later without hand-writing custom UI each time
-- [ ] Build editor UI: "Add Behavior" dropdown on Inspector panel (lists registered behavior types), dynamically renders the property form from the behavior's Zod schema (use a simple schema-to-form renderer — write a small one or evaluate `react-jsonschema-form` adapted for Zod via `zod-to-json-schema`)
-- [ ] Build waypoint-editing UX specifically for Patrol: click-to-add waypoint markers directly in the 3D viewport (a common "path editing" interaction pattern)
+- [x] Design the `Behavior` base interface in `/packages/engine`: `onInit(gameObject, params)`, `onUpdate(gameObject, deltaTime)`, `onEvent(gameObject, eventName, payload)`, `onDestroy(gameObject)`
+- [x] Build a `BehaviorRegistry` (simple `Map<string, BehaviorClass>`) with a `registerBehavior(typeName, class)` function
+- [x] Implement first behavior: `PatrolBehavior` (moves object along a list of waypoints, looping or ping-pong mode, configurable speed)
+- [x] Extend scene schema: `objects[].behaviors[]` array, each entry `{ type: string, params: Record<string, unknown> }`
+- [x] Define a **per-behavior params schema** (Zod) so the editor can auto-generate a property form (e.g., `PatrolParamsSchema = z.object({ waypoints: z.array(Vec3Schema), speed: z.number() })`) — this is what lets you add new behaviors later without hand-writing custom UI each time
+- [x] Build editor UI: "Add Behavior" dropdown on Inspector panel (lists registered behavior types), dynamically renders the property form from the behavior's Zod schema (use a simple schema-to-form renderer — write a small one or evaluate `react-jsonschema-form` adapted for Zod via `zod-to-json-schema`)
+- [x] Build waypoint-editing UX specifically for Patrol: click-to-add waypoint markers directly in the 3D viewport (a common "path editing" interaction pattern)
 
 **Tech notes:**
 

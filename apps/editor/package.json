@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "HelaEngine editor — React + react-three-fiber shell around the engine runtime.",
+  "description": "HelaEngine editor \u2014 React + react-three-fiber shell around the engine runtime.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -23,6 +23,7 @@
     "react-dom": "^18.3.1",
     "react-window": "^2.3.0",
     "three": "^0.172.0",
+    "zod": "^3.24.1",
     "zustand": "^5.0.2"
   },
   "devDependencies": {

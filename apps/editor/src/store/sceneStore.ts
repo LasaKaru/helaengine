@@ -46,6 +46,9 @@ export interface SceneState {
   setPosition(objectId: string, position: Vec3): void;
   setParent(objectId: string, parentId: string | null, localTransform?: Transform): void;
   setLabel(objectId: string, label: string): void;
+  addBehavior(objectId: string, type: string, params: Record<string, unknown>): void;
+  removeBehavior(objectId: string, index: number): void;
+  setBehaviorParams(objectId: string, index: number, params: Record<string, unknown>): void;
   setTerrain(terrain: Partial<Terrain>): void;
   setTerrainData(heightmap: string | null, splatmap: string | null): void;
   setEnvironment(environment: Partial<Environment>): void;
@@ -191,6 +194,12 @@ export const useSceneStore = create<SceneState>()(
                   rotation: [...rotation],
                   scale: [...scale],
                 },
+                // Behaviours come along with a copy — duplicating a patrolling guard should give
+                // you a second patrolling guard, not a statue.
+                behaviors: source.behaviors.map((behavior) => ({
+                  type: behavior.type,
+                  params: { ...behavior.params },
+                })),
                 metadata: {
                   ...source.metadata,
                   ...(source.metadata.label ? { label: `${source.metadata.label} copy` } : {}),
@@ -255,6 +264,25 @@ export const useSceneStore = create<SceneState>()(
             const trimmed = label.trim();
             if (trimmed === '') delete object.metadata.label;
             else object.metadata.label = trimmed;
+          }),
+
+        addBehavior: (objectId, type, params) =>
+          commit('behavior/add', (draft) => {
+            const object = draft.objects.find((item) => item.id === objectId);
+            object?.behaviors.push({ type, params });
+          }),
+
+        removeBehavior: (objectId, index) =>
+          commit('behavior/remove', (draft) => {
+            const object = draft.objects.find((item) => item.id === objectId);
+            object?.behaviors.splice(index, 1);
+          }),
+
+        setBehaviorParams: (objectId, index, params) =>
+          commit('behavior/setParams', (draft) => {
+            const object = draft.objects.find((item) => item.id === objectId);
+            const behavior = object?.behaviors[index];
+            if (behavior) behavior.params = params;
           }),
 
         setTerrain: (terrain) =>

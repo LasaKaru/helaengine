@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { Transform, Vec3 } from '@helaengine/schema';
 import { useEditorStore } from '../store/editorStore';
 import { useSceneStore } from '../store/sceneStore';
+import { BehaviorPanel } from './BehaviorPanel';
 import { NumberField } from './NumberField';
 import { TerrainPanel } from './TerrainPanel';
 
@@ -135,6 +136,8 @@ export function InspectorPanel(): React.JSX.Element {
           </div>
         )}
       </section>
+
+      {single && <BehaviorPanel object={single} />}
 
       <TerrainPanel />
     </aside>

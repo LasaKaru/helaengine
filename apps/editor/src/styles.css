@@ -1119,3 +1119,159 @@ body,
 .save-state.error {
   color: #ffb4b4;
 }
+
+/* ---- Behaviours ---- */
+
+.play-toggle {
+  padding: 4px 14px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--panel-raised);
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.play-toggle.active {
+  background: var(--accent);
+  color: #0f1218;
+}
+
+.behavior-card {
+  padding: 10px;
+  margin-bottom: 8px;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.behavior-card.unknown {
+  border-color: #7d6a3b;
+}
+
+.behavior-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.behavior-name {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.behavior-head button {
+  padding: 3px 8px;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 11px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.behavior-head button:hover {
+  color: #ffb4b4;
+  border-color: #7d3b3b;
+}
+
+.param-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.param-row > .number-field {
+  flex: 0 0 92px;
+}
+
+.param-row select,
+.param-row input[type='text'] {
+  flex: 0 0 110px;
+  padding: 4px 6px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+
+.param-row button {
+  padding: 3px 9px;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 11px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.param-row button.active {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.param-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.param-check input {
+  accent-color: var(--accent);
+}
+
+.waypoint-list {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 132px;
+  overflow-y: auto;
+}
+
+.waypoint-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: var(--panel);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
+.waypoint-list button {
+  padding: 0 4px;
+  color: var(--text-dim);
+  font: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.waypoint-list button:hover {
+  color: #ffb4b4;
+}
+
+.add-behavior select {
+  flex: 1;
+}

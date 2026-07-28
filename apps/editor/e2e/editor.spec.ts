@@ -693,3 +693,142 @@ test.describe('projects and local save', () => {
       .toBe(1);
   });
 });
+
+/**
+ * Behaviours. The claim this sprint makes is that a behaviour attached in the editor runs the
+ * same code an export will run, driven entirely by document data.
+ */
+test.describe('behaviours', () => {
+  test.beforeEach(async ({ page }) => {
+    await openEditor(page);
+    await page.evaluate(() => {
+      window.helaengine!.addObject('enemy_goblin_01', [0, 0, 0]);
+      window.helaengine!.store.getState().select(['obj_0001']);
+    });
+    await expect(page.getByRole('region', { name: 'Behaviours' })).toBeVisible();
+  });
+
+  test('the inspector builds a form from the behaviour schema alone', async ({ page }) => {
+    await page.getByLabel('Add behaviour').selectOption('patrol');
+
+    // Every one of these controls comes from PatrolParamsSchema — none is hand-written per type.
+    const panel = page.getByRole('region', { name: 'Behaviours' });
+    await expect(panel.getByRole('button', { name: 'Add in viewport' })).toBeVisible();
+    await expect(panel.getByLabel('Speed')).toHaveValue('2');
+    await expect(panel.getByLabel('Mode', { exact: true })).toHaveValue('loop');
+    await expect(panel.getByLabel('Face direction')).toBeChecked();
+    await expect(panel.getByLabel('Wait seconds')).toHaveValue('0');
+  });
+
+  test('editing a field writes through to the document', async ({ page }) => {
+    await page.getByLabel('Add behaviour').selectOption('patrol');
+
+    const panel = page.getByRole('region', { name: 'Behaviours' });
+    await panel.getByLabel('Speed').fill('7');
+    await panel.getByLabel('Speed').press('Enter');
+    await panel.getByLabel('Mode', { exact: true }).selectOption('pingPong');
+
+    const params = await page.evaluate(
+      () => window.helaengine!.store.getState().scene.objects[0]!.behaviors[0]!.params,
+    );
+    expect(params).toMatchObject({ speed: 7, mode: 'pingPong' });
+  });
+
+  test('clicking the ground adds waypoints', async ({ page }) => {
+    await page.getByLabel('Add behaviour').selectOption('patrol');
+    await page.getByRole('button', { name: 'Add in viewport' }).click();
+
+    const box = (await page.locator('canvas').boundingBox())!;
+    for (const [fx, fy] of [
+      [0.35, 0.7],
+      [0.6, 0.75],
+    ] as const) {
+      await page.mouse.click(box.x + box.width * fx, box.y + box.height * fy);
+      await page.waitForTimeout(120);
+    }
+    await page.getByRole('button', { name: 'Done' }).click();
+
+    const waypoints = await page.evaluate(
+      () =>
+        window.helaengine!.store.getState().scene.objects[0]!.behaviors[0]!.params[
+          'waypoints'
+        ] as number[][],
+    );
+    expect(waypoints).toHaveLength(2);
+    // Points land on the ground, not at an arbitrary height.
+    expect(Math.abs(waypoints[0]![1]!)).toBeLessThan(0.5);
+  });
+
+  test('play moves the object and stop puts it back', async ({ page }) => {
+    await page.evaluate(() => {
+      const state = window.helaengine!.store.getState();
+      state.addBehavior('obj_0001', 'patrol', {
+        waypoints: [
+          [0, 0, 0],
+          [20, 0, 0],
+        ],
+        speed: 6,
+        mode: 'loop',
+        faceDirection: true,
+        waitSeconds: 0,
+      });
+    });
+
+    await page.getByRole('button', { name: 'Play' }).click();
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.viewportObjectWorldX('obj_0001')))
+      .toBeGreaterThan(1);
+
+    await page.getByRole('button', { name: 'Stop' }).click();
+
+    // Back where the document says it is — a preview must never become an edit.
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.viewportObjectWorldX('obj_0001')))
+      .toBeCloseTo(0, 2);
+    expect(
+      await page.evaluate(
+        () => window.helaengine!.store.getState().scene.objects[0]!.transform.position,
+      ),
+    ).toEqual([0, 0, 0]);
+  });
+
+  test('a behaviour survives a save and reload', async ({ page }) => {
+    await page.getByLabel('Add behaviour').selectOption('patrol');
+    const panel = page.getByRole('region', { name: 'Behaviours' });
+    await panel.getByLabel('Speed').fill('4.5');
+    await panel.getByLabel('Speed').press('Enter');
+
+    await page.keyboard.press('Control+s');
+    await expect(page.getByRole('status', { name: 'Save state' })).toHaveText('Saved');
+
+    await page.reload();
+    await page.waitForFunction(() => window.helaengine !== undefined);
+    await page
+      .getByRole('button', { name: /Untitled scene/ })
+      .first()
+      .click();
+    await expect(page.getByRole('banner')).toBeVisible();
+
+    expect(
+      await page.evaluate(() => window.helaengine!.store.getState().scene.objects[0]!.behaviors[0]),
+    ).toMatchObject({ type: 'patrol', params: { speed: 4.5 } });
+  });
+
+  test('removing a behaviour takes it off the object', async ({ page }) => {
+    await page.getByLabel('Add behaviour').selectOption('patrol');
+    await page.getByRole('button', { name: 'Remove Patrol' }).click();
+
+    expect(
+      await page.evaluate(
+        () => window.helaengine!.store.getState().scene.objects[0]!.behaviors.length,
+      ),
+    ).toBe(0);
+  });
+
+  test('P toggles play mode', async ({ page }) => {
+    await page.keyboard.press('p');
+    await expect(page.getByRole('button', { name: 'Stop' })).toBeVisible();
+    await page.keyboard.press('p');
+    await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
+  });
+});

@@ -7,9 +7,9 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 8 — **Phase 1 (Editor MVP) complete**. Pick a template, place and transform
-objects, nest and rename them, sculpt and paint terrain, undo, and it all persists in the browser.
-Behaviours, physics and AI are next (Phase 2); there is no backend yet, deliberately.
+**Status:** Sprint 9 (Phase 2 — Behaviours). Everything from Phase 1, plus behaviours: attach one
+to an object and press Play to watch it run. Physics and enemy AI are next; there is no backend
+yet, deliberately.
 
 ---
 
@@ -134,6 +134,22 @@ assets, and nothing downstream has to change when it does.
 
 Texture compression (KTX2/Basis) is wired but inert: it needs `toktx` from KHRONOS KTX-Software on
 PATH, and the current assets are untextured. Ingest says so rather than skipping silently.
+
+## Behaviours
+
+Objects get gameplay from a **closed vocabulary** of behaviours. A scene document names a
+registered `type` and carries plain `params`; that name is the only thing that selects code, and it
+only ever selects from types registered ahead of time. Nothing in a document is interpreted — no
+expression strings, no callbacks — which is what makes an exported project safe to hand to someone
+else, and why the export story never needs a sandbox.
+
+Each behaviour ships a Zod schema for its params, and the inspector builds its form from that
+schema. Adding a behaviour to the engine gives it an editor UI for free; there is no per-type form
+code to drift.
+
+Press **P** to run the scene's behaviours in the viewport. The runtime moves the Three.js nodes and
+never touches the document, so stopping restores everything and a preview can never become an edit.
+It is the same `BehaviorRuntime` an exported project will run.
 
 ## Where this is going
 

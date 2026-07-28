@@ -13,9 +13,21 @@ export function PlacementToolbar(): React.JSX.Element {
   const setPlacement = useEditorStore((state) => state.setPlacement);
   const tool = useEditorStore((state) => state.tool);
   const setTool = useEditorStore((state) => state.setTool);
+  const playing = useEditorStore((state) => state.playing);
+  const setPlaying = useEditorStore((state) => state.setPlaying);
 
   return (
     <div className="placement-toolbar" role="group" aria-label="Placement options">
+      <button
+        type="button"
+        className={`play-toggle${playing ? ' active' : ''}`}
+        aria-pressed={playing}
+        title="Run the scene's behaviours (P)"
+        onClick={() => setPlaying(!playing)}
+      >
+        {playing ? 'Stop' : 'Play'}
+      </button>
+
       <div className="tool-switch" role="group" aria-label="Tool">
         {TOOLS.map((entry) => (
           <button
