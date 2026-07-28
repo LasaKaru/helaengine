@@ -94,6 +94,12 @@ Before exporting:
 Default to the cheapest shape that feels right when walking into it. `mesh` colliders on scattered
 props are the fastest way to wreck physics performance in a dense scene.
 
+Sizes come from the measured `bounds`, multiplied by the manifest's `defaultScale` and by whatever
+the instance is scaled to, and every shape sits with its base at the object's pivot — the same
+pivot-at-the-base convention as section 3. A placement can override the manifest with the
+inspector's Physics section; `auto` (the default) means "whatever the asset says", which is where
+the answer usually belongs.
+
 ## 8. Export settings (Blender glTF 2.0 exporter)
 
 - Format: **glTF Binary (.glb)**

@@ -7,6 +7,8 @@ export const ASSET_BASE_URL = './assets/';
 export interface AssetLibrary {
   manifest: AssetManifest;
   loader: SceneLoader;
+  /** The same resolver the loader uses, for the parts of the editor that need manifest entries. */
+  resolver: ManifestAssetResolver;
 }
 
 /**
@@ -25,10 +27,11 @@ export async function loadAssetLibrary(signal?: AbortSignal): Promise<AssetLibra
   }
 
   const manifest = parseAssetManifest(await response.json());
+  const resolver = new ManifestAssetResolver(manifest);
   const loader = new SceneLoader({
-    resolver: new ManifestAssetResolver(manifest),
+    resolver,
     modelSource: new GltfModelSource({ baseUrl: ASSET_BASE_URL }),
   });
 
-  return { manifest, loader };
+  return { manifest, loader, resolver };
 }

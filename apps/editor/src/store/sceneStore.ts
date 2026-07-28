@@ -4,6 +4,8 @@ import {
   CURRENT_SCENE_VERSION,
   SceneSchema,
   type Environment,
+  type ObjectPhysics,
+  type Player,
   type Scene,
   type SceneObject,
   type Terrain,
@@ -49,6 +51,8 @@ export interface SceneState {
   addBehavior(objectId: string, type: string, params: Record<string, unknown>): void;
   removeBehavior(objectId: string, index: number): void;
   setBehaviorParams(objectId: string, index: number, params: Record<string, unknown>): void;
+  setObjectPhysics(objectId: string, physics: Partial<ObjectPhysics>): void;
+  setPlayer(player: Partial<Player>): void;
   setTerrain(terrain: Partial<Terrain>): void;
   setTerrainData(heightmap: string | null, splatmap: string | null): void;
   setEnvironment(environment: Partial<Environment>): void;
@@ -200,6 +204,7 @@ export const useSceneStore = create<SceneState>()(
                   type: behavior.type,
                   params: { ...behavior.params },
                 })),
+                physics: { ...source.physics },
                 metadata: {
                   ...source.metadata,
                   ...(source.metadata.label ? { label: `${source.metadata.label} copy` } : {}),
@@ -283,6 +288,17 @@ export const useSceneStore = create<SceneState>()(
             const object = draft.objects.find((item) => item.id === objectId);
             const behavior = object?.behaviors[index];
             if (behavior) behavior.params = params;
+          }),
+
+        setObjectPhysics: (objectId, physics) =>
+          commit('object/setPhysics', (draft) => {
+            const object = draft.objects.find((item) => item.id === objectId);
+            if (object) Object.assign(object.physics, physics);
+          }),
+
+        setPlayer: (player) =>
+          commit('scene/setPlayer', (draft) => {
+            Object.assign(draft.player, player);
           }),
 
         setTerrain: (terrain) =>

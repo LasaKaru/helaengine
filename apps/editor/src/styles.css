@@ -1122,6 +1122,51 @@ body,
 
 /* ---- Behaviours ---- */
 
+.walk-toggle {
+  padding: 4px 14px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.walk-toggle:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.walk-toggle.active {
+  background: #8fd694;
+  border-color: #8fd694;
+  color: #0f1218;
+}
+
+/* Walk mode hides the editor's furniture, so the reminder of how to leave has to be unmissable. */
+.walk-hint {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 14px;
+  color: var(--text);
+  font-size: 12px;
+  background: rgba(15, 18, 24, 0.82);
+  border: 1px solid #8fd694;
+  border-radius: 999px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.walk-hint strong {
+  color: #8fd694;
+}
+
 .play-toggle {
   padding: 4px 14px;
   color: var(--text);

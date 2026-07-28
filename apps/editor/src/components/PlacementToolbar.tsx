@@ -15,6 +15,9 @@ export function PlacementToolbar(): React.JSX.Element {
   const setTool = useEditorStore((state) => state.setTool);
   const playing = useEditorStore((state) => state.playing);
   const setPlaying = useEditorStore((state) => state.setPlaying);
+  const walking = useEditorStore((state) => state.walking);
+  const setWalking = useEditorStore((state) => state.setWalking);
+  const physicsStatus = useEditorStore((state) => state.physicsStatus);
 
   return (
     <div className="placement-toolbar" role="group" aria-label="Placement options">
@@ -28,64 +31,87 @@ export function PlacementToolbar(): React.JSX.Element {
         {playing ? 'Stop' : 'Play'}
       </button>
 
-      <div className="tool-switch" role="group" aria-label="Tool">
-        {TOOLS.map((entry) => (
-          <button
-            key={entry.tool}
-            type="button"
-            title={entry.hint}
-            className={tool === entry.tool ? 'active' : ''}
-            aria-pressed={tool === entry.tool}
-            onClick={() => setTool(entry.tool)}
-          >
-            {entry.label}
-          </button>
-        ))}
-      </div>
+      <button
+        type="button"
+        className={`walk-toggle${walking ? ' active' : ''}`}
+        aria-pressed={walking}
+        disabled={physicsStatus === 'error' || (physicsStatus === 'loading' && !walking)}
+        title={
+          physicsStatus === 'error'
+            ? 'Physics could not start in this browser'
+            : physicsStatus === 'loading'
+              ? 'Preparing physics…'
+              : 'Walk the scene with physics (Shift + P). Escape returns.'
+        }
+        onClick={() => setWalking(!walking)}
+      >
+        {walking ? 'Exit walk' : 'Walk'}
+      </button>
 
-      <label className={tool === 'select' ? '' : 'disabled'}>
-        <input
-          type="checkbox"
-          disabled={tool !== 'select'}
-          checked={placement.snapToGrid}
-          onChange={(event) => setPlacement({ snapToGrid: event.target.checked })}
-        />
-        Snap to grid
-      </label>
+      {/* Nothing below this point does anything while the player is walking, and leaving it
+          clickable invites a stray click that silently changes what the next edit will do. */}
+      {!walking && (
+        <>
+          <div className="tool-switch" role="group" aria-label="Tool">
+            {TOOLS.map((entry) => (
+              <button
+                key={entry.tool}
+                type="button"
+                title={entry.hint}
+                className={tool === entry.tool ? 'active' : ''}
+                aria-pressed={tool === entry.tool}
+                onClick={() => setTool(entry.tool)}
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
 
-      <label className={placement.snapToGrid ? '' : 'disabled'}>
-        <span className="visually-hidden">Grid size</span>
-        <select
-          value={placement.gridSize}
-          disabled={!placement.snapToGrid}
-          aria-label="Grid size"
-          onChange={(event) => setPlacement({ gridSize: Number(event.target.value) })}
-        >
-          {GRID_SIZES.map((size) => (
-            <option key={size} value={size}>
-              {size} m
-            </option>
-          ))}
-        </select>
-      </label>
+          <label className={tool === 'select' ? '' : 'disabled'}>
+            <input
+              type="checkbox"
+              disabled={tool !== 'select'}
+              checked={placement.snapToGrid}
+              onChange={(event) => setPlacement({ snapToGrid: event.target.checked })}
+            />
+            Snap to grid
+          </label>
 
-      <label>
-        <input
-          type="checkbox"
-          checked={placement.randomRotation}
-          onChange={(event) => setPlacement({ randomRotation: event.target.checked })}
-        />
-        Random rotation
-      </label>
+          <label className={placement.snapToGrid ? '' : 'disabled'}>
+            <span className="visually-hidden">Grid size</span>
+            <select
+              value={placement.gridSize}
+              disabled={!placement.snapToGrid}
+              aria-label="Grid size"
+              onChange={(event) => setPlacement({ gridSize: Number(event.target.value) })}
+            >
+              {GRID_SIZES.map((size) => (
+                <option key={size} value={size}>
+                  {size} m
+                </option>
+              ))}
+            </select>
+          </label>
 
-      <label>
-        <input
-          type="checkbox"
-          checked={placement.alignToNormal}
-          onChange={(event) => setPlacement({ alignToNormal: event.target.checked })}
-        />
-        Align to surface
-      </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={placement.randomRotation}
+              onChange={(event) => setPlacement({ randomRotation: event.target.checked })}
+            />
+            Random rotation
+          </label>
+
+          <label>
+            <input
+              type="checkbox"
+              checked={placement.alignToNormal}
+              onChange={(event) => setPlacement({ alignToNormal: event.target.checked })}
+            />
+            Align to surface
+          </label>
+        </>
+      )}
     </div>
   );
 }

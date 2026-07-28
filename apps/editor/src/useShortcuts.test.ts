@@ -22,7 +22,12 @@ function press(key: string, init: KeyboardEventInit = {}): void {
 describe('useShortcuts', () => {
   beforeEach(() => {
     useSceneStore.setState({ scene: createEmptyScene(), selectedIds: [] });
-    useEditorStore.setState({ gizmoMode: 'translate', shortcutsOpen: false });
+    useEditorStore.setState({
+      gizmoMode: 'translate',
+      shortcutsOpen: false,
+      playing: false,
+      walking: false,
+    });
   });
 
   it('switches gizmo mode with W / E / R', () => {
@@ -124,5 +129,34 @@ describe('useShortcuts', () => {
     expect(useSceneStore.getState().scene.objects).toHaveLength(1);
     expect(useEditorStore.getState().gizmoMode).toBe('translate');
     input.remove();
+  });
+
+  it('enters walk mode on Shift + P and plain P still toggles behaviours', () => {
+    renderHook(() => useShortcuts());
+
+    press('p');
+    expect(useEditorStore.getState().playing).toBe(true);
+    expect(useEditorStore.getState().walking).toBe(false);
+
+    press('p');
+    press('P', { shiftKey: true });
+    expect(useEditorStore.getState().walking).toBe(true);
+    // Walking implies a running simulation; there is nothing to walk around in otherwise.
+    expect(useEditorStore.getState().playing).toBe(true);
+  });
+
+  it('gives the keyboard to the player while walking, and Escape gives it back', () => {
+    renderHook(() => useShortcuts());
+    useEditorStore.getState().setWalking(true);
+
+    // W is "walk forward" here, not "switch to the move gizmo".
+    press('e');
+    press('2');
+    expect(useEditorStore.getState().gizmoMode).toBe('translate');
+    expect(useEditorStore.getState().tool).toBe('select');
+
+    press('Escape');
+    expect(useEditorStore.getState().walking).toBe(false);
+    expect(useEditorStore.getState().playing).toBe(false);
   });
 });

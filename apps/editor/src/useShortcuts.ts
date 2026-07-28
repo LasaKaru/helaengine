@@ -13,6 +13,7 @@ import { useSceneStore } from './store/sceneStore';
  */
 export const SHORTCUTS: Array<{ keys: string; description: string }> = [
   { keys: 'P', description: 'Play / stop behaviours' },
+  { keys: 'Shift + P', description: 'Walk the scene (Play Preview)' },
   { keys: '1 / 2 / 3', description: 'Select, Sculpt, Paint tool' },
   { keys: 'W', description: 'Move tool' },
   { keys: 'E', description: 'Rotate tool' },
@@ -27,7 +28,7 @@ export const SHORTCUTS: Array<{ keys: string; description: string }> = [
   { keys: 'Ctrl/⌘ + D', description: 'Duplicate selection' },
   { keys: 'Ctrl/⌘ + A', description: 'Select all' },
   { keys: 'Delete / Backspace', description: 'Delete selection' },
-  { keys: 'Escape', description: 'Clear selection, or cancel a drag' },
+  { keys: 'Escape', description: 'Leave walk mode, or clear the selection' },
   { keys: '?', description: 'Show this list' },
 ];
 
@@ -98,10 +99,21 @@ export function useShortcuts(options: ShortcutOptions = {}): void {
 
       if (modifier) return;
 
+      // Walk mode owns the keyboard: WASD is movement, not tool switching. Escape is the way out
+      // and is handled below, so nothing else here should fire while the player is walking.
+      if (editor.walking) {
+        if (event.key === 'Escape') editor.setWalking(false);
+        return;
+      }
+
       switch (event.key) {
         case 'p':
-        case 'P':
           editor.setPlaying(!editor.playing);
+          break;
+        case 'P':
+          // Shift+P is the fuller preview: physics, behaviours and a body to walk around in.
+          if (event.shiftKey) editor.setWalking(true);
+          else editor.setPlaying(!editor.playing);
           break;
         case '1':
           editor.setTool('select');

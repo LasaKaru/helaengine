@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { initPhysics } from '@helaengine/engine';
 import { loadAssetLibrary, type AssetLibrary } from './engine/assetLibrary';
+import { useEditorStore } from './store/editorStore';
 import { exposeDevApi } from './devApi';
 import { AssetLibraryPanel } from './components/AssetLibraryPanel';
 import { DragChip } from './components/DragChip';
@@ -43,6 +45,22 @@ export function App(): React.JSX.Element {
     return () => controller.abort();
   }, []);
 
+  // Rapier is WebAssembly and has to be instantiated before anything can be simulated. Starting
+  // that here, once, is the sprint plan's "handle it at bootstrap" — by the time somebody presses
+  // Walk the module is normally already there, and if it is not, the button says so rather than
+  // every physics call having to ask whether it may run yet.
+  useEffect(() => {
+    const editor = useEditorStore.getState();
+    editor.setPhysicsStatus('loading');
+    void initPhysics().then(
+      () => editor.setPhysicsStatus('ready'),
+      (error: unknown) => {
+        console.error('[helaengine] physics unavailable', error);
+        editor.setPhysicsStatus('error');
+      },
+    );
+  }, []);
+
   if (state.status === 'loading') {
     return (
       <div className="fullscreen-message">
@@ -68,7 +86,7 @@ export function App(): React.JSX.Element {
       <TopBar />
       <div className="workspace">
         <AssetLibraryPanel manifest={state.library.manifest} />
-        <Viewport loader={state.library.loader} />
+        <Viewport loader={state.library.loader} resolver={state.library.resolver} />
         <InspectorPanel />
       </div>
       <DragChip />

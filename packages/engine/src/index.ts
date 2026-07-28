@@ -46,3 +46,17 @@ export type { OrbitCameraOptions } from './OrbitCamera.js';
 export { Viewport } from './Viewport.js';
 export type { ViewportOptions, FrameCallback } from './Viewport.js';
 export { ENGINE_VERSION } from './version.js';
+export { PhysicsWorld } from './physics/PhysicsWorld.js';
+export type { PhysicsWorldOptions, ObjectBodySpec, BodyRecord } from './physics/PhysicsWorld.js';
+export { PlayerController } from './physics/PlayerController.js';
+export type { MoveInput } from './physics/PlayerController.js';
+export { initPhysics, isPhysicsReady, physicsModule } from './physics/rapier.js';
+export type { RapierModule } from './physics/rapier.js';
+export { colliderDescFor, collectTrimesh } from './physics/colliders.js';
+export type { ColliderShapeInput, TrimeshData } from './physics/colliders.js';
+export { buildScenePhysics, resolveColliderType } from './physics/buildScenePhysics.js';
+export type {
+  ScenePhysicsOptions,
+  ScenePhysicsReport,
+  ScenePhysicsSkip,
+} from './physics/buildScenePhysics.js';

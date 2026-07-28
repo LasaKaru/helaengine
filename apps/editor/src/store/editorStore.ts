@@ -4,6 +4,9 @@ import { DEFAULT_PLACEMENT, type PlacementOptions } from '../placement';
 import type { SculptMode } from '@helaengine/engine';
 import type { GizmoMode } from '../transform';
 
+/** Where the asynchronous Rapier bootstrap has got to. */
+export type PhysicsStatus = 'idle' | 'loading' | 'ready' | 'error';
+
 /** What a pointer drag on the terrain does. */
 export type EditorTool = 'select' | 'sculpt' | 'paint';
 
@@ -59,6 +62,10 @@ export interface EditorState {
   shortcutsOpen: boolean;
   /** True while behaviours are running in the viewport. */
   playing: boolean;
+  /** True while the viewport is in Play Preview: physics on, camera driven by the player. */
+  walking: boolean;
+  /** Rapier is WASM and loads asynchronously; the Walk button reflects this. */
+  physicsStatus: PhysicsStatus;
   /** `objectId:index` of the behaviour whose waypoints are being edited, if any. */
   editingWaypoints: string | null;
 
@@ -75,6 +82,8 @@ export interface EditorState {
   setMarquee(marquee: Marquee | null): void;
   setShortcutsOpen(open: boolean): void;
   setPlaying(playing: boolean): void;
+  setWalking(walking: boolean): void;
+  setPhysicsStatus(status: PhysicsStatus): void;
   setEditingWaypoints(key: string | null): void;
 }
 
@@ -92,6 +101,8 @@ export const useEditorStore = create<EditorState>()(
       marquee: null,
       shortcutsOpen: false,
       playing: false,
+      walking: false,
+      physicsStatus: 'idle',
       editingWaypoints: null,
 
       beginDrag: (assetId, clientX, clientY) =>
@@ -125,6 +136,17 @@ export const useEditorStore = create<EditorState>()(
       setPlaying: (playing) =>
         // Leaving waypoint editing on during play would keep clicks adding points to a moving path.
         set({ playing, ...(playing ? { editingWaypoints: null } : {}) }, false, 'play/set'),
+      setWalking: (walking) =>
+        // Walking is Play plus a body: the simulation has to be running for there to be anything
+        // to walk around in, so the two are set together rather than left for the user to pair up.
+        set(
+          walking
+            ? { walking: true, playing: true, editingWaypoints: null, tool: 'select' }
+            : { walking: false, playing: false },
+          false,
+          'walk/set',
+        ),
+      setPhysicsStatus: (physicsStatus) => set({ physicsStatus }, false, 'physics/status'),
       setEditingWaypoints: (editingWaypoints) =>
         set({ editingWaypoints }, false, 'waypoints/editing'),
     }),

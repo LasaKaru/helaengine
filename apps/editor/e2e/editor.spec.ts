@@ -832,3 +832,116 @@ test.describe('behaviours', () => {
     await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
   });
 });
+
+/**
+ * Sprint 10 — Play Preview.
+ *
+ * Every assertion here is about the simulation rather than the DOM: where the character ends up,
+ * what stopped it, and whether the document survived being walked through. Those are the claims
+ * the sprint makes, and none of them can be checked by looking at the page.
+ */
+test.describe('play preview', () => {
+  test.beforeEach(async ({ page }) => {
+    await openEditor(page, /Forest clearing/);
+    await page.waitForTimeout(1200);
+  });
+
+  async function enterWalk(page: Page): Promise<void> {
+    await page.getByRole('button', { name: 'Walk' }).click();
+    await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
+      timeout: 20_000,
+    });
+    await page.waitForTimeout(600);
+  }
+
+  test('the player lands on the sculpted ground instead of falling through it', async ({
+    page,
+  }) => {
+    await enterWalk(page);
+
+    const player = await page.evaluate(() => window.helaengine!.playerPosition()!);
+    const ground = await page.evaluate(
+      ([x, z]) => window.helaengine!.terrainHeightAt(x as number, z as number),
+      [player.x, player.z],
+    );
+
+    expect(await page.evaluate(() => window.helaengine!.playerGrounded())).toBe(true);
+    expect(Math.abs(player.y - ground!)).toBeLessThan(0.2);
+  });
+
+  test('W walks the character across the world', async ({ page }) => {
+    await enterWalk(page);
+    await page.evaluate(() => window.helaengine!.setPlayerYaw(0));
+
+    const before = await page.evaluate(() => window.helaengine!.playerPosition()!);
+    await page.keyboard.down('w');
+    await page.waitForTimeout(1200);
+    await page.keyboard.up('w');
+    const after = await page.evaluate(() => window.helaengine!.playerPosition()!);
+
+    // Yaw 0 faces -Z; a second of the default 6 m/s covers several metres.
+    expect(after.z).toBeLessThan(before.z - 2);
+    expect(Math.abs(after.x - before.x)).toBeLessThan(1);
+  });
+
+  test('a building stops the player rather than letting them walk through it', async ({ page }) => {
+    // The hut's measured footprint is 7.2m, so its near face sits 3.6m out from its origin.
+    await page.evaluate(() => {
+      window.helaengine!.addObject('building_hut_01', [0, 0, -10]);
+      window.helaengine!.store.getState().setPlayer({ spawn: [0, 0, 0] });
+    });
+    await page.waitForTimeout(1200);
+
+    await enterWalk(page);
+    await page.evaluate(() => window.helaengine!.setPlayerYaw(0));
+
+    await page.keyboard.down('w');
+    await page.waitForTimeout(2500);
+    await page.keyboard.up('w');
+
+    const player = await page.evaluate(() => window.helaengine!.playerPosition()!);
+    expect(player.z).toBeGreaterThan(-6.6);
+    expect(player.z).toBeLessThan(-4);
+  });
+
+  test('walking is a rehearsal: the document is untouched and Escape returns to editing', async ({
+    page,
+  }) => {
+    const before = await page.evaluate(() =>
+      JSON.stringify(window.helaengine!.store.getState().scene),
+    );
+
+    await enterWalk(page);
+    await page.evaluate(() => window.helaengine!.setPlayerYaw(0));
+    await page.keyboard.down('w');
+    await page.waitForTimeout(800);
+    await page.keyboard.up('w');
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('button', { name: 'Walk' })).toBeVisible();
+    expect(await page.evaluate(() => window.helaengine!.playerPosition())).toBeNull();
+    expect(
+      await page.evaluate(() => JSON.stringify(window.helaengine!.store.getState().scene)),
+    ).toBe(before);
+  });
+
+  test('the inspector sets a per-instance body type', async ({ page }) => {
+    const id = await page.evaluate(() => window.helaengine!.addObject('prop_crate_01', [0, 4, 0]));
+    await page.evaluate((objectId) => window.helaengine!.store.getState().select([objectId]), id);
+
+    await page
+      .getByRole('group', { name: 'Body type' })
+      .getByRole('button', { name: 'Dynamic' })
+      .click();
+
+    expect(
+      await page.evaluate(
+        (objectId) =>
+          window
+            .helaengine!.store.getState()
+            .scene.objects.find((object) => object.id === objectId)!.physics.body,
+        id,
+      ),
+    ).toBe('dynamic');
+  });
+});

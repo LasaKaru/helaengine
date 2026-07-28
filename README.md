@@ -7,9 +7,8 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 9 (Phase 2 — Behaviours). Everything from Phase 1, plus behaviours: attach one
-to an object and press Play to watch it run. Physics and enemy AI are next; there is no backend
-yet, deliberately.
+**Status:** Sprint 10 (Phase 2 — Physics). Everything from Phase 1, plus behaviours and a physics
+world you can walk around in. Enemy AI is next; there is no backend yet, deliberately.
 
 ---
 
@@ -150,6 +149,24 @@ code to drift.
 Press **P** to run the scene's behaviours in the viewport. The runtime moves the Three.js nodes and
 never touches the document, so stopping restores everything and a preview can never become an edit.
 It is the same `BehaviorRuntime` an exported project will run.
+
+## Physics and Play Preview
+
+Press **Shift + P**, or the **Walk** button, to drop into the world as a person: a Rapier physics
+world is built from the scene, the sculpted terrain becomes a static heightfield, and a kinematic
+character controller handles gravity, slopes and stepping over low ledges. WASD moves, Space jumps,
+clicking captures the mouse to look around, and Escape returns to editing.
+
+Colliders come from the asset manifest — a pine is a capsule, a hut is a box — so a scene has
+sensible physics without anyone configuring anything. The inspector's Physics section overrides that
+per placement when the default is wrong: a body type (static, dynamic, kinematic) and a collider
+shape, with `auto` meaning "whatever the asset says".
+
+Walking is a rehearsal, not an edit. The simulation moves Three.js nodes and never the document, so
+leaving the mode puts everything back exactly where the document says it is.
+
+Rapier is WebAssembly and loads asynchronously. That happens once at startup rather than being
+checked for at every call site; until it finishes, the Walk button says so.
 
 ## Where this is going
 

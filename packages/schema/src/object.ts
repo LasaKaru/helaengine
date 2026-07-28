@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { BehaviorSchema } from './behavior.js';
+import { ObjectPhysicsSchema } from './physics.js';
 import { IdSchema, TransformSchema } from './primitives.js';
 
 /**
@@ -21,6 +22,8 @@ export const SceneObjectSchema = z.object({
   transform: TransformSchema.default({}),
   /** Gameplay attached to this object, in the order it should be applied. */
   behaviors: z.array(BehaviorSchema).max(32).default([]),
+  /** How this instance collides. Defaults defer to the asset manifest, so most objects say nothing. */
+  physics: ObjectPhysicsSchema,
   metadata: z
     .object({
       label: z.string().max(200).optional(),

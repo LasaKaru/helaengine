@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { Transform, Vec3 } from '@helaengine/schema';
+import type { BodyType, ColliderChoice, SceneObject, Transform, Vec3 } from '@helaengine/schema';
 import { useEditorStore } from '../store/editorStore';
 import { useSceneStore } from '../store/sceneStore';
 import { BehaviorPanel } from './BehaviorPanel';
@@ -43,6 +43,116 @@ function VectorRow({ title, value, step, suffix, onChange }: VectorRowProps): Re
         ))}
       </div>
     </div>
+  );
+}
+
+const BODY_TYPES: Array<{ value: BodyType; label: string; hint: string }> = [
+  { value: 'static', label: 'Static', hint: 'Never moves. Buildings, rocks, trees.' },
+  { value: 'dynamic', label: 'Dynamic', hint: 'Falls and is pushed around by contacts.' },
+  { value: 'kinematic', label: 'Kinematic', hint: 'Moved by gameplay; pushes, is not pushed.' },
+];
+
+const COLLIDER_CHOICES: ColliderChoice[] = ['auto', 'box', 'capsule', 'sphere', 'mesh', 'none'];
+
+/**
+ * How one placement collides.
+ *
+ * `auto` is the default and stays the default: the asset manifest already knows the shape of a
+ * pine tree, and answering it per instance would be a hundred chances to answer it differently.
+ */
+function PhysicsSection({ object }: { object: SceneObject }): React.JSX.Element {
+  const setObjectPhysics = useSceneStore((state) => state.setObjectPhysics);
+
+  return (
+    <section className="panel" aria-label="Physics">
+      <h2>Physics</h2>
+
+      <div className="gizmo-modes" role="group" aria-label="Body type">
+        {BODY_TYPES.map((entry) => (
+          <button
+            key={entry.value}
+            type="button"
+            title={entry.hint}
+            className={object.physics.body === entry.value ? 'active' : ''}
+            aria-pressed={object.physics.body === entry.value}
+            onClick={() => setObjectPhysics(object.id, { body: entry.value })}
+          >
+            {entry.label}
+          </button>
+        ))}
+      </div>
+
+      <label className="param-row">
+        <span>Collider</span>
+        <select
+          aria-label="Collider"
+          value={object.physics.collider}
+          onChange={(event) =>
+            setObjectPhysics(object.id, { collider: event.target.value as ColliderChoice })
+          }
+        >
+          {COLLIDER_CHOICES.map((choice) => (
+            <option key={choice} value={choice}>
+              {choice === 'auto' ? 'Auto (from asset)' : choice}
+            </option>
+          ))}
+        </select>
+      </label>
+    </section>
+  );
+}
+
+/** Where the player starts, and how they move, when the scene is walked or exported. */
+function PlayerPanel(): React.JSX.Element {
+  const player = useSceneStore((state) => state.scene.player);
+  const setPlayer = useSceneStore((state) => state.setPlayer);
+  const selectedIds = useSceneStore((state) => state.selectedIds);
+  const objects = useSceneStore((state) => state.scene.objects);
+
+  const moveToSelection = (): void => {
+    const object = objects.find((item) => item.id === selectedIds[0]);
+    if (object) setPlayer({ spawn: [...object.transform.position] });
+  };
+
+  return (
+    <section className="panel" aria-label="Player">
+      <h2>Player</h2>
+
+      <VectorRow
+        title="Spawn"
+        value={player.spawn}
+        step={0.5}
+        onChange={(spawn) => setPlayer({ spawn })}
+      />
+
+      <div className="param-row">
+        <span>Move speed</span>
+        <NumberField
+          label="Move speed"
+          scrubLabel=""
+          value={player.moveSpeed}
+          step={0.5}
+          suffix="m/s"
+          onChange={(moveSpeed) => setPlayer({ moveSpeed: Math.min(50, Math.max(0.5, moveSpeed)) })}
+        />
+      </div>
+
+      <div className="param-row">
+        <span>Jump speed</span>
+        <NumberField
+          label="Jump speed"
+          scrubLabel=""
+          value={player.jumpSpeed}
+          step={0.5}
+          suffix="m/s"
+          onChange={(jumpSpeed) => setPlayer({ jumpSpeed: Math.min(50, Math.max(0, jumpSpeed)) })}
+        />
+      </div>
+
+      <button type="button" disabled={selectedIds.length !== 1} onClick={moveToSelection}>
+        Spawn at object
+      </button>
+    </section>
   );
 }
 
@@ -137,9 +247,11 @@ export function InspectorPanel(): React.JSX.Element {
         )}
       </section>
 
+      {single && <PhysicsSection object={single} />}
       {single && <BehaviorPanel object={single} />}
 
       <TerrainPanel />
+      <PlayerPanel />
     </aside>
   );
 }

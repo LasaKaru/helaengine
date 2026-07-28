@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–9 complete. Phase 1 (Editor MVP) done; Phase 2 under way. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–10 complete. Phase 1 (Editor MVP) done; Phase 2 under way. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -247,12 +247,12 @@
 
 **Tasks:**
 
-- [ ] Integrate `@dimforge/rapier3d-compat` (WASM); build a `PhysicsWorld` wrapper class in `/packages/engine` that steps the Rapier world in sync with the Three.js render loop
-- [ ] Add `colliderType` handling from asset manifest (box/capsule/mesh/none) — auto-generate Rapier colliders when objects are instantiated based on their manifest default, with per-instance override option in Inspector
-- [ ] Implement static vs. dynamic vs. kinematic body types; terrain itself should be a static trimesh (or heightfield) collider matching the sculpted terrain from Sprint 7
-- [ ] Build a basic character controller (using Rapier's `KinematicCharacterController`) for a "player" template object — WASD movement + gravity + slope handling, used for the "test play" mode in the editor (a play-in-editor button that lets you walk around your world)
-- [ ] Sync Rapier rigid body transforms back to Three.js object transforms each frame (position/rotation)
-- [ ] Add a "Play Preview" mode toggle in the editor UI: switches from edit-camera to first/third-person player-controlled camera, runs the physics/behavior simulation live, Escape to exit back to edit mode
+- [x] Integrate `@dimforge/rapier3d-compat` (WASM); build a `PhysicsWorld` wrapper class in `/packages/engine` that steps the Rapier world in sync with the Three.js render loop — fixed timestep with an accumulator, so collision resolution does not depend on frame rate
+- [x] Add `colliderType` handling from asset manifest (box/capsule/mesh/none) — auto-generate Rapier colliders when objects are instantiated based on their manifest default, with per-instance override option in Inspector (`object.physics.collider`, defaulting to `auto`)
+- [x] Implement static vs. dynamic vs. kinematic body types; terrain itself should be a static trimesh (or heightfield) collider matching the sculpted terrain from Sprint 7 — heightfield, transposed from the field's row-major layout into Rapier's
+- [x] Build a basic character controller (using Rapier's `KinematicCharacterController`) for a "player" template object — WASD movement + gravity + slope handling, used for the "test play" mode in the editor (a play-in-editor button that lets you walk around your world)
+- [x] Sync Rapier rigid body transforms back to Three.js object transforms each frame (position/rotation) — including converting a parented node's result back into its parent's space
+- [x] Add a "Play Preview" mode toggle in the editor UI: switches from edit-camera to first/third-person player-controlled camera, runs the physics/behavior simulation live, Escape to exit back to edit mode — **first-person only**; a third-person rig is a camera change, not a physics one, and was left for when there is a character model worth looking at
 
 **Tech notes:**
 

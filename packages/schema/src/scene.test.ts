@@ -217,3 +217,54 @@ describe('terrain schema', () => {
     expect(safeParseScene({ ...base, terrain: { type: 'voxel' } }).success).toBe(false);
   });
 });
+
+describe('physics fields', () => {
+  it('reads a document written before physics existed', () => {
+    // The Sprint 10 additions are all defaulted, which is the only reason the scene version did
+    // not have to move. A field without a default here would have needed a migration.
+    const scene = parseScene({
+      sceneId: 'scene_old',
+      version: 1,
+      objects: [{ id: 'obj_0001', assetId: 'tree_pine_01' }],
+    });
+
+    expect(scene.objects[0]!.physics).toEqual({ body: 'static', collider: 'auto' });
+    expect(scene.player.spawn).toEqual([0, 0, 0]);
+    expect(scene.player.height).toBe(1.8);
+  });
+
+  it('accepts a per-instance collider override', () => {
+    const scene = parseScene({
+      sceneId: 'scene_test',
+      version: 1,
+      objects: [
+        {
+          id: 'obj_0001',
+          assetId: 'building_hut_01',
+          physics: { collider: 'mesh', body: 'static' },
+        },
+      ],
+    });
+
+    expect(scene.objects[0]!.physics.collider).toBe('mesh');
+  });
+
+  it('rejects a collider or body type it has never heard of', () => {
+    for (const physics of [{ collider: 'convexhull' }, { body: 'ragdoll' }]) {
+      expect(() =>
+        parseScene({
+          sceneId: 'scene_test',
+          version: 1,
+          objects: [{ id: 'obj_0001', assetId: 'a', physics }],
+        }),
+      ).toThrow();
+    }
+  });
+
+  it('keeps the player inside sane limits', () => {
+    const base = { sceneId: 'scene_test', version: 1 };
+    expect(() => parseScene({ ...base, player: { height: 0 } })).toThrow();
+    expect(() => parseScene({ ...base, player: { maxSlopeDegrees: 90 } })).toThrow();
+    expect(parseScene({ ...base, player: { moveSpeed: 12 } }).player.moveSpeed).toBe(12);
+  });
+});

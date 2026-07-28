@@ -176,6 +176,7 @@ export function TransformGizmo(): React.JSX.Element | null {
       parentId: null,
       transform,
       behaviors: [],
+      physics: { body: 'static' as const, collider: 'auto' as const },
       metadata: {},
     }));
 

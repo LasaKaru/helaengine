@@ -232,8 +232,8 @@ Even if starting solo, structure work as if these lanes exist — makes future h
 
 **Sprint 10: Physics integration (Rapier)**
 
-- [ ] Rapier WASM world synced to Three.js scene; collider types (box/capsule/mesh) assignable per asset in manifest defaults
-- [ ] Gravity, static vs dynamic bodies, simple character controller for "player" template object
+- [x] Rapier WASM world synced to Three.js scene; collider types (box/capsule/mesh) assignable per asset in manifest defaults
+- [x] Gravity, static vs dynamic bodies, simple character controller for "player" template object
 - **DoD:** Enemy with patrol behavior collides with terrain and static props correctly; player-controlled capsule can walk around without falling through terrain.
 
 **Sprint 11: Enemy AI (Yuka.js) + triggers**

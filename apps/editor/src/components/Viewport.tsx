@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { Grid, OrbitControls } from '@react-three/drei';
 import { useEditorStore } from '../store/editorStore';
-import type { LoadedScene, SceneLoader } from '@helaengine/engine';
+import type { AssetResolver, LoadedScene, SceneLoader } from '@helaengine/engine';
 import { setCamera, setLoadedScene } from '../devApi';
 import { useProjectStore } from '../store/projectStore';
 import { EngineBridge } from './EngineBridge';
@@ -10,6 +10,7 @@ import { MarqueeOverlay } from './Marquee';
 import { PlacementController } from './PlacementController';
 import { PlacementToolbar } from './PlacementToolbar';
 import { BehaviorPreview, WaypointEditor } from './BehaviorPreview';
+import { PhysicsPreview } from './PhysicsPreview';
 import { SculptController } from './SculptController';
 import { SelectionController } from './SelectionController';
 import { SelectionHighlight } from './SelectionHighlight';
@@ -57,6 +58,7 @@ function ThumbnailReporter(): null {
 
 interface ViewportProps {
   loader: SceneLoader;
+  resolver: AssetResolver;
 }
 
 /**
@@ -65,13 +67,14 @@ interface ViewportProps {
  * The grid and the camera controls are editor furniture — they exist to help someone build a
  * scene and are deliberately not part of the scene document, so they never end up in an export.
  */
-export function Viewport({ loader }: ViewportProps): React.JSX.Element {
+export function Viewport({ loader, resolver }: ViewportProps): React.JSX.Element {
   const [stats, setStats] = useState({ objects: 0, missing: 0 });
   const [loadedScene, setLoaded] = useState<LoadedScene | null>(null);
   const dragging = useEditorStore((state) => state.drag !== null);
   const gizmoActive = useEditorStore((state) => state.gizmoActive);
   const tool = useEditorStore((state) => state.tool);
   const playing = useEditorStore((state) => state.playing);
+  const walking = useEditorStore((state) => state.walking);
   const editingWaypoints = useEditorStore((state) => state.editingWaypoints);
 
   const handleLoaded = useCallback((loaded: LoadedScene) => {
@@ -94,6 +97,7 @@ export function Viewport({ loader }: ViewportProps): React.JSX.Element {
         <EngineBridge loader={loader} onLoaded={handleLoaded} />
         <PlacementController loader={loader} loadedScene={loadedScene} />
         <BehaviorPreview loadedScene={loadedScene} />
+        <PhysicsPreview loadedScene={loadedScene} resolver={resolver} />
         <WaypointEditor loadedScene={loadedScene} />
         {!playing && <SculptController loadedScene={loadedScene} />}
         {tool === 'select' && !playing && !editingWaypoints && (
@@ -103,17 +107,19 @@ export function Viewport({ loader }: ViewportProps): React.JSX.Element {
             <TransformGizmo />
           </>
         )}
-        <Grid
-          args={[200, 200]}
-          cellSize={1}
-          cellColor="#3a4354"
-          sectionSize={10}
-          sectionColor="#4d5a72"
-          fadeDistance={140}
-          fadeStrength={1.4}
-          followCamera={false}
-          infiniteGrid
-        />
+        {!walking && (
+          <Grid
+            args={[200, 200]}
+            cellSize={1}
+            cellColor="#3a4354"
+            sectionSize={10}
+            sectionColor="#4d5a72"
+            fadeDistance={140}
+            fadeStrength={1.4}
+            followCamera={false}
+            infiniteGrid
+          />
+        )}
         <OrbitControls
           makeDefault
           enableDamping
@@ -121,11 +127,18 @@ export function Viewport({ loader }: ViewportProps): React.JSX.Element {
           maxPolarAngle={Math.PI / 2.05}
           // Orbiting mid-drop would fight the ghost for the same pointer.
           // Orbiting during a sculpt stroke would drag the camera instead of the ground.
-          enabled={!dragging && !gizmoActive && tool === 'select'}
+          enabled={!dragging && !gizmoActive && !walking && tool === 'select'}
         />
       </Canvas>
 
       <MarqueeOverlay />
+
+      {walking && (
+        <div className="walk-hint" role="status" aria-label="Walk mode">
+          <strong>Walking</strong>
+          <span>WASD to move, Space to jump, click to look, Escape to return</span>
+        </div>
+      )}
 
       <div className="viewport-stats" role="status" aria-label="Viewport stats">
         <span>{stats.objects} objects</span>

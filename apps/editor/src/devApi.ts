@@ -1,5 +1,5 @@
 import { Vector3, type Camera } from 'three';
-import type { LoadedScene } from '@helaengine/engine';
+import type { LoadedScene, PlayerController } from '@helaengine/engine';
 import { SceneObjectSchema, type Vec3 } from '@helaengine/schema';
 import type { AssetLibrary } from './engine/assetLibrary';
 import { nextObjectId, useSceneStore } from './store/sceneStore';
@@ -21,6 +21,18 @@ export interface DevApi {
   terrainHeightAt(x: number, z: number): number | null;
   /** Client-space coordinates of an object, for driving precise clicks in tests. */
   projectObject(objectId: string): { x: number; y: number } | null;
+  /** Feet position of the Play Preview character, or null when not walking. */
+  playerPosition(): { x: number; y: number; z: number } | null;
+  /** Whether the character controller currently has ground under it. */
+  playerGrounded(): boolean | null;
+  /**
+   * Points the walking player somewhere specific, in radians of yaw.
+   *
+   * Looking around is a pointer-lock gesture, and pointer lock is one of the handful of browser
+   * APIs a headless run cannot drive. Without this, a test can only ever walk in whichever
+   * direction the edit camera happened to be facing.
+   */
+  setPlayerYaw(yaw: number): boolean;
 }
 
 declare global {
@@ -41,6 +53,26 @@ let currentLoadedScene: LoadedScene | null = null;
  */
 export function setLoadedScene(loaded: LoadedScene | null): void {
   currentLoadedScene = loaded;
+}
+
+let currentPlayer: PlayerController | null = null;
+
+/**
+ * Records the Play Preview character.
+ *
+ * The whole Sprint 10 definition of done is about where a character ends up — on a hill rather
+ * than through it, in front of a wall rather than inside it. That is a claim about the simulation,
+ * not about the DOM, so the tests need a way to read it.
+ */
+export function setPlayer(player: PlayerController | null): void {
+  currentPlayer = player;
+}
+
+let lookHandler: ((yaw: number) => void) | null = null;
+
+/** Registered by the walk preview while it owns the camera. */
+export function setLookHandler(handler: ((yaw: number) => void) | null): void {
+  lookHandler = handler;
 }
 
 let currentCamera: Camera | null = null;
@@ -115,6 +147,20 @@ export function exposeDevApi(library: AssetLibrary): void {
         x: rect.left + ((point.x + 1) / 2) * rect.width,
         y: rect.top + ((1 - point.y) / 2) * rect.height,
       };
+    },
+
+    playerPosition: () => {
+      if (!currentPlayer) return null;
+      const { x, y, z } = currentPlayer.position;
+      return { x, y, z };
+    },
+
+    playerGrounded: () => currentPlayer?.grounded ?? null,
+
+    setPlayerYaw: (yaw) => {
+      if (!lookHandler) return false;
+      lookHandler(yaw);
+      return true;
     },
 
     viewportObjects: () =>
