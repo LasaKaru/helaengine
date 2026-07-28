@@ -7,8 +7,9 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 7 (Phase 1 — Editor MVP). Place, select, transform, nest, rename, sculpt, paint,
-undo and redo all work. Local save is next; there is no backend yet, deliberately.
+**Status:** Sprint 8 — **Phase 1 (Editor MVP) complete**. Pick a template, place and transform
+objects, nest and rename them, sculpt and paint terrain, undo, and it all persists in the browser.
+Behaviours, physics and AI are next (Phase 2); there is no backend yet, deliberately.
 
 ---
 
@@ -42,6 +43,11 @@ Press **2** for the sculpt tool and **3** for paint (**1** returns to select). S
 lowers, smooths and flattens the ground; painting blends four terrain layers. A whole stroke is one
 undo step. Height and paint data are stored in the scene document as base64 — about 33 KB at the
 default 64×64 resolution — so a scene opens and exports without a second fetch.
+
+Projects live in IndexedDB. The app opens on a projects screen with three starter templates; work
+saves on Ctrl+S, on leaving the editor, and automatically 20 seconds after you stop editing. Every
+project is validated against the schema on the way back in, so a document written by an older build
+fails loudly at the boundary rather than halfway through a render.
 
 `window.helaengine` in the browser console drives the editor directly, which is handy for scripting
 a scene:

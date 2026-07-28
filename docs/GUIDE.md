@@ -214,9 +214,9 @@ Even if starting solo, structure work as if these lanes exist — makes future h
 
 **Sprint 8: Save/load (local first, no backend yet)**
 
-- [ ] Local save/load to IndexedDB (Dexie.js) so early testing doesn't need backend
-- [ ] Scene schema validation on load (Zod) with migration hook stub
-- [ ] "New project from template" flow using 2–3 hand-built starter scenes
+- [x] Local save/load to IndexedDB (Dexie.js) so early testing doesn't need backend
+- [x] Scene schema validation on load (Zod) with migration hook stub
+- [x] "New project from template" flow using 2–3 hand-built starter scenes
 - **DoD:** Close browser, reopen, project auto-restores from IndexedDB. Template picker loads a real starter scene.
 
 ---

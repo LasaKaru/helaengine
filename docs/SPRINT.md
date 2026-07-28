@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–7 complete. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–8 complete — Phase 1 (Editor MVP) done. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -197,13 +197,13 @@
 
 **Tasks:**
 
-- [ ] Integrate Dexie.js (IndexedDB wrapper) for local project storage
-- [ ] Build save flow: serialize `sceneStore` → validate against Zod schema → write to IndexedDB keyed by project ID
-- [ ] Build load flow: read from IndexedDB → Zod-validate → hydrate `sceneStore`; handle validation failure gracefully (surface error, don't silently corrupt state)
-- [ ] Add a schema `version` field and a stub migration registry (`migrations/v1-to-v2.ts` etc.) even if empty right now — establishes the pattern before real migrations are needed
-- [ ] Build "New Project" flow: blank template vs. pick-from-starter-template (hand-build 2-3 starter `scene.json` files representing different scenarios — e.g., "empty field," "small village layout," "forest clearing")
-- [ ] Build a basic Projects list/home screen (local-only for now) showing saved projects with thumbnail (can be a simple canvas screenshot capture of the viewport at save time) and last-modified date
-- [ ] Add autosave (debounced, e.g., every 30-60 seconds of inactivity, or on major actions) to reduce risk of data loss during long sessions
+- [x] Integrate Dexie.js (IndexedDB wrapper) for local project storage
+- [x] Build save flow: serialize `sceneStore` → validate against Zod schema → write to IndexedDB keyed by project ID
+- [x] Build load flow: read from IndexedDB → Zod-validate → hydrate `sceneStore`; handle validation failure gracefully (surface error, don't silently corrupt state)
+- [x] Add a schema `version` field and a stub migration registry (`migrations/v1-to-v2.ts` etc.) even if empty right now — establishes the pattern before real migrations are needed
+- [x] Build "New Project" flow: blank template vs. pick-from-starter-template (hand-build 2-3 starter `scene.json` files representing different scenarios — e.g., "empty field," "small village layout," "forest clearing")
+- [x] Build a basic Projects list/home screen (local-only for now) showing saved projects with thumbnail (can be a simple canvas screenshot capture of the viewport at save time) and last-modified date
+- [x] Add autosave (debounced, e.g., every 30-60 seconds of inactivity, or on major actions) to reduce risk of data loss during long sessions
 
 **Deliverables:** Full local persistence loop, template picker.
 

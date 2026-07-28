@@ -1,6 +1,29 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
+ * Opens a fresh project in the editor.
+ *
+ * The app starts on the projects screen, so anything testing the editor has to get there first.
+ * The database is cleared each time so no test inherits another's projects.
+ */
+async function openEditor(page: Page, template = /Empty field/): Promise<void> {
+  await page.goto('/');
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const request = indexedDB.deleteDatabase('helaengine');
+        request.onsuccess = () => resolve();
+        request.onerror = () => resolve();
+        request.onblocked = () => resolve();
+      }),
+  );
+  await page.reload();
+  await page.getByRole('button', { name: template }).click();
+  await expect(page.getByRole('banner')).toBeVisible();
+  await page.waitForFunction(() => window.helaengine !== undefined);
+}
+
+/**
  * Sprint 3 smoke test — it asserts the one thing this sprint claims: that a change to the store
  * puts a real asset in the viewport, through the shared engine, with no editor-side placement code.
  *
@@ -10,16 +33,14 @@ import { expect, test, type Page } from '@playwright/test';
  */
 test.describe('editor shell', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await expect(page.getByRole('banner')).toBeVisible();
-    await page.waitForFunction(() => window.helaengine !== undefined);
+    await openEditor(page);
   });
 
   test('renders the shell with a live canvas', async ({ page }) => {
     await expect(page.locator('canvas')).toBeVisible();
     await expect(page.getByRole('region', { name: 'Assets' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Inspector' })).toBeVisible();
-    await expect(page.getByRole('status')).toContainText('0 objects');
+    await expect(page.getByRole('status', { name: 'Viewport stats' })).toContainText('0 objects');
   });
 
   test('loads the manifest produced by the ingest pipeline', async ({ page }) => {
@@ -31,7 +52,7 @@ test.describe('editor shell', () => {
   test('adding an object to the store puts a real model in the scene', async ({ page }) => {
     await page.evaluate(() => window.helaengine!.addObject('building_hut_01', [0, 0, 0]));
 
-    await expect(page.getByRole('status')).toContainText('1 objects');
+    await expect(page.getByRole('status', { name: 'Viewport stats' })).toContainText('1 objects');
     await expect(page.getByRole('region', { name: 'Scene' })).toContainText('building_hut_01');
 
     // The real assertion: the object reached the Three.js scene graph, not just React state.
@@ -53,11 +74,11 @@ test.describe('editor shell', () => {
 
   test('removing an object takes it back out of the viewport', async ({ page }) => {
     await page.evaluate(() => window.helaengine!.addObject('rock_boulder_01'));
-    await expect(page.getByRole('status')).toContainText('1 objects');
+    await expect(page.getByRole('status', { name: 'Viewport stats' })).toContainText('1 objects');
 
     await page.evaluate(() => window.helaengine!.clear());
 
-    await expect(page.getByRole('status')).toContainText('0 objects');
+    await expect(page.getByRole('status', { name: 'Viewport stats' })).toContainText('0 objects');
     await expect(page.getByRole('region', { name: 'Scene' })).toContainText('This scene is empty');
     await expect
       .poll(async () => page.evaluate(() => window.helaengine!.viewportObjectIds()))
@@ -72,7 +93,7 @@ test.describe('editor shell', () => {
     });
 
     await page.evaluate(() => window.helaengine!.addObject('tree_pine_01', [3, 0, 2]));
-    await expect(page.getByRole('status')).toContainText('1 objects');
+    await expect(page.getByRole('status', { name: 'Viewport stats' })).toContainText('1 objects');
 
     expect(errors).toEqual([]);
   });
@@ -84,8 +105,7 @@ test.describe('editor shell', () => {
  */
 test.describe('drag to place', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForFunction(() => window.helaengine !== undefined);
+    await openEditor(page);
     await expect(page.getByRole('region', { name: 'Assets' })).toBeVisible();
   });
 
@@ -110,13 +130,17 @@ test.describe('drag to place', () => {
   test('dropping an asset on the terrain adds it to the scene', async ({ page }) => {
     const canvas = page.locator('canvas');
     const canvasBox = (await canvas.boundingBox())!;
+    // The terrain has to exist before a drop can raycast against it.
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.terrainHeightAt(0, 0) !== null))
+      .toBe(true);
 
     await dragAssetTo(page, 'building_hut_01', {
       x: canvasBox.x + canvasBox.width / 2,
       y: canvasBox.y + canvasBox.height * 0.62,
     });
 
-    await expect(page.getByRole('status').last()).toContainText('1 objects');
+    await expect(page.getByRole('status', { name: 'Viewport stats' })).toContainText('1 objects');
     await expect
       .poll(async () => page.evaluate(() => window.helaengine!.viewportObjects()))
       .toEqual([{ id: 'obj_0001', assetId: 'building_hut_01', isModel: true }]);
@@ -138,7 +162,7 @@ test.describe('drag to place', () => {
       y: canvasBox.y + 8,
     });
 
-    await expect(page.getByRole('status').last()).toContainText('0 objects');
+    await expect(page.getByRole('status', { name: 'Viewport stats' })).toContainText('0 objects');
   });
 
   test('snap to grid rounds the dropped position to whole metres', async ({ page }) => {
@@ -170,8 +194,7 @@ test.describe('drag to place', () => {
  */
 test.describe('selection and transforms', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForFunction(() => window.helaengine !== undefined);
+    await openEditor(page);
     await page.evaluate(() => {
       window.helaengine!.addObject('building_hut_01', [0, 0, 0]);
       // Off the camera-to-origin line, so it never occludes the hut when clicking.
@@ -208,10 +231,9 @@ test.describe('selection and transforms', () => {
     await page.evaluate(() => window.helaengine!.store.getState().select(['obj_0001']));
     const canvasBox = (await page.locator('canvas').boundingBox())!;
 
-    await page.mouse.click(
-      canvasBox.x + canvasBox.width * 0.12,
-      canvasBox.y + canvasBox.height * 0.9,
-    );
+    // High in the viewport is sky: unambiguously nothing, unlike a ground corner that a tree can
+    // drift into as soon as a template or camera angle changes.
+    await page.mouse.click(canvasBox.x + canvasBox.width * 0.5, canvasBox.y + 10);
 
     await expect
       .poll(async () => page.evaluate(() => window.helaengine!.store.getState().selectedIds))
@@ -309,8 +331,7 @@ test.describe('selection and transforms', () => {
 /** Undo/redo and the scene tree — the flows that make experimenting in the editor safe. */
 test.describe('history and the scene tree', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForFunction(() => window.helaengine !== undefined);
+    await openEditor(page);
     await page.evaluate(() => {
       window.helaengine!.addObject('building_hut_01', [0, 0, 0]);
       window.helaengine!.addObject('prop_barrel_01', [4, 0, 2]);
@@ -420,8 +441,7 @@ test.describe('history and the scene tree', () => {
 /** Terrain sculpting and painting: a real pointer stroke against a real raycast. */
 test.describe('terrain', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForFunction(() => window.helaengine !== undefined);
+    await openEditor(page);
     await expect(page.getByRole('region', { name: 'Terrain' })).toBeVisible();
   });
 
@@ -525,5 +545,151 @@ test.describe('terrain', () => {
     await expect
       .poll(async () => page.evaluate(() => window.helaengine!.terrainHeightAt(0, 0)))
       .toBeCloseTo(height!, 2);
+  });
+});
+
+/**
+ * Projects and persistence. The claim this sprint makes is that work survives closing the tab,
+ * which nothing short of a real reload against real IndexedDB actually tests.
+ */
+test.describe('projects and local save', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    // Each test starts from an empty database, so ordering between them cannot matter.
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          const request = indexedDB.deleteDatabase('helaengine');
+          request.onsuccess = () => resolve();
+          request.onerror = () => resolve();
+          request.onblocked = () => resolve();
+        }),
+    );
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Your projects' })).toBeVisible();
+  });
+
+  test('opens on the projects screen with the template picker', async ({ page }) => {
+    await expect(page.getByRole('button', { name: /Empty field/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Forest clearing/ })).toBeVisible();
+    await expect(page.getByText('Nothing saved yet')).toBeVisible();
+  });
+
+  test('a template opens a populated scene in the editor', async ({ page }) => {
+    await page.getByRole('button', { name: /Village outpost/ }).click();
+
+    await expect(page.getByRole('banner')).toBeVisible();
+    await expect(page.getByLabel('Project name')).toHaveValue('Village Outpost');
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.viewportObjectIds().length))
+      .toBeGreaterThan(10);
+    // The template ships sculpted ground, not a flat plane.
+    expect(await page.evaluate(() => window.helaengine!.terrainHeightAt(30, -30))).toBeGreaterThan(
+      0,
+    );
+  });
+
+  test('edits survive a full page reload', async ({ page }) => {
+    await page.getByRole('button', { name: /Empty field/ }).click();
+    await expect(page.getByRole('banner')).toBeVisible();
+
+    await page.evaluate(() => {
+      window.helaengine!.store.getState().setName('Persisted Scene');
+      window.helaengine!.addObject('building_hut_01', [2, 0, 3]);
+    });
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByRole('status', { name: 'Save state' })).toHaveText('Saved');
+
+    await page.reload();
+    await page.waitForFunction(() => window.helaengine !== undefined);
+
+    // Back on the projects screen, the saved project is listed...
+    await expect(page.getByRole('button', { name: /Persisted Scene/ })).toBeVisible();
+    await page.getByRole('button', { name: /Persisted Scene/ }).click();
+
+    // ...and reopening it restores the document and the viewport.
+    await expect(page.getByLabel('Project name')).toHaveValue('Persisted Scene');
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.viewportObjectIds()))
+      .toEqual(['obj_0001']);
+  });
+
+  test('a sculpted terrain survives a reload', async ({ page }) => {
+    await page.getByRole('button', { name: /Empty field/ }).click();
+    await expect(page.getByRole('banner')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Sculpt' }).click();
+    const box = (await page.locator('canvas').boundingBox())!;
+    await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.6);
+    await page.mouse.down();
+    for (let step = 0; step < 6; step += 1) {
+      await page.mouse.move(box.x + box.width * 0.5 + step * 3, box.y + box.height * 0.6);
+      await page.waitForTimeout(40);
+    }
+    await page.mouse.up();
+
+    const height = await page.evaluate(() => window.helaengine!.terrainHeightAt(0, 0));
+    expect(height).toBeGreaterThan(0);
+
+    await page.keyboard.press('Control+s');
+    await expect(page.getByRole('status', { name: 'Save state' })).toHaveText('Saved');
+    await page.reload();
+    await page.waitForFunction(() => window.helaengine !== undefined);
+    await page
+      .getByRole('button', { name: /Untitled scene/ })
+      .first()
+      .click();
+
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.terrainHeightAt(0, 0)))
+      .toBeCloseTo(height!, 2);
+  });
+
+  test('the projects list shows a thumbnail after saving', async ({ page }) => {
+    await page.getByRole('button', { name: /Forest clearing/ }).click();
+    await expect(page.getByRole('banner')).toBeVisible();
+    await page.waitForTimeout(1500);
+
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByRole('status', { name: 'Save state' })).toHaveText('Saved');
+
+    await page.getByRole('button', { name: 'Projects' }).click();
+
+    const thumbnail = page.locator('.project-card img').first();
+    await expect(thumbnail).toBeVisible();
+    expect(await thumbnail.getAttribute('src')).toMatch(/^data:image\/jpeg/);
+  });
+
+  test('duplicating a project leaves the original alone', async ({ page }) => {
+    await page.getByRole('button', { name: /Empty field/ }).click();
+    await page.getByRole('button', { name: 'Projects' }).click();
+
+    await page.getByRole('button', { name: 'Duplicate' }).first().click();
+
+    await expect(page.getByRole('button', { name: /Untitled scene copy/ })).toBeVisible();
+    await expect(page.locator('.project-card')).toHaveCount(2);
+  });
+
+  test('leaving the editor saves first, so nothing is lost', async ({ page }) => {
+    await page.getByRole('button', { name: /Empty field/ }).click();
+    // Creating from a template is async — editing before it lands would be edits to the outgoing
+    // document, which the template then replaces.
+    await expect(page.getByRole('banner')).toBeVisible();
+    await page.evaluate(() => window.helaengine!.addObject('rock_boulder_01'));
+
+    // No explicit save — clicking away is enough. The projects screen only appears once the
+    // save has resolved, so its arrival is the signal that the write landed.
+    await page.getByRole('button', { name: 'Projects' }).click();
+    await expect(page.getByRole('heading', { name: 'Your projects' })).toBeVisible();
+    await page.reload();
+    await page.waitForFunction(() => window.helaengine !== undefined);
+    await page
+      .getByRole('button', { name: /Untitled scene/ })
+      .first()
+      .click();
+
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.viewportObjectIds().length))
+      .toBe(1);
   });
 });

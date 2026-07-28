@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useEditorStore } from './store/editorStore';
+import { useProjectStore } from './store/projectStore';
 import { useSceneStore } from './store/sceneStore';
 
 /**
@@ -18,6 +19,7 @@ export const SHORTCUTS: Array<{ keys: string; description: string }> = [
   { keys: 'Click', description: 'Select object' },
   { keys: 'Shift + Click', description: 'Add to / remove from selection' },
   { keys: 'Drag on empty space', description: 'Marquee select' },
+  { keys: 'Ctrl/⌘ + S', description: 'Save' },
   { keys: 'Ctrl/⌘ + Z', description: 'Undo' },
   { keys: 'Ctrl/⌘ + Shift + Z', description: 'Redo' },
   { keys: 'Ctrl/⌘ + Y', description: 'Redo (alternate)' },
@@ -60,6 +62,13 @@ export function useShortcuts(options: ShortcutOptions = {}): void {
       const editor = useEditorStore.getState();
       const selected = scene.selectedIds;
       const modifier = event.ctrlKey || event.metaKey;
+
+      if (modifier && event.key.toLowerCase() === 's') {
+        // The browser's own save dialog is never what someone wants here.
+        event.preventDefault();
+        void useProjectStore.getState().save();
+        return;
+      }
 
       if (modifier && event.key.toLowerCase() === 'z') {
         event.preventDefault();

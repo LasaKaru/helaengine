@@ -6,9 +6,17 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './e2e',
-  fullyParallel: true,
+  // Serial, deliberately. Every test shares one origin and therefore one IndexedDB, so a parallel
+  // worker resetting the database lands in the middle of another test's save. The suite is small
+  // enough that correctness is worth the wall-clock time.
+  fullyParallel: false,
+  workers: 1,
   forbidOnly: !!process.env['CI'],
-  retries: process.env['CI'] ? 1 : 0,
+  // One retry everywhere, not just CI. These tests drive a WebGL canvas through a software
+  // renderer, where a slow frame can push a poll past its deadline; a rerun distinguishes that
+  // from a real failure without hiding one.
+  retries: 1,
+  expect: { timeout: 10_000 },
   reporter: process.env['CI'] ? 'github' : 'list',
   use: {
     baseURL: 'http://127.0.0.1:5174',

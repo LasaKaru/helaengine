@@ -4,8 +4,11 @@ import { exposeDevApi } from './devApi';
 import { AssetLibraryPanel } from './components/AssetLibraryPanel';
 import { DragChip } from './components/DragChip';
 import { InspectorPanel } from './components/Panels';
+import { ProjectsScreen } from './components/ProjectsScreen';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { useShortcuts } from './useShortcuts';
+import { useAutosave } from './useAutosave';
+import { useProjectStore } from './store/projectStore';
 import { TopBar } from './components/TopBar';
 import { Viewport } from './components/Viewport';
 
@@ -16,7 +19,10 @@ type LoadState =
 
 export function App(): React.JSX.Element {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
+  const screen = useProjectStore((store) => store.screen);
+
   useShortcuts();
+  useAutosave(screen === 'editor');
 
   useEffect(() => {
     const controller = new AbortController();
@@ -54,6 +60,8 @@ export function App(): React.JSX.Element {
       </div>
     );
   }
+
+  if (screen === 'projects') return <ProjectsScreen />;
 
   return (
     <div className="editor">

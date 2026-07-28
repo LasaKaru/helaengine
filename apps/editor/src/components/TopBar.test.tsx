@@ -2,12 +2,14 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SceneObjectSchema } from '@helaengine/schema';
+import { useProjectStore } from '../store/projectStore';
 import { createEmptyScene, useSceneStore } from '../store/sceneStore';
 import { TopBar } from './TopBar';
 
 describe('TopBar', () => {
   beforeEach(() => {
     useSceneStore.setState({ scene: createEmptyScene('Test Scene'), selectedIds: [] });
+    useProjectStore.setState({ dirty: false, saveState: { status: 'idle' } });
   });
 
   it('shows the project name from the store', () => {
@@ -40,9 +42,24 @@ describe('TopBar', () => {
     expect(screen.getByText('1 objects')).toBeInTheDocument();
   });
 
-  it('disables actions whose sprints have not landed', () => {
+  it('offers save, and still disables actions whose sprints have not landed', () => {
     render(<TopBar />);
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Export' })).toBeDisabled();
+  });
+
+  it('reports unsaved changes', () => {
+    useProjectStore.setState({ dirty: true, saveState: { status: 'idle' } });
+    render(<TopBar />);
+    expect(screen.getByRole('status')).toHaveTextContent('Unsaved changes');
+  });
+
+  it('reports a failed save rather than staying silent', () => {
+    useProjectStore.setState({
+      dirty: false,
+      saveState: { status: 'error', message: 'disk full' },
+    });
+    render(<TopBar />);
+    expect(screen.getByRole('status')).toHaveTextContent('Save failed');
   });
 });

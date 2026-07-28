@@ -4,6 +4,7 @@ import { Grid, OrbitControls } from '@react-three/drei';
 import { useEditorStore } from '../store/editorStore';
 import type { LoadedScene, SceneLoader } from '@helaengine/engine';
 import { setCamera, setLoadedScene } from '../devApi';
+import { useProjectStore } from '../store/projectStore';
 import { EngineBridge } from './EngineBridge';
 import { MarqueeOverlay } from './Marquee';
 import { PlacementController } from './PlacementController';
@@ -20,6 +21,36 @@ function CameraReporter(): null {
     setCamera(camera);
     return () => setCamera(null);
   }, [camera]);
+  return null;
+}
+
+/**
+ * Hands the project store a way to screenshot the viewport for project thumbnails.
+ *
+ * Registered from inside the Canvas because that is the only place with the renderer. The canvas
+ * is created with `preserveDrawingBuffer`, without which `toDataURL` returns a blank image on most
+ * drivers — the back buffer is normally cleared as soon as it has been presented.
+ */
+function ThumbnailReporter(): null {
+  const gl = useThree((state) => state.gl);
+  const scene = useThree((state) => state.scene);
+  const camera = useThree((state) => state.camera);
+
+  useEffect(() => {
+    useProjectStore.getState().setCaptureThumbnail(() => {
+      try {
+        // Rendered on demand rather than trusting whatever is in the buffer, so the thumbnail
+        // matches the scene at save time even if the loop was idle.
+        gl.render(scene, camera);
+        return gl.domElement.toDataURL('image/jpeg', 0.6);
+      } catch {
+        return null;
+      }
+    });
+
+    return () => useProjectStore.getState().setCaptureThumbnail(null);
+  }, [gl, scene, camera]);
+
   return null;
 }
 
@@ -52,10 +83,11 @@ export function Viewport({ loader }: ViewportProps): React.JSX.Element {
       <Canvas
         shadows
         camera={{ position: [18, 14, 18], fov: 55, near: 0.1, far: 2000 }}
-        gl={{ antialias: true }}
+        gl={{ antialias: true, preserveDrawingBuffer: true }}
         data-testid="viewport-canvas"
       >
         <CameraReporter />
+        <ThumbnailReporter />
         <EngineBridge loader={loader} onLoaded={handleLoaded} />
         <PlacementController loader={loader} loadedScene={loadedScene} />
         <SculptController loadedScene={loadedScene} />
@@ -90,7 +122,7 @@ export function Viewport({ loader }: ViewportProps): React.JSX.Element {
 
       <MarqueeOverlay />
 
-      <div className="viewport-stats" role="status">
+      <div className="viewport-stats" role="status" aria-label="Viewport stats">
         <span>{stats.objects} objects</span>
         {stats.missing > 0 && <span className="warn">{stats.missing} missing assets</span>}
       </div>
