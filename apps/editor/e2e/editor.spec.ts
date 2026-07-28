@@ -416,3 +416,114 @@ test.describe('history and the scene tree', () => {
     await expect(page.getByRole('treeitem').first()).toContainText('Village hut');
   });
 });
+
+/** Terrain sculpting and painting: a real pointer stroke against a real raycast. */
+test.describe('terrain', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.waitForFunction(() => window.helaengine !== undefined);
+    await expect(page.getByRole('region', { name: 'Terrain' })).toBeVisible();
+  });
+
+  async function strokeCanvas(page: Page, fx: number, fy: number, samples = 6): Promise<void> {
+    const box = (await page.locator('canvas').boundingBox())!;
+    const x = box.x + box.width * fx;
+    const y = box.y + box.height * fy;
+
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    for (let step = 0; step < samples; step += 1) {
+      await page.mouse.move(x + step * 3, y + step * 2);
+      await page.waitForTimeout(40);
+    }
+    await page.mouse.up();
+    await page.waitForTimeout(150);
+  }
+
+  test('a sculpt stroke raises the ground and records one undo step', async ({ page }) => {
+    await page.getByRole('button', { name: 'Sculpt' }).click();
+    await page.getByLabel('Brush radius').fill('16');
+    await page.getByLabel('Brush radius').press('Enter');
+
+    expect(await page.evaluate(() => window.helaengine!.terrainHeightAt(0, 0))).toBe(0);
+
+    await strokeCanvas(page, 0.5, 0.6);
+
+    // The live field rose...
+    expect(await page.evaluate(() => window.helaengine!.terrainHeightAt(0, 0))).toBeGreaterThan(0);
+    // ...the document recorded it...
+    expect(await page.evaluate(() => window.helaengine!.store.getState().scene.terrain.type)).toBe(
+      'heightmap',
+    );
+    // ...and the whole drag is a single undo step, not one per frame.
+    expect(await page.evaluate(() => window.helaengine!.store.getState().history.past.length)).toBe(
+      1,
+    );
+  });
+
+  test('undo flattens the ground again', async ({ page }) => {
+    await page.getByRole('button', { name: 'Sculpt' }).click();
+    await strokeCanvas(page, 0.5, 0.6);
+    expect(await page.evaluate(() => window.helaengine!.terrainHeightAt(0, 0))).toBeGreaterThan(0);
+
+    await page.keyboard.press('Control+z');
+
+    // The document moving must drag the live terrain back with it.
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.terrainHeightAt(0, 0)))
+      .toBe(0);
+  });
+
+  test('painting writes a splatmap without touching the heights', async ({ page }) => {
+    await page.getByRole('button', { name: 'Paint' }).click();
+    await page
+      .getByRole('group', { name: 'Paint layer' })
+      .getByRole('button', { name: 'Rock', exact: true })
+      .click();
+
+    await strokeCanvas(page, 0.5, 0.6);
+
+    const terrain = await page.evaluate(() => window.helaengine!.store.getState().scene.terrain);
+    expect(terrain.splatmap).not.toBeNull();
+    expect(await page.evaluate(() => window.helaengine!.terrainHeightAt(0, 0))).toBe(0);
+  });
+
+  test('1 / 2 / 3 switch tools', async ({ page }) => {
+    await page.keyboard.press('2');
+    await expect(page.getByRole('button', { name: 'Sculpt' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    await page.keyboard.press('3');
+    await expect(page.getByRole('button', { name: 'Paint' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    await page.keyboard.press('1');
+    await expect(page.getByRole('button', { name: 'Select' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  test('sculpted terrain survives a reload of the document', async ({ page }) => {
+    await page.getByRole('button', { name: 'Sculpt' }).click();
+    await strokeCanvas(page, 0.5, 0.6);
+
+    const saved = await page.evaluate(() =>
+      JSON.stringify(window.helaengine!.store.getState().scene),
+    );
+    const height = await page.evaluate(() => window.helaengine!.terrainHeightAt(0, 0));
+
+    // Round-trip the document exactly as a save/load would.
+    await page.evaluate((json) => {
+      window.helaengine!.store.getState().setScene(JSON.parse(json));
+    }, saved);
+
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.terrainHeightAt(0, 0)))
+      .toBeCloseTo(height!, 2);
+  });
+});

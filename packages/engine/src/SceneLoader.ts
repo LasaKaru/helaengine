@@ -8,6 +8,7 @@ import type {
 } from '@helaengine/schema';
 import { MISSING_ASSET_ENTRY, type AssetResolver } from './assets.js';
 import type { ModelSource } from './models.js';
+import { LAYER_COUNT, TerrainField } from './TerrainField.js';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -95,6 +96,23 @@ function placeholderMaterial(
   return material;
 }
 
+/**
+ * Rebuilds the editable terrain field from a scene document.
+ *
+ * A document carries the terrain as base64; everything that wants to sample, sculpt or render it
+ * works from a `TerrainField`, so decoding happens once, here.
+ */
+export function terrainFieldFromDocument(terrain: Terrain): TerrainField {
+  const field = new TerrainField({
+    segments: terrain.segments,
+    size: terrain.size,
+    maxHeight: terrain.maxHeight,
+  });
+  if (terrain.heightmap) field.decodeHeights(terrain.heightmap.data);
+  if (terrain.splatmap) field.decodeWeights(terrain.splatmap.data);
+  return field;
+}
+
 /** Applies a document transform to a node. Rotation is authored in degrees, converted once here. */
 function applyTransform(node: THREE.Object3D, object: SceneObject): void {
   const { position, rotation, scale } = object.transform;
@@ -136,6 +154,57 @@ export class LoadedScene {
    * metres across) and the sun's position, pushing the camera so far back the content disappears
    * into the fog. Callers almost always want the bounds of the things the user placed.
    */
+  /** The terrain mesh, or null for a scene that somehow has none. */
+  get terrain(): THREE.Mesh | null {
+    return (this.threeScene.getObjectByName('terrain') as THREE.Mesh | undefined) ?? null;
+  }
+
+  /** The editable height/paint data behind the terrain mesh. */
+  get terrainField(): TerrainField | null {
+    return (this.terrain?.userData['terrainField'] as TerrainField | undefined) ?? null;
+  }
+
+  /**
+   * Pushes the field's current heights and colours into the terrain geometry.
+   *
+   * This is the sculpt equivalent of `syncTransforms`: a stroke mutates the field and refreshes
+   * the geometry in place, without the document — and therefore the undo stack — being touched
+   * until the stroke ends.
+   */
+  refreshTerrain(layerColors: string[]): void {
+    const mesh = this.terrain;
+    const field = this.terrainField;
+    if (mesh && field) field.updateGeometry(mesh.geometry, layerColors);
+  }
+
+  /**
+   * Re-reads the document's heightmap and paint data into the live field.
+   *
+   * The sculpt path deliberately edits the field directly and only writes the document when a
+   * stroke ends — which means the document can also move without the field: an undo, a redo, or a
+   * scene loaded from elsewhere. This is the way back, and the terrain equivalent of
+   * `syncTransforms`.
+   */
+  syncTerrain(terrain: Terrain): void {
+    const field = this.terrainField;
+    if (!field) return;
+
+    if (terrain.heightmap) field.decodeHeights(terrain.heightmap.data);
+    else field.heights.fill(0);
+
+    if (terrain.splatmap) {
+      field.decodeWeights(terrain.splatmap.data);
+    } else {
+      field.weights.fill(0);
+      for (let index = 0; index < field.width * field.width; index += 1) {
+        field.weights[index * LAYER_COUNT] = 255;
+      }
+    }
+
+    field.maxHeight = terrain.maxHeight;
+    this.refreshTerrain(terrain.layers.map((layer) => layer.color));
+  }
+
   getContentBounds(): THREE.Box3 {
     const box = new THREE.Box3();
     for (const object of this.objects.values()) {
@@ -400,11 +469,17 @@ export class SceneLoader {
   }
 
   #buildTerrain(terrain: Terrain, disposables: DisposableResource[]): THREE.Object3D {
-    const [sizeX, sizeZ] = terrain.size;
-    const geometry = new THREE.PlaneGeometry(sizeX, sizeZ, terrain.segments, terrain.segments);
-    geometry.rotateX(-Math.PI / 2);
+    const field = terrainFieldFromDocument(terrain);
+
+    // Flat terrain keeps a single flat colour; sculpted terrain blends its four layers per vertex.
+    // Per-vertex blending rather than a splat-mapped shader: at low-poly densities the vertex grid
+    // *is* the paint resolution, and it keeps the material an ordinary MeshStandardMaterial that
+    // any exported project can render without shader plumbing.
+    const useLayers = terrain.type === 'heightmap';
+    const geometry = field.buildGeometry(terrain.layers.map((layer) => layer.color));
     const material = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(terrain.material.color),
+      color: useLayers ? new THREE.Color('#ffffff') : new THREE.Color(terrain.material.color),
+      vertexColors: useLayers,
       roughness: 1,
       metalness: 0,
     });
@@ -414,6 +489,7 @@ export class SceneLoader {
     mesh.name = 'terrain';
     mesh.receiveShadow = true;
     mesh.userData['isTerrain'] = true;
+    mesh.userData['terrainField'] = field;
     return mesh;
   }
 

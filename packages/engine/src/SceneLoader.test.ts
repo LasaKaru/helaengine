@@ -584,3 +584,87 @@ describe('SceneLoader hierarchy', () => {
     loaded.dispose();
   });
 });
+
+describe('LoadedScene terrain', () => {
+  function terrainScene(overrides: Record<string, unknown> = {}) {
+    return parseScene({
+      sceneId: 'scene_test',
+      version: 1,
+      terrain: { type: 'heightmap', size: [64, 64], segments: 16, maxHeight: 20, ...overrides },
+      objects: [],
+    });
+  }
+
+  it('exposes an editable field for the terrain', () => {
+    const loaded = makeLoader().load(terrainScene());
+
+    expect(loaded.terrain).not.toBeNull();
+    expect(loaded.terrainField?.width).toBe(17);
+
+    loaded.dispose();
+  });
+
+  it('rebuilds heights from a document heightmap', () => {
+    const source = makeLoader().load(terrainScene());
+    source.terrainField!.sculpt(0, 0, 'raise', { radius: 16, strength: 0.5 });
+    const encoded = source.terrainField!.encodeHeights();
+    source.dispose();
+
+    const loaded = makeLoader().load(
+      terrainScene({ heightmap: { encoding: 'base64', data: encoded } }),
+    );
+
+    expect(loaded.terrainField!.sampleHeight(0, 0)).toBeGreaterThan(0);
+    loaded.dispose();
+  });
+
+  it('pushes document data back into a field that has drifted', () => {
+    // This is the undo path: the document moves, and the live field has to follow.
+    const loaded = makeLoader().load(terrainScene());
+    loaded.terrainField!.sculpt(0, 0, 'raise', { radius: 16, strength: 0.5 });
+    expect(loaded.terrainField!.sampleHeight(0, 0)).toBeGreaterThan(0);
+
+    loaded.syncTerrain(terrainScene().terrain);
+
+    expect(loaded.terrainField!.sampleHeight(0, 0)).toBe(0);
+    loaded.dispose();
+  });
+
+  it('resets paint weights when the document has no splatmap', () => {
+    const loaded = makeLoader().load(terrainScene());
+    loaded.terrainField!.paint(0, 0, 2, { radius: 20, strength: 1 });
+
+    loaded.syncTerrain(terrainScene().terrain);
+
+    expect(loaded.terrainField!.weights[0]).toBe(255);
+    expect(loaded.terrainField!.weights[2]).toBe(0);
+    loaded.dispose();
+  });
+
+  it('follows a change to the terrain height range', () => {
+    const loaded = makeLoader().load(terrainScene());
+    loaded.terrainField!.heights.fill(1);
+    const encoded = loaded.terrainField!.encodeHeights();
+
+    loaded.syncTerrain(
+      terrainScene({ maxHeight: 50, heightmap: { encoding: 'base64', data: encoded } }).terrain,
+    );
+
+    // Same normalised heights, taller world range.
+    expect(loaded.terrainField!.sampleHeight(0, 0)).toBeCloseTo(50, 3);
+    loaded.dispose();
+  });
+
+  it('gives flat terrain a plain material and sculpted terrain vertex colours', () => {
+    const flat = makeLoader().load(
+      parseScene({ sceneId: 's', version: 1, terrain: { type: 'flat' }, objects: [] }),
+    );
+    const sculpted = makeLoader().load(terrainScene());
+
+    expect((flat.terrain!.material as THREE.MeshStandardMaterial).vertexColors).toBe(false);
+    expect((sculpted.terrain!.material as THREE.MeshStandardMaterial).vertexColors).toBe(true);
+
+    flat.dispose();
+    sculpted.dispose();
+  });
+});

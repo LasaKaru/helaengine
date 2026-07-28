@@ -16,7 +16,24 @@ interface EngineBridgeProps {
  * destroyed; anything else can be applied to the nodes already there.
  */
 function structureKey(scene: Scene): string {
-  return scene.objects.map((object) => `${object.id}:${object.assetId}`).join('|');
+  const { terrain } = scene;
+  // Terrain shape belongs here too: changing its type, resolution or palette needs new geometry
+  // and a differently-configured material, not just new vertex data. Height and paint data are
+  // deliberately excluded — those take the cheap sync path below.
+  const terrainKey = [
+    terrain.type,
+    terrain.segments,
+    terrain.size.join('x'),
+    terrain.maxHeight,
+    terrain.layers.map((layer) => layer.color).join(','),
+  ].join(':');
+
+  return `${terrainKey}#${scene.objects.map((object) => `${object.id}:${object.assetId}`).join('|')}`;
+}
+
+/** Identifies the terrain's *data* — the part that can change without new geometry being needed. */
+function terrainDataKey(scene: Scene): string {
+  return `${scene.terrain.heightmap?.data ?? ''}|${scene.terrain.splatmap?.data ?? ''}`;
 }
 
 /**
@@ -36,6 +53,7 @@ export function EngineBridge({ loader, onLoaded }: EngineBridgeProps): null {
   const scene = useSceneStore((state) => state.scene);
   const [modelEpoch, setModelEpoch] = useState(0);
   const loadedRef = useRef<LoadedScene | null>(null);
+  const appliedTerrain = useRef<string | null>(null);
 
   // Models are fetched separately from scene construction so that `loadInto` stays synchronous.
   // Anything not yet downloaded renders as a placeholder on the first pass; when new models do
@@ -58,6 +76,7 @@ export function EngineBridge({ loader, onLoaded }: EngineBridgeProps): null {
   useEffect(() => {
     const loaded = loader.loadInto(threeScene, scene);
     loadedRef.current = loaded;
+    appliedTerrain.current = terrainDataKey(scene);
     onLoaded?.(loaded);
     return () => {
       loadedRef.current = null;
@@ -73,6 +92,19 @@ export function EngineBridge({ loader, onLoaded }: EngineBridgeProps): null {
   useEffect(() => {
     loadedRef.current?.syncTransforms(scene);
   }, [scene]);
+
+  // Terrain data changes that did not come from the live sculpt stroke — an undo, a redo, a loaded
+  // document — are pushed back into the field. Skipped when the data already matches, so a stroke
+  // committing what it just drew does not decode it all over again.
+  const terrainData = terrainDataKey(scene);
+  useEffect(() => {
+    if (appliedTerrain.current === terrainData) return;
+    appliedTerrain.current = terrainData;
+    loadedRef.current?.syncTerrain(scene.terrain);
+    // `scene.terrain` is read through the ref-guarded key rather than listed, so an unrelated
+    // object edit does not re-decode the heightmap.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [terrainData]);
 
   return null;
 }

@@ -17,6 +17,8 @@ export interface DevApi {
   viewportObjectWorldX(objectId: string): number | null;
   /** Whether a transform gizmo is currently attached in the scene. */
   hasGizmo(): boolean;
+  /** World height of the live terrain at a world X/Z — proves a sculpt reached the geometry. */
+  terrainHeightAt(x: number, z: number): number | null;
   /** Client-space coordinates of an object, for driving precise clicks in tests. */
   projectObject(objectId: string): { x: number; y: number } | null;
 }
@@ -95,6 +97,8 @@ export function exposeDevApi(library: AssetLibrary): void {
       currentLoadedScene?.threeScene.children.some((child) =>
         child.type.startsWith('TransformControls'),
       ) === true,
+
+    terrainHeightAt: (x, z) => currentLoadedScene?.terrainField?.sampleHeight(x, z) ?? null,
 
     projectObject: (objectId) => {
       const node = currentLoadedScene?.objects.get(objectId);

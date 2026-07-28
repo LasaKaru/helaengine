@@ -47,6 +47,7 @@ export interface SceneState {
   setParent(objectId: string, parentId: string | null, localTransform?: Transform): void;
   setLabel(objectId: string, label: string): void;
   setTerrain(terrain: Partial<Terrain>): void;
+  setTerrainData(heightmap: string | null, splatmap: string | null): void;
   setEnvironment(environment: Partial<Environment>): void;
   setName(name: string): void;
 
@@ -259,6 +260,15 @@ export const useSceneStore = create<SceneState>()(
         setTerrain: (terrain) =>
           commit('terrain/set', (draft) => {
             Object.assign(draft.terrain, terrain);
+          }),
+
+        // One commit per completed stroke, not per frame: the whole heightmap is a single patch,
+        // so recording one mid-drag would put tens of megabytes through the undo stack.
+        setTerrainData: (heightmap, splatmap) =>
+          commit('terrain/sculpt', (draft) => {
+            draft.terrain.type = 'heightmap';
+            draft.terrain.heightmap = heightmap ? { encoding: 'base64', data: heightmap } : null;
+            draft.terrain.splatmap = splatmap ? { encoding: 'base64', data: splatmap } : null;
           }),
 
         setEnvironment: (environment) =>

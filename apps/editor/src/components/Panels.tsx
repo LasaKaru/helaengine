@@ -3,6 +3,7 @@ import type { Transform, Vec3 } from '@helaengine/schema';
 import { useEditorStore } from '../store/editorStore';
 import { useSceneStore } from '../store/sceneStore';
 import { NumberField } from './NumberField';
+import { TerrainPanel } from './TerrainPanel';
 
 type Axis = 0 | 1 | 2;
 const AXES: Array<{ axis: Axis; label: string }> = [
@@ -134,6 +135,8 @@ export function InspectorPanel(): React.JSX.Element {
           </div>
         )}
       </section>
+
+      <TerrainPanel />
     </aside>
   );
 }

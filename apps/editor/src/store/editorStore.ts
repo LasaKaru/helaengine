@@ -1,7 +1,26 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { DEFAULT_PLACEMENT, type PlacementOptions } from '../placement';
+import type { SculptMode } from '@helaengine/engine';
 import type { GizmoMode } from '../transform';
+
+/** What a pointer drag on the terrain does. */
+export type EditorTool = 'select' | 'sculpt' | 'paint';
+
+export interface BrushSettings {
+  radius: number;
+  strength: number;
+  sculptMode: SculptMode;
+  /** Index into the terrain's four blend layers. */
+  layer: number;
+}
+
+export const DEFAULT_BRUSH: BrushSettings = {
+  radius: 8,
+  strength: 0.35,
+  sculptMode: 'raise',
+  layer: 1,
+};
 
 export interface DragState {
   assetId: string;
@@ -31,6 +50,8 @@ export interface EditorState {
   placement: PlacementOptions;
   assetSearch: string;
   assetCategory: string | null;
+  tool: EditorTool;
+  brush: BrushSettings;
   gizmoMode: GizmoMode;
   /** True while a gizmo drag owns the pointer, so selection and orbit stay out of the way. */
   gizmoActive: boolean;
@@ -43,6 +64,8 @@ export interface EditorState {
   setPlacement(placement: Partial<PlacementOptions>): void;
   setAssetSearch(search: string): void;
   setAssetCategory(category: string | null): void;
+  setTool(tool: EditorTool): void;
+  setBrush(brush: Partial<BrushSettings>): void;
   setGizmoMode(mode: GizmoMode): void;
   setGizmoActive(active: boolean): void;
   setMarquee(marquee: Marquee | null): void;
@@ -56,6 +79,8 @@ export const useEditorStore = create<EditorState>()(
       placement: DEFAULT_PLACEMENT,
       assetSearch: '',
       assetCategory: null,
+      tool: 'select',
+      brush: DEFAULT_BRUSH,
       gizmoMode: 'translate',
       gizmoActive: false,
       marquee: null,
@@ -82,6 +107,9 @@ export const useEditorStore = create<EditorState>()(
 
       setAssetSearch: (assetSearch) => set({ assetSearch }, false, 'assets/search'),
       setAssetCategory: (assetCategory) => set({ assetCategory }, false, 'assets/category'),
+      setTool: (tool) => set({ tool }, false, 'tool/set'),
+      setBrush: (brush) =>
+        set((state) => ({ brush: { ...state.brush, ...brush } }), false, 'brush/set'),
       setGizmoMode: (gizmoMode) => set({ gizmoMode }, false, 'gizmo/mode'),
       setGizmoActive: (gizmoActive) => set({ gizmoActive }, false, 'gizmo/active'),
       setMarquee: (marquee) => set({ marquee }, false, 'selection/marquee'),

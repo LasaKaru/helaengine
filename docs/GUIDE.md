@@ -207,9 +207,9 @@ Even if starting solo, structure work as if these lanes exist — makes future h
 
 **Sprint 7: Terrain tools**
 
-- [ ] Heightmap sculpt brush (raise/lower/smooth/flatten) using a canvas-based heightmap texture, GPU displacement shader
-- [ ] Terrain texture painting (splat map: grass/rock/sand blend)
-- [ ] Terrain size/resolution config on new-project creation
+- [x] Heightmap sculpt brush (raise/lower/smooth/flatten) using a canvas-based heightmap texture, GPU displacement shader
+- [x] Terrain texture painting (splat map: grass/rock/sand blend)
+- [x] Terrain size/resolution config on new-project creation
 - **DoD:** User can sculpt a hill and paint texture blends, terrain persists correctly in scene.json.
 
 **Sprint 8: Save/load (local first, no backend yet)**

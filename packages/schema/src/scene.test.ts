@@ -19,7 +19,9 @@ describe('SceneSchema', () => {
 
     expect(scene.name).toBe('Untitled scene');
     expect(scene.terrain.type).toBe('flat');
-    expect(scene.terrain.size).toEqual([256, 256]);
+    expect(scene.terrain.size).toEqual([128, 128]);
+    expect(scene.terrain.heightmap).toBeNull();
+    expect(scene.terrain.layers).toHaveLength(4);
     expect(scene.environment.fog).toBeNull();
     expect(scene.environment.lighting.ambient).toBe(0.4);
     expect(scene.objects[0]?.transform).toEqual({
@@ -119,5 +121,99 @@ describe('migrateScene', () => {
 
   it('ships with no migrations registered while v1 is the only version', () => {
     expect(Object.keys(sceneMigrations)).toHaveLength(0);
+  });
+});
+
+describe('object hierarchy', () => {
+  const base = { sceneId: 'scene_demo', version: CURRENT_SCENE_VERSION };
+
+  it('defaults an object to the root', () => {
+    expect(parseScene(minimalScene).objects[0]?.parentId).toBeNull();
+  });
+
+  it('accepts a valid parent', () => {
+    const result = safeParseScene({
+      ...base,
+      objects: [
+        { id: 'a', assetId: 'x' },
+        { id: 'b', assetId: 'y', parentId: 'a' },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a child declared before its parent', () => {
+    const result = safeParseScene({
+      ...base,
+      objects: [
+        { id: 'b', assetId: 'y', parentId: 'a' },
+        { id: 'a', assetId: 'x' },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a parent that does not exist', () => {
+    const result = safeParseScene({
+      ...base,
+      objects: [{ id: 'b', assetId: 'y', parentId: 'ghost' }],
+    });
+    expect(result.success).toBe(false);
+    expect(result.success === false && result.error.issues[0]?.message).toContain('does not exist');
+  });
+
+  it('rejects an object parented to itself', () => {
+    const result = safeParseScene({
+      ...base,
+      objects: [{ id: 'a', assetId: 'x', parentId: 'a' }],
+    });
+    expect(result.success).toBe(false);
+    expect(result.success === false && result.error.issues[0]?.message).toContain('cycle');
+  });
+
+  it('rejects a longer parent cycle', () => {
+    // A cycle would hang any naive traversal, so it must never reach a consumer.
+    const result = safeParseScene({
+      ...base,
+      objects: [
+        { id: 'a', assetId: 'x', parentId: 'c' },
+        { id: 'b', assetId: 'y', parentId: 'a' },
+        { id: 'c', assetId: 'z', parentId: 'b' },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('terrain schema', () => {
+  const base = { sceneId: 'scene_demo', version: CURRENT_SCENE_VERSION, objects: [] };
+
+  it('accepts a sculpted terrain', () => {
+    const result = safeParseScene({
+      ...base,
+      terrain: {
+        type: 'heightmap',
+        segments: 64,
+        heightmap: { encoding: 'base64', data: 'AAAA' },
+        splatmap: { encoding: 'base64', data: 'AAAA' },
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a resolution beyond what inline storage is meant to carry', () => {
+    expect(safeParseScene({ ...base, terrain: { segments: 512 } }).success).toBe(false);
+  });
+
+  it('requires exactly four blend layers, matching the splat map channels', () => {
+    const result = safeParseScene({
+      ...base,
+      terrain: { layers: [{ name: 'Grass', color: '#6a8f4f' }] },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an unknown terrain type', () => {
+    expect(safeParseScene({ ...base, terrain: { type: 'voxel' } }).success).toBe(false);
   });
 });

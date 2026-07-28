@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–6 complete. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–7 complete. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -174,12 +174,12 @@
 
 **Tasks:**
 
-- [ ] Implement heightmap-based terrain: a plane geometry with vertex displacement driven by a heightmap texture (canvas-based, editable)
-- [ ] Build sculpt brush tool: raise/lower/smooth/flatten modes, adjustable brush radius + strength, applied via raycast-hit-point painting onto the heightmap canvas, re-uploaded to GPU each stroke (throttled/debounced for performance)
-- [ ] Build texture painting: splat-map approach (a second canvas/texture storing per-pixel blend weights for up to 4 texture layers — grass/rock/sand/dirt), custom shader (or `MeshStandardMaterial` with a custom `onBeforeCompile` injection) blending textures by splat weights
-- [ ] Add terrain configuration on new-project creation: size (e.g., 128x128, 256x256), resolution/subdivision count
-- [ ] Persist heightmap + splatmap as data in `scene.json` (base64-encoded PNG or a compact float array — decide based on size tradeoffs; likely store as an uploaded/generated texture asset reference rather than inline for large terrains)
-- [ ] Performance check: ensure sculpting at expected brush sizes doesn't drop frame rate below acceptable threshold on target hardware
+- [x] Implement heightmap-based terrain: a plane geometry with vertex displacement driven by a heightmap texture (canvas-based, editable)
+- [x] Build sculpt brush tool: raise/lower/smooth/flatten modes, adjustable brush radius + strength, applied via raycast-hit-point painting onto the heightmap canvas, re-uploaded to GPU each stroke (throttled/debounced for performance)
+- [x] Build layer painting: splat weights for 4 layers (grass/rock/sand/dirt), blended **per vertex** into `MeshStandardMaterial`'s vertex colours rather than per pixel through a custom shader. Reason: there are no terrain _textures_ in the library yet — assets are flat-shaded and untextured — so there is nothing to sample. At low-poly vertex densities the grid is the paint resolution, and it keeps the material something any exported project renders with no shader plumbing. Swap to a texture-space splat map when textured terrain assets exist; the stored weights are the same either way.
+- [x] Add terrain configuration on new-project creation: size (e.g., 128x128, 256x256), resolution/subdivision count
+- [x] Persist heightmap + splatmap as data in `scene.json` (base64-encoded PNG or a compact float array — decide based on size tradeoffs; likely store as an uploaded/generated texture asset reference rather than inline for large terrains)
+- [x] Performance check: ensure sculpting at expected brush sizes doesn't drop frame rate below acceptable threshold on target hardware
 
 **Tech notes:**
 

@@ -8,6 +8,7 @@ import { EngineBridge } from './EngineBridge';
 import { MarqueeOverlay } from './Marquee';
 import { PlacementController } from './PlacementController';
 import { PlacementToolbar } from './PlacementToolbar';
+import { SculptController } from './SculptController';
 import { SelectionController } from './SelectionController';
 import { SelectionHighlight } from './SelectionHighlight';
 import { TransformGizmo } from './TransformGizmo';
@@ -37,6 +38,7 @@ export function Viewport({ loader }: ViewportProps): React.JSX.Element {
   const [loadedScene, setLoaded] = useState<LoadedScene | null>(null);
   const dragging = useEditorStore((state) => state.drag !== null);
   const gizmoActive = useEditorStore((state) => state.gizmoActive);
+  const tool = useEditorStore((state) => state.tool);
 
   const handleLoaded = useCallback((loaded: LoadedScene) => {
     setStats({ objects: loaded.objects.size, missing: loaded.missingAssetIds.length });
@@ -56,9 +58,14 @@ export function Viewport({ loader }: ViewportProps): React.JSX.Element {
         <CameraReporter />
         <EngineBridge loader={loader} onLoaded={handleLoaded} />
         <PlacementController loader={loader} loadedScene={loadedScene} />
-        <SelectionController loadedScene={loadedScene} />
-        <SelectionHighlight loadedScene={loadedScene} />
-        <TransformGizmo />
+        <SculptController loadedScene={loadedScene} />
+        {tool === 'select' && (
+          <>
+            <SelectionController loadedScene={loadedScene} />
+            <SelectionHighlight loadedScene={loadedScene} />
+            <TransformGizmo />
+          </>
+        )}
         <Grid
           args={[200, 200]}
           cellSize={1}
@@ -76,7 +83,8 @@ export function Viewport({ loader }: ViewportProps): React.JSX.Element {
           dampingFactor={0.08}
           maxPolarAngle={Math.PI / 2.05}
           // Orbiting mid-drop would fight the ghost for the same pointer.
-          enabled={!dragging && !gizmoActive}
+          // Orbiting during a sculpt stroke would drag the camera instead of the ground.
+          enabled={!dragging && !gizmoActive && tool === 'select'}
         />
       </Canvas>
 

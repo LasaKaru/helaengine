@@ -1,4 +1,12 @@
-export { SceneLoader, LoadedScene, MissingAssetError } from './SceneLoader.js';
+export {
+  SceneLoader,
+  LoadedScene,
+  MissingAssetError,
+  terrainFieldFromDocument,
+} from './SceneLoader.js';
+export { TerrainField, LAYER_COUNT } from './TerrainField.js';
+export type { SculptMode, BrushOptions, TerrainFieldOptions } from './TerrainField.js';
+export { bytesToBase64, base64ToBytes } from './base64.js';
 export type {
   SceneLoaderOptions,
   PreloadReport,
