@@ -263,7 +263,8 @@ export class GameRuntime implements WorldHandle {
     this.behaviors.removeObject(objectId);
     this.triggers.removeObject(objectId);
     this.#physics?.removeObject(objectId);
-    this.#loaded.release(objectId);
+    // Recycled rather than released: the next wave will want a node exactly like this one.
+    this.#loader.recycle(this.#loaded, objectId);
 
     const at = this.#spawned.indexOf(objectId);
     if (at >= 0) this.#spawned.splice(at, 1);

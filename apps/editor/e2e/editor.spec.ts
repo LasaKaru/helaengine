@@ -1135,3 +1135,82 @@ test.describe('enemies and triggers', () => {
     ).toBe(1);
   });
 });
+
+/**
+ * Sprint 12 — the performance pass.
+ *
+ * Draw calls are the number this sprint is about, and unlike a frame rate they are identical on
+ * every machine — so they are the thing worth asserting on. The rest of these check that batching
+ * did not cost the editor anything: a batched tree still has to be clickable and movable.
+ */
+test.describe('instancing and performance', () => {
+  test.beforeEach(async ({ page }) => {
+    await openEditor(page, /Stress test/);
+    // Models arrive asynchronously; counting draw calls for placeholder boxes proves nothing.
+    await page.waitForTimeout(4000);
+  });
+
+  test('draws 520 objects in a couple of dozen calls', async ({ page }) => {
+    const stats = (await page.evaluate(() => window.helaengine!.renderStats()))!;
+
+    expect(stats.sceneObjects).toBe(520);
+    expect(stats.instancedObjects).toBe(500);
+    // The bar from docs/PERFORMANCE.md. Unbatched, the same scene costs over 500.
+    expect(stats.calls).toBeLessThanOrEqual(80);
+  });
+
+  test('a batched object is still selectable and still moves', async ({ page }) => {
+    const id = await page.evaluate(() => {
+      const store = window.helaengine!.store.getState();
+      const prop = store.scene.objects.find((object) => object.assetId.startsWith('tree_'))!;
+      store.select([prop.id]);
+      return prop.id;
+    });
+
+    await expect(page.getByRole('region', { name: 'Inspector' })).toContainText(id);
+
+    await page.evaluate(
+      (objectId) => window.helaengine!.store.getState().setPosition(objectId, [40, 12, -40]),
+      id,
+    );
+
+    // The proof is the world position of the node the engine keeps for it: an instanced object
+    // whose node moved but whose buffer did not would look identical in the store and wrong on
+    // screen.
+    expect(
+      await page.evaluate((objectId) => window.helaengine!.viewportObjectWorldX(objectId), id),
+    ).toBeCloseTo(40, 3);
+  });
+
+  test('deleting a batched object takes it out of the scene', async ({ page }) => {
+    const before = await page.evaluate(() => window.helaengine!.renderStats()!.sceneObjects);
+
+    await page.evaluate(() => {
+      const store = window.helaengine!.store.getState();
+      const prop = store.scene.objects.find((object) => object.assetId.startsWith('tree_'))!;
+      store.removeObject(prop.id);
+    });
+    await page.waitForTimeout(500);
+
+    expect(await page.evaluate(() => window.helaengine!.renderStats()!.sceneObjects)).toBe(
+      before - 1,
+    );
+  });
+
+  test('the stress scene is playable, not just drawable', async ({ page }) => {
+    await page.getByRole('button', { name: 'Walk' }).click();
+    await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
+      timeout: 30_000,
+    });
+    await page.waitForTimeout(2000);
+
+    const states = await page.evaluate(() => window.helaengine!.enemyStates());
+    expect(Object.keys(states)).toHaveLength(20);
+
+    const simulation = await page.evaluate(() => window.helaengine!.simulationStats());
+    expect(simulation).not.toBeNull();
+    // The CPU bar from docs/PERFORMANCE.md. Generous against a shared CI container, and still an
+    // order of magnitude below the point where the simulation would be the bottleneck.
+    expect(simulation!.physicsMs + simulation!.gameplayMs).toBeLessThan(8);
+  });
+});

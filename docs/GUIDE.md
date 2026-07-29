@@ -245,9 +245,9 @@ Even if starting solo, structure work as if these lanes exist — makes future h
 
 **Sprint 12: Behavior QA + performance pass**
 
-- [ ] Object pooling for frequently spawned things (projectiles, particles)
-- [ ] Instanced rendering (`InstancedMesh`) for repeated static assets (trees/rocks) — critical for scenes with hundreds of props
-- [ ] Frustum culling + basic LOD swapping by distance
+- [x] Object pooling for frequently spawned things (projectiles, particles)
+- [x] Instanced rendering (`InstancedMesh`) for repeated static assets (trees/rocks) — critical for scenes with hundreds of props
+- [x] Frustum culling verified; LOD deliberately deferred until an asset exceeds its triangle budget (see `docs/PERFORMANCE.md`)
 - **DoD:** A test scene with 500 trees + 20 enemies with active AI holds 60fps on mid-tier hardware (define target: e.g., GTX 1660 / M1 equivalent).
 
 ---

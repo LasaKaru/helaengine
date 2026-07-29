@@ -20,6 +20,8 @@ interface Placement {
   rotationY?: number;
   scale?: number;
   label?: string;
+  behaviors?: Array<{ type: string; params: Record<string, unknown> }>;
+  body?: 'static' | 'dynamic' | 'kinematic';
 }
 
 /**
@@ -55,6 +57,8 @@ function buildScene(
         rotation: [0, placement.rotationY ?? 0, 0],
         scale: [placement.scale ?? 1, placement.scale ?? 1, placement.scale ?? 1],
       },
+      ...(placement.behaviors ? { behaviors: placement.behaviors } : {}),
+      ...(placement.body ? { physics: { body: placement.body } } : {}),
       ...(placement.label ? { metadata: { label: placement.label } } : {}),
     })),
   });
@@ -182,7 +186,90 @@ export const TEMPLATES: SceneTemplate[] = [
       });
     },
   },
+  {
+    id: 'stress-test',
+    name: 'Stress test',
+    description:
+      '520 objects: a forest of instanced props and twenty patrolling goblins. The recurring performance benchmark.',
+    build: buildStressScene,
+  },
 ];
+
+/**
+ * The performance benchmark scene, described in `docs/PERFORMANCE.md`.
+ *
+ * Deliberately shaped like a real level rather than like a synthetic torture test: five hundred
+ * static props drawn from a handful of assets, so instancing has something to batch, plus twenty
+ * enemies that each run a patrol, an AI state machine and a kinematic body — the things that cost
+ * CPU rather than draw calls. A benchmark that only stressed one of those would hide the other.
+ */
+export function buildStressScene(): Scene {
+  const random = seeded(20260801);
+  const placements: Placement[] = [];
+  const props = [
+    'tree_pine_01',
+    'tree_pine_02',
+    'tree_oak_01',
+    'rock_boulder_01',
+    'rock_shard_01',
+    'prop_barrel_01',
+    'prop_crate_01',
+    'prop_fence_01',
+  ];
+
+  for (let index = 0; index < 500; index += 1) {
+    const assetId = props[Math.floor(random() * props.length)]!;
+    placements.push({
+      assetId,
+      position: [
+        Number(((random() - 0.5) * 118).toFixed(2)),
+        0,
+        Number(((random() - 0.5) * 118).toFixed(2)),
+      ],
+      rotationY: Number((random() * 360).toFixed(1)),
+      scale: Number((0.8 + random() * 0.5).toFixed(2)),
+    });
+  }
+
+  for (let index = 0; index < 20; index += 1) {
+    const angle = (index / 20) * Math.PI * 2;
+    const distance = 18 + random() * 34;
+    const x = Number((Math.cos(angle) * distance).toFixed(2));
+    const z = Number((Math.sin(angle) * distance).toFixed(2));
+    placements.push({
+      assetId: 'enemy_goblin_01',
+      position: [x, 0, z],
+      label: `Goblin ${index + 1}`,
+      body: 'kinematic',
+      behaviors: [
+        {
+          type: 'patrol',
+          params: {
+            waypoints: [
+              [x, 0, z],
+              [Number((x * 0.4).toFixed(2)), 0, Number((z * 0.4).toFixed(2))],
+            ],
+            speed: 2 + random(),
+            mode: 'pingPong',
+          },
+        },
+        {
+          type: 'chaseOnSight',
+          params: { sightRange: 22, chaseSpeed: 4, attackDamage: 4, attackInterval: 1.5 },
+        },
+      ],
+    });
+  }
+
+  return buildScene('Stress Test', placements, {
+    ...sculptedTerrain((field) => {
+      field.sculpt(-40, -30, 'raise', { radius: 40, strength: 0.5 });
+      field.sculpt(35, 34, 'raise', { radius: 36, strength: 0.4 });
+      field.sculpt(0, 0, 'smooth', { radius: 70, strength: 0.5 });
+      field.paint(-40, -30, 1, { radius: 30, strength: 0.8 });
+    }),
+  });
+}
 
 export function templateById(id: string): SceneTemplate | undefined {
   return TEMPLATES.find((template) => template.id === id);

@@ -1,4 +1,4 @@
-import { Vector3, type Camera } from 'three';
+import { Vector3, type Camera, type WebGLRenderer } from 'three';
 import type { GameRuntime, LoadedScene, PlayerController } from '@helaengine/engine';
 import { SceneObjectSchema, type Vec3 } from '@helaengine/schema';
 import type { AssetLibrary } from './engine/assetLibrary';
@@ -41,6 +41,31 @@ export interface DevApi {
   enemyStates(): Record<string, string>;
   /** Raises an event on the running world's bus, the way a weapon or a script would. */
   emit(event: string, payload?: unknown): boolean;
+  /**
+   * What the renderer actually did on the last frame.
+   *
+   * Draw calls are the number the performance work is really about, and unlike a frame rate they
+   * are the same on every machine — which is what makes them worth asserting on.
+   */
+  /**
+   * Rolling average of what the simulation costs on the CPU, in milliseconds per frame.
+   *
+   * Unlike a frame rate this is not at the mercy of the GPU, so it is comparable between a laptop
+   * and a CI container — which makes it the half of the performance story worth regression-testing.
+   */
+  simulationStats(): {
+    physicsMs: number;
+    gameplayMs: number;
+    peakMs: number;
+    frames: number;
+  } | null;
+  renderStats(): {
+    calls: number;
+    triangles: number;
+    instancedObjects: number;
+    sceneObjects: number;
+    pooledNodes: number;
+  } | null;
 }
 
 declare global {
@@ -88,6 +113,52 @@ let lookHandler: ((yaw: number) => void) | null = null;
 /** Registered by the walk preview while it owns the camera. */
 export function setLookHandler(handler: ((yaw: number) => void) | null): void {
   lookHandler = handler;
+}
+
+const timing = { physicsMs: 0, gameplayMs: 0, peakMs: 0, frames: 0, seen: 0 };
+
+/**
+ * Frames ignored before the average starts.
+ *
+ * The first steps of a simulation are not representative of any of the ones after them: Rapier
+ * builds its broad phase, every enemy runs its first line-of-sight trace at once, and the JIT has
+ * seen none of it yet. Averaging those in reports a per-frame cost the game never actually pays.
+ * `peakMs` still records them, so a genuine spike is not hidden by this.
+ */
+const WARMUP_FRAMES = 10;
+
+/**
+ * Folds one frame's simulation cost into a rolling average.
+ *
+ * An exponential average rather than a full history: it needs to be readable at any moment without
+ * the caller having to say when to start, and a per-frame array would be its own allocation
+ * problem in exactly the code being measured.
+ */
+export function recordSimulationTiming(physicsMs: number, gameplayMs: number): void {
+  timing.seen += 1;
+  timing.peakMs = Math.max(timing.peakMs, physicsMs + gameplayMs);
+  if (timing.seen <= WARMUP_FRAMES) return;
+
+  const weight = timing.frames === 0 ? 1 : 0.05;
+  timing.physicsMs += (physicsMs - timing.physicsMs) * weight;
+  timing.gameplayMs += (gameplayMs - timing.gameplayMs) * weight;
+  timing.frames += 1;
+}
+
+/** Forgets the timings, so a new run does not average against the last one. */
+export function resetSimulationTiming(): void {
+  timing.physicsMs = 0;
+  timing.gameplayMs = 0;
+  timing.peakMs = 0;
+  timing.frames = 0;
+  timing.seen = 0;
+}
+
+let currentRenderer: WebGLRenderer | null = null;
+
+/** Records the renderer, so the dev API can report what it drew. */
+export function setRenderer(renderer: WebGLRenderer | null): void {
+  currentRenderer = renderer;
 }
 
 let currentCamera: Camera | null = null;
@@ -199,6 +270,28 @@ export function exposeDevApi(library: AssetLibrary): void {
       if (!currentGame) return false;
       currentGame.emit(event, payload);
       return true;
+    },
+
+    simulationStats: () =>
+      timing.frames === 0
+        ? null
+        : {
+            physicsMs: Number(timing.physicsMs.toFixed(3)),
+            gameplayMs: Number(timing.gameplayMs.toFixed(3)),
+            peakMs: Number(timing.peakMs.toFixed(3)),
+            frames: timing.frames,
+          },
+
+    renderStats: () => {
+      if (!currentRenderer) return null;
+      const { render } = currentRenderer.info;
+      return {
+        calls: render.calls,
+        triangles: render.triangles,
+        instancedObjects: currentLoadedScene?.instances?.instancedObjectIds.length ?? 0,
+        sceneObjects: currentLoadedScene?.objects.size ?? 0,
+        pooledNodes: library.loader.pooledCount(),
+      };
     },
 
     viewportObjects: () =>

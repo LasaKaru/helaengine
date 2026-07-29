@@ -13,7 +13,13 @@ import {
 } from '@helaengine/engine';
 import { useEditorStore } from '../store/editorStore';
 import { useSceneStore } from '../store/sceneStore';
-import { setGameRuntime, setLookHandler, setPlayer } from '../devApi';
+import {
+  recordSimulationTiming,
+  resetSimulationTiming,
+  setGameRuntime,
+  setLookHandler,
+  setPlayer,
+} from '../devApi';
 
 registerBuiltinBehaviors();
 
@@ -89,6 +95,7 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
     let built: PhysicsWorld | null = null;
 
     setPhysicsStatus('loading');
+    resetSimulationTiming();
 
     void PhysicsWorld.create({ gravity: scene.player.gravity })
       .then((physics) => {
@@ -251,9 +258,16 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
       yaw: look.current.yaw,
     };
 
+    // Timed separately because they answer different questions: the solver's cost scales with
+    // bodies and contacts, gameplay's with how many things are thinking. Conflating them would
+    // hide which one a future regression came from.
+    const beforePhysics = performance.now();
     physics.step(delta, (step) => player.move(input, step));
+    const afterPhysics = performance.now();
+
     // Gameplay advances after physics, so enemies read positions the solver has already settled.
     runtime.current?.update(delta);
+    recordSimulationTiming(afterPhysics - beforePhysics, performance.now() - afterPhysics);
 
     // Health is pushed into the store only when it changes: mirroring it every frame would mean a
     // React render sixty times a second to display a number that moves once a second at most.

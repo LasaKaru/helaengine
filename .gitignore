@@ -14,3 +14,6 @@ coverage/
 generated/
 test-results/
 playwright-report/
+
+# Written by `pnpm bench`.
+tools/benchmark/stress.png

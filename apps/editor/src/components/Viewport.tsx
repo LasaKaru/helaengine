@@ -4,7 +4,7 @@ import { Grid, OrbitControls } from '@react-three/drei';
 import { useEditorStore } from '../store/editorStore';
 import { useSceneStore } from '../store/sceneStore';
 import type { AssetResolver, LoadedScene, SceneLoader } from '@helaengine/engine';
-import { setCamera, setLoadedScene } from '../devApi';
+import { setCamera, setLoadedScene, setRenderer } from '../devApi';
 import { useProjectStore } from '../store/projectStore';
 import { EngineBridge } from './EngineBridge';
 import { MarqueeOverlay } from './Marquee';
@@ -20,10 +20,17 @@ import { TransformGizmo } from './TransformGizmo';
 /** Publishes the r3f camera to the dev API. Dev/test tooling only; nothing renders. */
 function CameraReporter(): null {
   const camera = useThree((state) => state.camera);
+  const gl = useThree((state) => state.gl);
+
   useEffect(() => {
     setCamera(camera);
-    return () => setCamera(null);
-  }, [camera]);
+    setRenderer(gl);
+    return () => {
+      setCamera(null);
+      setRenderer(null);
+    };
+  }, [camera, gl]);
+
   return null;
 }
 

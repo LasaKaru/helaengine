@@ -94,6 +94,26 @@ export default tseslint.config(
     },
   },
   {
+    // The benchmark is a Node script that drives a browser, so it legitimately touches both
+    // environments: `process` and `console` on one side of the wire, `window` and
+    // `requestAnimationFrame` inside the `page.evaluate` callbacks on the other.
+    files: ['tools/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+        URL: 'readonly',
+        window: 'readonly',
+        indexedDB: 'readonly',
+        performance: 'readonly',
+        requestAnimationFrame: 'readonly',
+      },
+    },
+    rules: {
+      'no-console': 'off',
+    },
+  },
+  {
     files: ['**/*.test.ts', 'scripts/**/*.ts', '**/vite.config.ts'],
     rules: {
       'no-console': 'off',

@@ -42,6 +42,12 @@ export async function loadAssetLibrary(signal?: AbortSignal): Promise<AssetLibra
   const loader = new SceneLoader({
     resolver,
     modelSource: new GltfModelSource({ baseUrl: ASSET_BASE_URL }),
+    // `?instances=off` turns batching off for the session. It exists for one reason: the benchmark
+    // has to be able to measure the same scene both ways, and a number with nothing to compare it
+    // against is not a measurement.
+    ...(new URLSearchParams(window.location.search).get('instances') === 'off'
+      ? { instanceThreshold: 0 }
+      : {}),
   });
 
   return { manifest, loader, resolver };

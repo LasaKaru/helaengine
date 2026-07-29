@@ -7,6 +7,7 @@ import type {
   Terrain,
 } from '@helaengine/schema';
 import { MISSING_ASSET_ENTRY, type AssetResolver } from './assets.js';
+import { InstanceManager } from './InstanceManager.js';
 import type { ModelSource } from './models.js';
 import { LAYER_COUNT, TerrainField } from './TerrainField.js';
 
@@ -23,7 +24,20 @@ export interface SceneLoaderOptions {
   onMissingAsset?: 'placeholder' | 'throw';
   /** Sink for non-fatal load diagnostics. Default: `console.warn`. */
   warn?: (message: string) => void;
+  /**
+   * How many copies of one asset it takes before they are drawn as instances. 0 disables batching.
+   *
+   * Below the threshold a batch costs more than it saves — an extra buffer, an extra bounding
+   * sphere that never culls — so a handful of huts stay ordinary meshes and a forest does not.
+   */
+  instanceThreshold?: number;
 }
+
+/** Default batching threshold. Eight is where one buffer starts beating eight draw calls. */
+export const DEFAULT_INSTANCE_THRESHOLD = 8;
+
+/** Ceiling on recycled nodes per asset, so a pool can never become a slow leak. */
+export const POOL_LIMIT_PER_ASSET = 64;
 
 export interface PreloadFailure {
   assetId: string;
@@ -160,12 +174,16 @@ export class LoadedScene {
   /** Exactly the nodes this load added to `threeScene`, so teardown touches nothing else. */
   readonly #added: THREE.Object3D[];
 
+  /** Batched static objects, if any. Their nodes live in `objects` but not in the scene graph. */
+  readonly instances: InstanceManager | null;
+
   constructor(init: {
     threeScene: THREE.Scene;
     objects: Map<string, THREE.Object3D>;
     missingAssetIds: string[];
     disposables: DisposableResource[];
     added: THREE.Object3D[];
+    instances?: InstanceManager | null;
   }) {
     this.threeScene = init.threeScene;
     this.objects = init.objects;
@@ -173,6 +191,7 @@ export class LoadedScene {
     this.missingAssetIds = init.missingAssetIds;
     this.#disposables = init.disposables;
     this.#added = init.added;
+    this.instances = init.instances ?? null;
   }
 
   /**
@@ -252,6 +271,7 @@ export class LoadedScene {
     const node = this.#objects.get(objectId);
     if (!node) return;
 
+    this.instances?.remove(objectId);
     this.#objects.delete(objectId);
     node.removeFromParent();
     const at = this.#added.indexOf(node);
@@ -286,12 +306,19 @@ export class LoadedScene {
       if (!node) continue;
 
       applyTransform(node, object);
+      // A batched object's node is detached, so nothing updates its world matrix for us — and the
+      // instance buffer is the only place its new transform actually shows up.
+      if (this.instances?.has(object.id)) {
+        node.updateMatrixWorld(true);
+        this.instances.setMatrix(object.id, node.matrixWorld);
+      }
       updated += 1;
     }
     return updated;
   }
 
   dispose(): void {
+    this.instances?.dispose();
     for (const disposable of this.#disposables) {
       disposable.dispose();
     }
@@ -320,12 +347,23 @@ export class SceneLoader {
   readonly #warn: (message: string) => void;
   readonly #modelSource: ModelSource | null;
   readonly #models = new Map<string, THREE.Object3D>();
+  readonly #instanceThreshold: number;
+  /**
+   * Nodes kept for reuse, by asset id.
+   *
+   * Spawning is the one thing a running game does over and over — a wave of enemies, a projectile,
+   * a pickup — and building a node means cloning a model tree and allocating a matrix per part
+   * every time. Recycling the tree instead turns a steady drip of garbage into none, which matters
+   * far more than the allocation itself: a collection pause is a dropped frame.
+   */
+  readonly #pool = new Map<string, THREE.Object3D[]>();
 
   constructor(options: SceneLoaderOptions) {
     this.#resolver = options.resolver;
     this.#onMissingAsset = options.onMissingAsset ?? 'placeholder';
     this.#warn = options.warn ?? ((message) => console.warn(`[helaengine] ${message}`));
     this.#modelSource = options.modelSource ?? null;
+    this.#instanceThreshold = options.instanceThreshold ?? DEFAULT_INSTANCE_THRESHOLD;
   }
 
   /**
@@ -403,6 +441,7 @@ export class SceneLoader {
 
   /** Releases the models this loader preloaded. Loaded scenes hold clones and are unaffected. */
   disposeModels(): void {
+    this.#pool.clear();
     this.#models.clear();
     this.#modelSource?.dispose();
   }
@@ -445,6 +484,8 @@ export class SceneLoader {
       );
     }
 
+    const batched = this.#chooseBatched(scene);
+
     // Parenting is a second pass so declaration order in the document never matters — a child may
     // appear before its parent. The schema has already rejected cycles and dangling parents, but
     // the loader degrades to root placement rather than trusting that blindly.
@@ -459,6 +500,13 @@ export class SceneLoader {
         );
       }
 
+      // Batched objects keep their node — transforms, bounds and selection all still work on it —
+      // but it never enters the scene graph, because the instanced mesh is what gets drawn.
+      if (batched.has(object.id)) {
+        node.updateMatrixWorld(true);
+        continue;
+      }
+
       if (parent) {
         parent.add(node);
       } else {
@@ -467,7 +515,89 @@ export class SceneLoader {
       }
     }
 
-    return new LoadedScene({ threeScene, objects, missingAssetIds, disposables, added });
+    const instances = this.#buildInstances(batched, objects, threeScene, added);
+
+    return new LoadedScene({
+      threeScene,
+      objects,
+      missingAssetIds,
+      disposables,
+      added,
+      instances,
+    });
+  }
+
+  /**
+   * Decides which objects are safe to batch, as `objectId -> assetId`.
+   *
+   * The rules are all about "does anything ever touch this object individually". A behaviour moves
+   * it, a trigger listens through it, a dynamic body is moved by the solver, and a parent or child
+   * relationship means its transform is not its own — any of those and it stays a real node. What
+   * is left is scenery, which is also the overwhelming majority of a scene and the entire reason
+   * instancing is worth doing.
+   */
+  #chooseBatched(scene: Scene): Map<string, string> {
+    if (this.#instanceThreshold <= 0) return new Map();
+
+    const hasChildren = new Set<string>();
+    for (const object of scene.objects) {
+      if (object.parentId !== null) hasChildren.add(object.parentId);
+    }
+
+    const candidates = new Map<string, string[]>();
+    for (const object of scene.objects) {
+      const eligible =
+        object.parentId === null &&
+        !hasChildren.has(object.id) &&
+        object.behaviors.length === 0 &&
+        object.trigger === null &&
+        object.physics.body === 'static';
+      if (!eligible) continue;
+
+      const group = candidates.get(object.assetId) ?? [];
+      group.push(object.id);
+      candidates.set(object.assetId, group);
+    }
+
+    const batched = new Map<string, string>();
+    for (const [assetId, ids] of candidates) {
+      if (ids.length < this.#instanceThreshold) continue;
+      for (const id of ids) batched.set(id, assetId);
+    }
+    return batched;
+  }
+
+  #buildInstances(
+    batched: Map<string, string>,
+    objects: Map<string, THREE.Object3D>,
+    threeScene: THREE.Scene,
+    added: THREE.Object3D[],
+  ): InstanceManager | null {
+    if (batched.size === 0) return null;
+
+    const byAsset = new Map<string, Map<string, THREE.Matrix4>>();
+    for (const [objectId, assetId] of batched) {
+      const node = objects.get(objectId);
+      if (!node) continue;
+      const group = byAsset.get(assetId) ?? new Map<string, THREE.Matrix4>();
+      group.set(objectId, node.matrixWorld.clone());
+      byAsset.set(assetId, group);
+    }
+
+    // A group of its own, so the batches are added and removed as one and never confused with the
+    // objects a caller placed in the scene.
+    const root = new THREE.Group();
+    root.name = 'instances';
+    threeScene.add(root);
+    added.push(root);
+
+    const manager = new InstanceManager(root);
+    for (const [assetId, matrices] of byAsset) {
+      const [firstId] = matrices.keys();
+      const template = firstId ? objects.get(firstId) : undefined;
+      if (template) manager.addBatch(assetId, template, matrices);
+    }
+    return manager;
   }
 
   #resolveEntry(object: SceneObject, missingAssetIds: string[]): AssetManifestEntry {
@@ -490,11 +620,53 @@ export class SceneLoader {
    * transform handling, same placeholder fallback, same disposal.
    */
   instantiateInto(loaded: LoadedScene, object: SceneObject): THREE.Object3D {
+    const pooled = this.#pool.get(object.assetId)?.pop();
+    if (pooled) {
+      // A recycled node is the same shape as a fresh one; only its identity and placement differ.
+      pooled.name = object.metadata.label ?? object.id;
+      pooled.userData['objectId'] = object.id;
+      pooled.visible = true;
+      applyTransform(pooled, object);
+      loaded.adopt(object.id, pooled);
+      return pooled;
+    }
+
     const disposables: DisposableResource[] = [];
     const entry = this.#resolver.get(object.assetId) ?? MISSING_ASSET_ENTRY;
     const node = this.#buildObject(object, entry, new Map(), new Map(), disposables);
     loaded.adopt(object.id, node, disposables);
     return node;
+  }
+
+  /**
+   * Takes an object out of the world and keeps its node for the next spawn of the same asset.
+   *
+   * The cap is what stops a wave-spawner from turning the pool into a leak: past it, the node is
+   * simply dropped and collected normally. Its geometry and materials are shared with the rest of
+   * the scene either way, so nothing is disposed here.
+   */
+  recycle(loaded: LoadedScene, objectId: string): void {
+    const node = loaded.objects.get(objectId);
+    loaded.release(objectId);
+    if (!node) return;
+
+    const assetId = String(node.userData['assetId'] ?? '');
+    if (!assetId) return;
+
+    const pool = this.#pool.get(assetId) ?? [];
+    if (pool.length >= POOL_LIMIT_PER_ASSET) return;
+
+    node.visible = false;
+    pool.push(node);
+    this.#pool.set(assetId, pool);
+  }
+
+  /** How many nodes are waiting to be reused. For tests and the perf readout. */
+  pooledCount(assetId?: string): number {
+    if (assetId !== undefined) return this.#pool.get(assetId)?.length ?? 0;
+    let total = 0;
+    for (const pool of this.#pool.values()) total += pool.length;
+    return total;
   }
 
   #buildObject(

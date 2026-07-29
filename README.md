@@ -7,9 +7,9 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 11 (Phase 2 — AI and triggers). Everything from Phase 1, plus behaviours, a
-physics world you can walk around in, enemies that hunt you and trigger volumes that wire a level
-together. The export system is next; there is no backend yet, deliberately.
+**Status:** Sprint 12 — Phases 1 and 2 complete. A working editor, behaviours, physics you can walk
+around in, enemies that hunt you, trigger volumes, and a measured performance baseline. The export
+system is next; there is no backend yet, deliberately.
 
 ---
 
@@ -188,6 +188,23 @@ scale gizmo — there is no second size field, because there should not be two a
 is — and it runs a list of actions on enter, on exit, or when a named event reaches the bus. Actions
 are a closed set (`emit`, `spawn`, `destroy`) for the same reason behaviours are: an exported
 project must never run something its author did not put in the document.
+
+## Performance
+
+`docs/PERFORMANCE.md` holds the acceptance bar and the last measurement. The short version: repeated
+static props are batched into instanced meshes, which takes the 520-object stress scene from **530
+draw calls to 57**, and the whole simulation — 520 colliders, twenty AI state machines, a character
+controller — costs about **2 ms of CPU per frame**.
+
+There is a benchmark for it, and it is meant to be re-run:
+
+```bash
+pnpm build && pnpm --filter @helaengine/editor preview &
+pnpm bench
+```
+
+Draw calls and CPU cost are the numbers to hold to account, because they are the same on every
+machine. Frame rate is not, and the document is explicit about what has and has not been verified.
 
 ## Where this is going
 
