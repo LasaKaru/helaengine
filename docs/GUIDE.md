@@ -153,7 +153,7 @@ Even if starting solo, structure work as if these lanes exist — makes future h
 
 ---
 
-## 5. Sprint Plan (2-week sprints, ~26 sprints ≈ 12 months to enterprise-grade v1)
+## 5. Sprint Plan (2-week sprints, ~40 sprints ≈ 19 months to enterprise-grade v1)
 
 ### PHASE 0 — Foundations (Sprints 1–2)
 
@@ -252,23 +252,30 @@ Even if starting solo, structure work as if these lanes exist — makes future h
 
 ---
 
-### PHASE 3 — Export System (Sprints 13–15)
+### PHASE 2B — Gameplay Runtime & UI (Sprints 13–20)
 
-**Sprint 13: Static export (no behaviors)**
+The play-mode layer: camera rigs and an input abstraction, a schema-driven menu/HUD renderer,
+weapons and health, unlockables, checkpoints, audio and a co-op multiplayer slice. Detailed in
+`GAMEPLAY-RUNTIME-AND-QA-PLAN.md` and broken into sprints in `SPRINT.md`; inserted here because
+exporting a world with no way to start, lose or hear it is not yet shipping a game.
+
+### PHASE 3 — Export System (Sprints 21–23)
+
+**Sprint 21: Static export (no behaviors)**
 
 - [ ] Export wizard UI: choose options (compress assets further? include source scene.json? minify?)
 - [ ] Bundler: copies `/packages/engine` (built, versioned) + user's scene.json + referenced assets only (tree-shake unused manifest entries) into a folder structure
 - [ ] Client-side zip via JSZip, or server-side job for large projects (queue if > threshold size)
 - **DoD:** Exported zip, when unzipped and opened via `index.html` (or `npx serve`), renders the identical static scene the editor showed.
 
-**Sprint 14: Full behavior export + readability layer**
+**Sprint 22: Full behavior export + readability layer**
 
 - [ ] Ensure exported `/engine` includes all behavior/physics/AI code needed (tree-shaken to only behaviors actually used in this scene)
 - [ ] Optional "readable code" mode: template pass (EJS) that emits human-readable `main.js` calling engine APIs explicitly per object, instead of pure JSON-driven load — good for users who want to hand-edit after export
 - [ ] Licensing/attribution file auto-generated (asset credits, engine license, user's own license choice)
 - **DoD:** Exported project with enemies/physics/triggers runs identically to in-editor preview, standalone, offline, no build step required (plain `<script type="module">`).
 
-**Sprint 15: Export hardening + cross-browser QA**
+**Sprint 23: Export hardening + cross-browser QA**
 
 - [ ] Playwright test: automated "create scene → export → serve export → visually diff against editor preview" pipeline
 - [ ] Test exported bundle in Chrome/Firefox/Safari/Edge, and on a throttled connection (asset loading spinners, error states)
@@ -277,55 +284,61 @@ Even if starting solo, structure work as if these lanes exist — makes future h
 
 ---
 
-### PHASE 4 — Backend Platform (Sprints 16–20)
+### PHASE 3B — Pre-Delivery Validation & Shareable Deploy (Sprints 24–27)
 
-**Sprint 16: Auth + multi-tenancy**
+Every build is smoke-tested in a sandbox before anyone can download it; failures get a bounded,
+schema-validated auto-repair loop, and whatever was changed is disclosed. Detailed in
+`GAMEPLAY-RUNTIME-AND-QA-PLAN.md` §4.
+
+### PHASE 4 — Backend Platform (Sprints 28–32)
+
+**Sprint 28: Auth + multi-tenancy**
 
 - [ ] NestJS API scaffold, Postgres + Prisma schema: `User, Organization, Membership, Project, SceneVersion, Asset, License`
 - [ ] Auth via Auth0/Clerk (OIDC), org-based RBAC (owner/editor/viewer roles per project)
 - [ ] SSO/SAML stub for future enterprise customers (even if not fully wired, design DB/role model for it now)
 - **DoD:** Users can sign up, create an org, invite a teammate with a role, and role gates API access correctly (tested with integration tests).
 
-**Sprint 17: Project CRUD + cloud save**
+**Sprint 29: Project CRUD + cloud save**
 
 - [ ] `POST/GET/PUT /projects`, scene stored as JSONB `SceneVersion` rows (append-only — every save = new version row, not overwrite) → gives you free version history
 - [ ] Autosave (debounced) from editor to backend; conflict detection (optimistic concurrency via version number)
 - [ ] Project listing/dashboard UI (replacing local-only IndexedDB flow from Sprint 8 — migrate local-first data to cloud once backend exists)
 - **DoD:** User can save from browser A, load same project on browser B, see identical state. Version history list shows last 20 saves with timestamps and restore option.
 
-**Sprint 18: Asset storage + CDN pipeline**
+**Sprint 30: Asset storage + CDN pipeline**
 
 - [ ] S3/R2 bucket structure: `/orgs/{orgId}/assets/{assetId}/...`, signed upload URLs, backend-triggered ingest job (Sprint 2's script now runs as a queued worker, not local CLI)
 - [ ] Custom asset upload flow for premium/enterprise tier (bring-your-own-GLB)
 - [ ] CDN in front of asset bucket, cache headers, versioned asset URLs (immutable caching)
 - **DoD:** User uploads a custom GLB, it's auto-compressed/thumbnailed within seconds via background job, and appears in their private asset library.
 
-**Sprint 19: Real-time collaboration**
+**Sprint 31: Real-time collaboration**
 
 - [ ] Yjs document mirroring the scene schema; y-websocket server (or Liveblocks managed service to save infra time)
 - [ ] Presence (cursors/selection highlight per collaborator), awareness API
 - [ ] Conflict-free merge of simultaneous transform edits (this is why CRDT over naive last-write-wins)
 - **DoD:** Two browser tabs (different users) editing the same project see each other's cursor, selection, and object edits live within <200ms, with no data loss on simultaneous edits.
 
-**Sprint 20: Export job orchestration at scale**
+**Sprint 32: Export job orchestration at scale**
 
-- [ ] Move export bundling to BullMQ worker (Sprint 13–14 logic, now server-side for large/enterprise projects)
+- [ ] Move export bundling to BullMQ worker (Sprint 21–14 logic, now server-side for large/enterprise projects)
 - [ ] Progress websocket/polling for export job status, signed download URL on completion, auto-expiry
 - [ ] Rate limiting + quota enforcement per plan tier
 - **DoD:** A 300MB project export completes as a background job with progress bar, doesn't block the editor UI, and produces a time-limited signed download link.
 
 ---
 
-### PHASE 5 — Enterprise Hardening (Sprints 21–24)
+### PHASE 5 — Enterprise Hardening (Sprints 33–36)
 
-**Sprint 21: Observability + SRE basics**
+**Sprint 33: Observability + SRE basics**
 
 - [ ] OpenTelemetry instrumentation across API + workers; Grafana dashboards (latency, error rate, queue depth)
 - [ ] Sentry on both editor client and API
 - [ ] Structured logging + correlation IDs across request → job → export lifecycle
 - **DoD:** You can trace a single export request from HTTP call → queue → worker → S3 upload → user notification, end to end, in one dashboard.
 
-**Sprint 22: Security & compliance pass**
+**Sprint 34: Security & compliance pass**
 
 - [ ] Dependency scanning (Dependabot/Snyk), SAST in CI
 - [ ] Signed URL expiry audit, S3 bucket policy audit, CORS lockdown
@@ -333,13 +346,13 @@ Even if starting solo, structure work as if these lanes exist — makes future h
 - [ ] Basic SOC2-readiness checklist (audit logging on project access/changes, data retention policy doc)
 - **DoD:** Pen-test checklist (OWASP Top 10 relevant items) run against staging with no critical findings.
 
-**Sprint 23: Billing & plan tiers**
+**Sprint 35: Billing & plan tiers**
 
 - [ ] Stripe integration: Free / Pro / Enterprise tiers (asset upload limits, export size limits, seat counts, collab session limits)
 - [ ] Usage metering (exports/month, storage used, active seats) feeding into Postgres for billing reconciliation
 - **DoD:** Upgrading/downgrading a plan correctly gates features (test: free-tier user blocked from custom asset upload, sees upgrade prompt).
 
-**Sprint 24: Performance & load testing**
+**Sprint 36: Performance & load testing**
 
 - [ ] k6 or Artillery load tests against API (target concurrent editors, export throughput)
 - [ ] Editor performance budget audit (bundle size, Three.js draw calls, memory leaks on long sessions — use Chrome perf/memory profiler on a 2-hour editing session)
@@ -348,16 +361,16 @@ Even if starting solo, structure work as if these lanes exist — makes future h
 
 ---
 
-### PHASE 6 — Content, Polish, Launch (Sprints 25–26+)
+### PHASE 6 — Content, Polish, Launch (Sprints 37–38+)
 
-**Sprint 25: Template & asset library expansion**
+**Sprint 37: Template & asset library expansion**
 
 - [ ] Commission/produce 50–100 production-quality low-poly assets across categories (trees, rocks, buildings, enemies, props, terrain sets)
 - [ ] 5–10 polished starter templates (village, dungeon, island, forest, arena) showcasing full feature set
-- [ ] Asset marketplace groundwork if you want third-party creators later (license model, revenue share schema in DB already — Sprint 16's `License` table)
+- [ ] Asset marketplace groundwork if you want third-party creators later (license model, revenue share schema in DB already — Sprint 28's `License` table)
 - **DoD:** New user can go from signup → pick template → make meaningful edits → export in under 10 minutes (usability test with 5 real users, not just internal team).
 
-**Sprint 26: Docs, onboarding, beta launch**
+**Sprint 38: Docs, onboarding, beta launch**
 
 - [ ] Public docs site (engine API reference, behavior reference, export guide) — Docusaurus or similar
 - [ ] In-app onboarding tour, sample video walkthroughs
@@ -380,8 +393,8 @@ Even if starting solo, structure work as if these lanes exist — makes future h
 1. **React leaking into gameplay logic.** If any behavior/physics/AI code imports React or Zustand directly, your export breaks. Enforce via lint rule/ESLint boundary (e.g., `eslint-plugin-boundaries`) preventing `/packages/engine` from importing anything from `/apps/editor`.
 2. **Scene schema churn without migrations.** Once real users have saved projects, every schema change needs a migration function — never a breaking change without one.
 3. **Asset licensing.** If you use any third-party low-poly asset packs for speed, verify redistribution rights before letting users export them in their own downloadable projects — enterprise customers will ask about this.
-4. **Underestimating export edge cases.** Circular parent/child references, missing assets, very large heightmaps — build the Playwright export-diff suite (Sprint 15) early, not at the end.
-5. **Real-time collab complexity.** Yjs/CRDT is not trivial — budget real time for it (Sprint 19 alone may run long); a simpler "locking" model (one editor at a time per project) is an acceptable v1 fallback if timeline is tight.
+4. **Underestimating export edge cases.** Circular parent/child references, missing assets, very large heightmaps — build the Playwright export-diff suite (Sprint 23) early, not at the end.
+5. **Real-time collab complexity.** Yjs/CRDT is not trivial — budget real time for it (Sprint 31 alone may run long); a simpler "locking" model (one editor at a time per project) is an acceptable v1 fallback if timeline is tight.
 
 ---
 

@@ -32,7 +32,7 @@ const nextPosition = new THREE.Vector3();
  * introductions, and this is it — deliberately the only class in the engine that knows about all
  * four, so nothing else has to.
  *
- * It is also what an exported project will construct at startup (Sprint 13): the editor's Play
+ * It is also what an exported project will construct at startup (Sprint 21): the editor's Play
  * Preview is not a special path, it is this class with a viewport attached.
  */
 export class GameRuntime implements WorldHandle {

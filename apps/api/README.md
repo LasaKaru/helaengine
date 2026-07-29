@@ -1,6 +1,6 @@
 # @helaengine/api — placeholder
 
-Scaffolded in **Sprint 16** (NestJS + Postgres + Prisma).
+Scaffolded in **Sprint 28** (NestJS + Postgres + Prisma).
 
 Planned module layout, per `docs/DEVELOPMENT-PLAN.md` section 4:
 

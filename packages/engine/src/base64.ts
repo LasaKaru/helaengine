@@ -12,7 +12,7 @@ const LOOKUP = /* @__PURE__ */ (() => {
  * Base64 encode/decode without `btoa`, `atob` or `Buffer`.
  *
  * Terrain data is encoded in the browser (the editor), in Node (tests, and the server-side export
- * worker from Sprint 20) and inside exported projects. Hand-rolling ~40 lines beats branching on
+ * worker from Sprint 32) and inside exported projects. Hand-rolling ~40 lines beats branching on
  * which globals happen to exist in each of those, and keeps the engine free of a polyfill
  * dependency it would otherwise carry into every export.
  */

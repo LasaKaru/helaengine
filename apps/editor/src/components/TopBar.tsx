@@ -77,7 +77,7 @@ export function TopBar(): React.JSX.Element {
         >
           Save
         </button>
-        <button type="button" disabled title="Export arrives in Sprint 13">
+        <button type="button" disabled title="Export arrives in Sprint 21">
           Export
         </button>
       </div>

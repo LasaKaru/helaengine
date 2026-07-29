@@ -10,7 +10,7 @@ import { migrateScene, parseAssetManifest } from '@helaengine/schema';
 /**
  * The proof that the engine stands alone: a scene document and an asset manifest go in, a rendered
  * world comes out, with no UI framework and no state library in the chain. Whatever this file can
- * do, an exported project can do — it is deliberately close to what the exporter emits in Sprint 13.
+ * do, an exported project can do — it is deliberately close to what the exporter emits in Sprint 21.
  */
 
 const ASSET_BASE_URL = './assets/';

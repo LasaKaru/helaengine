@@ -44,7 +44,7 @@ export function ProjectsScreen(): React.JSX.Element {
           <span className="brand-name">HelaEngine</span>
         </div>
         <p className="projects-tagline">
-          Projects live in this browser. Cloud sync arrives in Sprint 17.
+          Projects live in this browser. Cloud sync arrives in Sprint 29.
         </p>
       </header>
 

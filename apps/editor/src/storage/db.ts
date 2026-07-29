@@ -5,7 +5,7 @@ import Dexie, { type Table } from 'dexie';
  *
  * `sceneJson` is stored as a string rather than a structured object on purpose: IndexedDB would
  * happily hold the object, but round-tripping through JSON is exactly what the cloud API will do
- * in Sprint 17, and a document that survives one survives the other. It also means the stored form
+ * in Sprint 29, and a document that survives one survives the other. It also means the stored form
  * is inert data that no amount of prototype trickery can smuggle behaviour into.
  */
 export interface StoredProject {

@@ -95,7 +95,7 @@ function GridCell({
  * The asset library. Search, category filter, and a virtualized grid of draggable cards.
  *
  * The grid is virtualized at ten assets, which is obviously unnecessary today — but the library is
- * headed for hundreds (Sprint 25), and retrofitting virtualization onto a panel with scroll
+ * headed for hundreds (Sprint 37), and retrofitting virtualization onto a panel with scroll
  * position, drag handlers and selection already wired through it is far more disruptive than
  * starting with it.
  */

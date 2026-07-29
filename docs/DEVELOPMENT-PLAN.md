@@ -166,19 +166,29 @@ Payments: Stripe (fully managed, external)
 
 ## 6. Timeline Overview (zero → GA)
 
-| Phase                           | Duration                   | Outcome                                                      |
-| ------------------------------- | -------------------------- | ------------------------------------------------------------ |
-| Phase 0 — Foundations           | Sprints 1-2 (1 month)      | Engine skeleton + asset pipeline working locally             |
-| Phase 1 — Editor MVP            | Sprints 3-8 (3 months)     | Full local-only editor: place, transform, terrain, save/load |
-| Phase 2 — Behaviors/Physics/AI  | Sprints 9-12 (2 months)    | Enemies, physics, triggers working in preview                |
-| Phase 3 — Export System         | Sprints 13-15 (1.5 months) | Standalone playable exports, cross-browser verified          |
-| Phase 4 — Backend Platform      | Sprints 16-20 (2.5 months) | Auth, cloud save, collab, cloud export jobs                  |
-| Phase 5 — Enterprise Hardening  | Sprints 21-24 (2 months)   | Observability, security, billing, load testing               |
-| Phase 6 — Content & Beta Launch | Sprints 25-26 (1 month)    | Asset library, templates, closed beta                        |
-| **Total to public beta**        | **~13 months**             |                                                              |
-| Phase 7 — GA Launch             | +2 months post-beta        | Public launch, pricing live, support processes running       |
+| Phase                                           | Duration                     | Outcome                                                        |
+| ----------------------------------------------- | ---------------------------- | -------------------------------------------------------------- |
+| Phase 0 — Foundations                           | Sprints 1-2 (1 month)        | Engine skeleton + asset pipeline working locally               |
+| Phase 1 — Editor MVP                            | Sprints 3-8 (3 months)       | Full local-only editor: place, transform, terrain, save/load   |
+| Phase 2 — Behaviors/Physics/AI                  | Sprints 9-12 (2 months)      | Enemies, physics, triggers working in preview                  |
+| **Phase 2B — Gameplay Runtime & UI**            | **Sprints 13-20 (4 months)** | **Play modes, menus, HUD, weapons, checkpoints, audio, co-op** |
+| Phase 3 — Export System                         | Sprints 21-23 (1.5 months)   | Standalone playable exports, cross-browser verified            |
+| **Phase 3B — Pre-Delivery Validation & Deploy** | **Sprints 24-27 (2 months)** | **Sandbox test + AI auto-fix, hosted play links**              |
+| Phase 4 — Backend Platform                      | Sprints 28-32 (2.5 months)   | Auth, cloud save, collab, cloud export jobs                    |
+| Phase 5 — Enterprise Hardening                  | Sprints 33-36 (2 months)     | Observability, security, billing, load testing                 |
+| Phase 6 — Content & Beta Launch                 | Sprints 37-38 (1 month)      | Asset library, templates, closed beta                          |
+| **Total to public beta**                        | **~19 months**               |                                                                |
+| Phase 7 — GA Launch                             | Sprints 39-40 (+2 months)    | Public launch, pricing live, support processes running         |
+| Phase 8 — AI Prototype Generation               | Sprints 41-44 (~2 months)    | Prompt-to-prototype layer (AI-PROTOTYPE-PLAN.md)               |
+| **Total to full vision**                        | **~23 months**               |                                                                |
 
 _(Solo/small-team estimate assuming focused execution; compress by 30-40% with a 3-4 person team split across the lanes in GUIDE.md section 4.)_
+
+**Phases 2B and 3B were added after Sprint 12** and are the reason the total moved from ~13 to ~19
+months to beta. The reasoning is in `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`: an export with no menu, no
+HUD, no way to win or lose and no sound is a world viewer, not a game, and shipping the export
+system first would have meant shipping the wrong thing well. Worth being clear-eyed that this is a
+real four-month scope addition rather than a rounding error.
 
 ---
 

@@ -63,7 +63,7 @@ export interface Behavior {
  * vocabulary: a scene document can only ask for a registered `type` with params that satisfy that
  * type's schema. Nothing in a document is ever interpreted as code — no `eval`, no `new Function`,
  * no string that becomes a callback — so an exported project cannot be made to run something its
- * author did not put there. Sprint 22 re-verifies this by grepping for dynamic execution.
+ * author did not put there. Sprint 34 re-verifies this by grepping for dynamic execution.
  *
  * The schema doubles as the editor's form description: the inspector reads it to render fields,
  * so adding a behaviour does not mean hand-writing UI for it.

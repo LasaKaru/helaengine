@@ -143,7 +143,7 @@ describe('engine boundaries', () => {
 
   it('runs no code a document could choose', () => {
     // The closed-vocabulary promise, checked rather than asserted: nothing in the runtime turns a
-    // string into executable code. Sprint 22 re-runs this against the exporter's output too.
+    // string into executable code. Sprint 34 re-runs this against the exporter's output too.
     const offenders: string[] = [];
     const dangerous = /\beval\s*\(|new\s+Function\s*\(|setTimeout\s*\(\s*['"`]/;
 

@@ -177,7 +177,7 @@ async function ingestOne(
  * Copies three.js's Draco decoder next to the models.
  *
  * Draco-compressed GLBs are undecodable without it, so it is part of the asset payload, not a
- * build-time dependency — the exporter (Sprint 13) will copy the same files into every bundle so
+ * build-time dependency — the exporter (Sprint 21) will copy the same files into every bundle so
  * exports keep working offline, with no CDN in the loop.
  */
 async function copyDracoDecoder(outputDir: string): Promise<void> {

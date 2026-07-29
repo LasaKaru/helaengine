@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 /**
  * Only a smoke test today (Sprint 3). This grows into the export visual-regression suite in
- * Sprint 15, so the harness is set up now rather than bolted on when it is urgent.
+ * Sprint 23, so the harness is set up now rather than bolted on when it is urgent.
  */
 export default defineConfig({
   testDir: './e2e',

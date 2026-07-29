@@ -1,7 +1,7 @@
 /**
  * Generates the ten starter `.glb` sources in `raw-assets/`.
  *
- * These are stand-ins, not final art. Sprint 25 commissions real modelled assets; until then the
+ * These are stand-ins, not final art. Sprint 37 commissions real modelled assets; until then the
  * pipeline needs genuine GLB files to chew on, and stand-ins built in code are honest about what
  * they are and stay reproducible. They follow the same rules as hand-authored assets — metre
  * scale, +Y up, pivot at the base, flat shading, one material per colour — so nothing downstream

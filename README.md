@@ -83,7 +83,7 @@ tools/asset-pipeline   Ingest: raw GLBs in, compressed GLBs + thumbnails + manif
 raw-assets/            Hand-authored .glb sources. The artefacts under version control.
 apps/demo              Framework-free harness rendering a scene document. Proves the engine stands alone.
 apps/editor            The editor: React + react-three-fiber shell around the engine.
-apps/api               Empty until Sprint 16 (NestJS + Postgres).
+apps/api               Empty until Sprint 28 (NestJS + Postgres).
 docs/                  GUIDE, DEVELOPMENT-PLAN, SPRINT, ASSET-CONVENTIONS — the plan of record.
 ```
 
@@ -129,7 +129,7 @@ looks wrong, fix the source file — never special-case it in engine code, becau
 project inherits engine code.
 
 The ten starter assets are **stand-ins generated in code** (`pnpm generate-assets`), not modelled
-art. They exist so the pipeline has real GLBs to chew on; Sprint 25 replaces them with commissioned
+art. They exist so the pipeline has real GLBs to chew on; Sprint 37 replaces them with commissioned
 assets, and nothing downstream has to change when it does.
 
 Texture compression (KTX2/Basis) is wired but inert: it needs `toktx` from KHRONOS KTX-Software on
@@ -209,8 +209,14 @@ machine. Frame rate is not, and the document is explicit about what has and has 
 ## Where this is going
 
 `docs/SPRINT.md` is the working backlog, sprint by sprint. In short: editor MVP (Sprints 3–8),
-behaviors/physics/AI (9–12), the export system (13–15), the cloud platform (16–20), enterprise
-hardening (21–24), then content and beta (25–26).
+behaviours/physics/AI (9–12), **the gameplay runtime — menus, HUD, combat, checkpoints, audio,
+co-op (13–20)**, the export system (21–23), **pre-delivery validation and hosted play (24–27)**,
+the cloud platform (28–32), enterprise hardening (33–36), then content and beta (37–38).
+
+The two bolded phases were added after Sprint 12 and pushed everything after them back by twelve
+sprints. `docs/GAMEPLAY-RUNTIME-AND-QA-PLAN.md` has the reasoning: exporting a world you can walk
+around, with no menu, no HUD, no way to win or lose and no sound, is shipping a viewer rather than
+a game.
 
 ## License
 

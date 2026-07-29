@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–12 complete. Phases 1 (Editor MVP) and 2 (Behaviours, Physics, AI) done; Phase 3 (Export) next. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–12 complete. Phases 1 (Editor MVP) and 2 (Behaviours, Physics, AI) done; **Phase 2B (Gameplay Runtime & UI, Sprints 13–20) is next** — it was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -310,11 +310,156 @@
 
 ---
 
+## PHASE 2B — GAMEPLAY RUNTIME & UI
+
+**Duration:** Sprints 13–20 (4 months) | **Outcome:** An exported project is a _game_ — menus, HUD, combat, checkpoints, audio, optional co-op — not a scene you can walk around in.
+
+**Why this sits here and not after export:** exporting today would hand someone a world with no way to start it, no way to lose, no way to pause and no sound. That is a world viewer, not a game. Full detail in `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`; this section is the backlog form of it.
+
+---
+
+### Sprint 13 — Camera & Player Controller System
+
+**Goal:** A player who can actually be controlled — in first or third person, with keyboard, touch or a gamepad.
+
+**Tasks:**
+
+- [ ] Build the FPS camera rig on top of Sprint 10's Rapier kinematic controller: head-height offset, pointer-lock mouse-look, optional head-bob
+- [ ] Build the TPS camera rig: spring-arm follow with collision avoidance, so the camera never ends up inside a wall
+- [ ] Build `InputManager` — one abstract action set (`moveForward`, `moveRight`, `look`, `jump`, `sprint`, `crouch`, `fire`, `interact`) fed by keyboard/mouse, touch (virtual joystick + buttons) and the Gamepad API
+- [ ] Add `gameConfig` to the schema (`cameraMode`, `allowModeSwitch`, multiplayer settings) and select the rig at scene load; implement the runtime toggle when `allowModeSwitch` is on
+- [ ] Extend the character controller with sprint and crouch
+
+**Tech notes:**
+
+- The input abstraction has to be designed once, generically. Bolting touch on per-platform later is how an engine ends up with three divergent control paths.
+- Pointer lock and the Gamepad API are both browser features a headless test cannot fully drive; plan on a dev-API hook for automated verification, as Sprint 10 needed for look.
+
+**Deliverables:** Two camera rigs, one input layer, `gameConfig` in the schema.
+
+**Definition of Done:** A test scene is playable end to end in both FPS and TPS with keyboard and mouse, and verified functional with touch input on a mobile browser and with a connected gamepad.
+
+---
+
+### Sprint 14 — Menu/UI Renderer Foundation
+
+**Goal:** The shell around the game: a home screen, menus, and a pause loop, all driven by the document.
+
+**Tasks:**
+
+- [ ] Build `UIRenderer` — a DOM+CSS overlay driven entirely by `uiConfig`, mounted alongside the WebGL canvas. Structurally the same idea as `SceneLoader`: data in, interface out, no per-project code
+- [ ] Home screen: background image, optional intro video (skippable, autoplay-muted then unmuted on interaction, respecting browser autoplay policy), title, Play button
+- [ ] Main menu and pause menu as button lists bound to a registered **UI action** vocabulary (`startGame`, `openSettings`, `quit`, `resume`, `restartCheckpoint`, `mainMenu`) — closed, exactly like behaviours
+- [ ] Theme system: font, colour palette and panel-style presets applied to every UI surface at once
+
+**Tech notes:**
+
+- DOM overlay rather than in-3D UI meshes: text quality, accessibility and customisation all favour the DOM, and an in-world menu is a niche the engine can add later without redoing this.
+
+**Deliverables:** `UIRenderer`, home/main/pause screens, theme presets.
+
+**Definition of Done:** A full home → main menu → play → pause → resume loop works in preview, and swapping the theme preset restyles every menu without touching any individual button config.
+
+---
+
+### Sprint 15 — Editor-Side UI Customization Tools
+
+**Goal:** All of Sprint 14's configuration editable by someone who has never seen JSON.
+
+**Tasks:**
+
+- [ ] Build the in-editor "Game UI" panel: home screen image/video/title, menu button list (add, remove, reorder, relabel, reassign action), HUD toggles
+- [ ] Custom HUD elements (`hud.customElements[]`): text and image overlays with anchor/position controls and variable binding (score, timer, ammo)
+- [ ] Extend the asset upload flow to accept images and video for UI use
+
+**Definition of Done:** A non-technical tester can change the home screen image, swap the intro video, rename and reorder menu buttons and add a custom HUD text element without help, and see it all in Play Preview.
+
+---
+
+### Sprint 16 — Weapons, Health, Ammo, Combat
+
+**Goal:** Something to do in the world besides walk around it.
+
+**Tasks:**
+
+- [ ] Add `inventory` and `playerConfig` to the schema; implement runtime inventory state (current weapon, ammo counts, held items)
+- [ ] Wire weapon firing through `InputManager`: fire action → raycast or projectile → hit check → damage event on the existing bus
+- [ ] Extend the health/damage flow from Sprint 11 to the player; death triggers a respawn stub (full checkpoint integration lands in Sprint 18)
+- [ ] Pickup behaviour (`onPickup`): adds to inventory or health, despawns itself, raises an SFX event
+- [ ] Inspector support for weapon stats and starting inventory — new registered types, not a new UI paradigm
+
+**Definition of Done:** A test scene with a weapon pickup, an enemy and health/ammo pickups is fully playable: pick up a weapon, shoot an enemy, take damage, heal with a medkit, all reflected in the HUD.
+
+---
+
+### Sprint 17 — Unlockables / Secret Methods
+
+**Goal:** Secrets, as data rather than as code.
+
+**Tasks:**
+
+- [ ] Build the `unlockables` registry — closed vocabulary — starting with `inputSequence` (Konami-style) and `triggerVolume`
+- [ ] Build the unlock-action registry: `teleportPlayer`, `unlockInventoryItem`, `revealArea`
+- [ ] Editor "Secrets" panel so none of it requires touching raw JSON
+
+**Definition of Done:** A scene with both an input-sequence secret and a hidden-trigger secret works in Play Preview and is configurable entirely through the editor.
+
+---
+
+### Sprint 18 — Checkpoints & Save System
+
+**Goal:** Losing means something, and progress survives closing the tab.
+
+**Tasks:**
+
+- [ ] Checkpoint objects, placeable and triggerable, updating `currentCheckpointId`
+- [ ] Respawn at the current checkpoint on death, with per-checkpoint reset rules (full or partial health/ammo)
+- [ ] Persistence: `localStorage` in a standalone export; server-side later for hosted play with an account
+- [ ] Editor placement and per-checkpoint config panel
+
+**Definition of Done:** The player reaches a checkpoint, dies, respawns there with correctly reset stats; closing and reopening an exported build resumes from the last checkpoint.
+
+---
+
+### Sprint 19 — Audio System
+
+**Goal:** Sound, which is half of what makes a scene feel like a game.
+
+**Tasks:**
+
+- [ ] Howler.js for music (state-driven crossfade between menu, exploration and combat tracks); Three.js positional audio for in-world sources
+- [ ] Bind SFX to engine events: damage, pickup, checkpoint, footsteps, weapon fire
+- [ ] Extend the ingest pipeline with an audio step: format normalisation to a web-friendly codec, loudness levelling
+- [ ] Settings-menu volume mixer (master/music/SFX) plus editor-side defaults
+
+**Definition of Done:** A scene has distinct menu and gameplay music with a clean crossfade, correct SFX on damage/pickup/checkpoint, and a working in-game mixer that persists for the session.
+
+---
+
+### Sprint 20 — Multiplayer Runtime (Co-op Slice)
+
+**Goal:** Two people in the same world. Deliberately not a competitive shooter.
+
+**Tasks:**
+
+- [ ] Stand up a Colyseus server as its own deployable service — a different workload shape from the API, per the monolith-vs-services reasoning in DEVELOPMENT-PLAN.md
+- [ ] Authoritative room state: positions, health, shared world state. Clients send inputs; the server simulates and broadcasts
+- [ ] Wire `gameConfig.multiplayer` (enabled, maxPlayers, mode) through to the exported build's networking
+- [ ] Scope explicitly to co-op/shared-world. **Lag-compensated competitive combat — client prediction, rollback — is an explicit future item**, not silently included
+
+**Definition of Done:** Two browser clients join the same session and see each other move in real time, server-authoritative, with no obvious desync under normal network conditions.
+
+---
+
+**Phase 2B wrap check:** An exported build is now a complete playable product — menus, HUD, combat, checkpoints, audio, optional co-op. This, not the earlier static-scene export, is the milestone worth demoing widely.
+
+---
+
 ## PHASE 3 — EXPORT SYSTEM
 
-**Duration:** Sprints 13–15 (1.5 months) | **Outcome:** Standalone playable exports, cross-browser verified.
+**Duration:** Sprints 21–23 (1.5 months) | **Outcome:** Standalone playable exports, cross-browser verified.
 
-### Sprint 13 — Static Export (No Behaviors Yet)
+### Sprint 21 — Static Export (No Behaviors Yet)
 
 **Goal:** Prove the fundamental export mechanism works before layering in the harder behavior/physics export case.
 
@@ -332,7 +477,7 @@
 
 ---
 
-### Sprint 14 — Full Behavior Export + Readability Layer
+### Sprint 22 — Full Behavior Export + Readability Layer
 
 **Goal:** Extend export to cover the harder cases — behaviors, physics, AI — and add a "human-readable" option for power users.
 
@@ -346,11 +491,11 @@
 
 **Deliverables:** Full-feature export (behaviors/physics/AI included), optional readable-code mode, licensing file generation.
 
-**Definition of Done:** A scene with active enemy AI, physics, and a trigger-based scene event, once exported and served standalone, behaves identically to the in-editor Play Preview — verified by side-by-side manual comparison, and later automated in Sprint 15.
+**Definition of Done:** A scene with active enemy AI, physics, and a trigger-based scene event, once exported and served standalone, behaves identically to the in-editor Play Preview — verified by side-by-side manual comparison, and later automated in Sprint 23.
 
 ---
 
-### Sprint 15 — Export Hardening + Cross-Browser QA
+### Sprint 23 — Export Hardening + Cross-Browser QA
 
 **Goal:** Make export trustworthy enough to be a core product promise, not a fragile demo feature.
 
@@ -371,11 +516,88 @@
 
 ---
 
+## PHASE 3B — PRE-DELIVERY VALIDATION & SHAREABLE DEPLOY
+
+**Duration:** Sprints 24–27 (2 months) | **Outcome:** Nothing reaches a user until it has been proved to run, and a build can be shared as a link rather than a zip.
+
+**Why this matters commercially:** most tools in this space hand over a bundle and wish you luck. Auto-testing every export, repairing what it can, and disclosing what it changed is a genuine differentiator — and it is only safe because every repair goes through the same closed-vocabulary, schema-validated discipline as the rest of the product. Full detail in `GAMEPLAY-RUNTIME-AND-QA-PLAN.md` §4.
+
+---
+
+### Sprint 24 — Headless Smoke Test Harness
+
+**Goal:** A deterministic robot that plays every build before a human can.
+
+**Tasks:**
+
+- [ ] Playwright-based sandbox runner: loads a staged, non-public export and captures console errors and failed network requests
+- [ ] Implement the scripted checklist — deliberately deterministic checks, **not** "an AI plays it and judges":
+  - page loads with zero uncaught JS errors
+  - every asset request resolves (no 404s on GLB, texture or audio)
+  - the engine reports "scene loaded" within a timeout (catches hangs)
+  - synthetic WASD and look input for N seconds actually moves the player (catches spawning stuck or falling through the world — the most common export-breaking bug)
+  - player health does not hit zero while idle (catches damage triggers misplaced at spawn)
+  - Rapier's WASM actually initialises (catches the MIME-type hosting problem flagged in Sprint 23)
+  - memory does not climb without bound over a short window
+- [ ] Wire it as a required step: the export worker writes to a private staging path first, never straight to a download or a public deploy
+
+**Definition of Done:** Five known-good templates pass cleanly; three deliberately broken scenes (spawn inside terrain, missing asset reference, broken WASM path) each fail with specific, identifiable output.
+
+---
+
+### Sprint 25 — AI Diagnosis + Auto-Repair Loop
+
+**Goal:** Fix what can be fixed, automatically, without ever running model-authored code.
+
+**Tasks:**
+
+- [ ] Error-context extraction: given a failure, isolate the _relevant slice_ of `scene.json` — spawn position and terrain collider for a fall-through, not the whole object list
+- [ ] Request a targeted patch through the shared `ModelRouter` (same routing layer as AI-PROTOTYPE-PLAN.md), in structured form
+- [ ] Zod-validate every proposed patch before applying it; bounded retry loop, max 3 attempts, re-running the Sprint 24 harness after each
+- [ ] Auto-repair audit log: what changed, why, on which attempt
+
+**Tech notes:**
+
+- The safety argument is the same one behaviours make: the model proposes into a schema it cannot escape, the patch is narrow, the result is re-verified by a deterministic test, and the whole thing is logged. At no point does model output become executable code.
+
+**Definition of Done:** All three deliberately broken scenes from Sprint 24 are detected and repaired within the retry budget, verified by the harness passing afterwards.
+
+---
+
+### Sprint 26 — Release Gating + User-Facing Reporting
+
+**Goal:** The gate, and being honest about it.
+
+**Tasks:**
+
+- [ ] Gate access on the pipeline outcome: the download button and play link appear only after a pass
+- [ ] Build the report UI — auto-fixes applied, stated plainly ("we moved your spawn point up 1.2 m so the player would not fall through the terrain"), or a specific human-readable failure with a suggested manual fix
+- [ ] Handle unrecoverable failure explicitly: never a spinner that never resolves
+
+**Definition of Done:** A good scene shows a brief validating state and then the download; a broken one either shows a transparent auto-fix notice with working output or a clear, specific failure — never a silent hang or an unexplained rejection.
+
+---
+
+### Sprint 27 — Shareable Hosted Play
+
+**Goal:** "Here's a link" instead of "here's a zip, good luck".
+
+**Tasks:**
+
+- [ ] Extend the export worker with a deploy mode: the same validated bundle, uploaded to a public CDN path per project instead of zipped
+- [ ] Access controls: public, unlisted, org-only
+- [ ] Play analytics stub: play count, last played, surfaced in the dashboard
+- [ ] Verify multiplayer sessions work specifically through the hosted path — that is how co-op will actually be used
+
+**Definition of Done:** A user generates a share link for a validated build, sends it to someone else, and that person plays it in-browser — including joining a co-op session — with no download and no local server.
+
+---
+
 ## PHASE 4 — BACKEND PLATFORM
 
-**Duration:** Sprints 16–20 (2.5 months) | **Outcome:** Auth, cloud save, real-time collab, cloud-based export jobs.
+**Duration:** Sprints 28–32 (2.5 months) | **Outcome:** Auth, cloud save, real-time collab, cloud-based export jobs.
 
-### Sprint 16 — Auth + Multi-Tenancy
+### Sprint 28 — Auth + Multi-Tenancy
 
 **Goal:** Real user accounts, organizations, and role-based access — the foundation every other backend feature builds on.
 
@@ -398,7 +620,7 @@
 
 ---
 
-### Sprint 17 — Project CRUD + Cloud Save
+### Sprint 29 — Project CRUD + Cloud Save
 
 **Goal:** Move project persistence from local IndexedDB (Sprint 8) to the cloud, with full version history "for free" via append-only versioning.
 
@@ -407,7 +629,7 @@
 - [ ] Implement `Project` and `SceneVersion` Prisma models per the schema in DEVELOPMENT-PLAN.md section 3; build `POST /projects`, `GET /projects/:id`, `PUT /projects/:id` (metadata only — name, thumbnail), `POST /projects/:id/versions` (append a new SceneVersion — this is the actual "save")
 - [ ] Zod-validate incoming `sceneJson` server-side before persisting (reuse the shared `/packages/schema` package — same validation logic as the editor uses locally)
 - [ ] Build editor-side migration: replace Dexie/IndexedDB calls from Sprint 8 with API calls; implement autosave as a debounced `POST /projects/:id/versions` call (e.g., every 30-60s of activity, plus explicit manual save button)
-- [ ] Implement optimistic concurrency: `SceneVersion` has a `versionNumber`; if a save request's base version doesn't match the project's current latest version, reject with a conflict response (409) — editor surfaces a "someone else saved, reload?" prompt (full collab merge comes in Sprint 19, this is just conflict _detection_ for now)
+- [ ] Implement optimistic concurrency: `SceneVersion` has a `versionNumber`; if a save request's base version doesn't match the project's current latest version, reject with a conflict response (409) — editor surfaces a "someone else saved, reload?" prompt (full collab merge comes in Sprint 31, this is just conflict _detection_ for now)
 - [ ] Build Projects Dashboard UI: list of projects (thumbnail, name, last modified, org), create-new, delete (soft-delete with confirmation), duplicate
 - [ ] Build Version History panel: list last N `SceneVersion` rows with timestamp/author, "restore this version" action (creates a _new_ version copying the old one's content — never deletes/rewrites history)
 
@@ -417,7 +639,7 @@
 
 ---
 
-### Sprint 18 — Asset Storage + CDN Pipeline
+### Sprint 30 — Asset Storage + CDN Pipeline
 
 **Goal:** Move the local-file asset pipeline (Sprint 2) to a real cloud storage + CDN setup, and enable user-uploaded custom assets.
 
@@ -436,7 +658,7 @@
 
 ---
 
-### Sprint 19 — Real-Time Collaboration
+### Sprint 31 — Real-Time Collaboration
 
 **Goal:** Multiple users editing the same project simultaneously with live presence and conflict-free merging.
 
@@ -455,14 +677,14 @@
 
 ---
 
-### Sprint 20 — Export Job Orchestration at Scale
+### Sprint 32 — Export Job Orchestration at Scale
 
-**Goal:** Move export bundling (Sprints 13-15) from a client-side operation to a server-side background job, for large projects and to enforce plan quotas.
+**Goal:** Move export bundling (Sprints 21-23) from a client-side operation to a server-side background job, for large projects and to enforce plan quotas.
 
 **Tasks:**
 
 - [ ] Build `ExportJob` Prisma model + `POST /projects/:id/export` (enqueues a BullMQ job) + `GET /export-jobs/:id` (status polling: queued/processing/done/failed)
-- [ ] Build the Export Worker as a separate deployable process (per DEVELOPMENT-PLAN.md topology) consuming the BullMQ queue: fetches the target `SceneVersion`, runs the same bundler logic from Sprint 13-14 (now server-side, with access to the full cloud asset storage rather than local files), zips the result, uploads to a temporary signed-URL location in object storage
+- [ ] Build the Export Worker as a separate deployable process (per DEVELOPMENT-PLAN.md topology) consuming the BullMQ queue: fetches the target `SceneVersion`, runs the same bundler logic from Sprint 21-14 (now server-side, with access to the full cloud asset storage rather than local files), zips the result, uploads to a temporary signed-URL location in object storage
 - [ ] Build client-side progress UI: polling or WebSocket-based job status updates, progress bar, "Download" button appearing on completion with the signed URL (auto-expiring, e.g., 24h)
 - [ ] Implement plan-tier quota enforcement: rate-limit exports per billing period based on `Subscription.planTier` (via a `PlanTierGuard`), return a clear "upgrade to export more" response when exceeded
 - [ ] Add job retry/failure handling: BullMQ retry policy for transient failures (e.g., temporary storage timeout), and a clear failure state surfaced to the user (not a silent hang) for permanent failures (e.g., corrupted scene data)
@@ -478,9 +700,9 @@
 
 ## PHASE 5 — ENTERPRISE HARDENING
 
-**Duration:** Sprints 21–24 (2 months) | **Outcome:** Observability, security, billing, load testing all production-grade.
+**Duration:** Sprints 33–36 (2 months) | **Outcome:** Observability, security, billing, load testing all production-grade.
 
-### Sprint 21 — Observability + SRE Basics
+### Sprint 33 — Observability + SRE Basics
 
 **Goal:** You can see what's happening in production, end to end, before something goes wrong — not just after.
 
@@ -499,7 +721,7 @@
 
 ---
 
-### Sprint 22 — Security & Compliance Pass
+### Sprint 34 — Security & Compliance Pass
 
 **Goal:** Close obvious gaps before you have real customer data and enterprise scrutiny to deal with.
 
@@ -519,7 +741,7 @@
 
 ---
 
-### Sprint 23 — Billing & Plan Tiers
+### Sprint 35 — Billing & Plan Tiers
 
 **Goal:** The business model is actually enforced in software, not just on a pricing page.
 
@@ -528,7 +750,7 @@
 - [ ] Define concrete plan tiers (e.g., Free / Pro / Enterprise) and their limits: seats, storage GB, exports/month, custom asset uploads (yes/no), collab session participant cap, SSO (enterprise only)
 - [ ] Integrate Stripe: Products/Prices for each tier, Stripe Checkout or Billing Portal for self-serve upgrade/downgrade, webhook handlers (`invoice.paid`, `customer.subscription.updated/deleted`) updating the `Subscription` Prisma model
 - [ ] Implement `UsageRecord` metering: track exports, storage used, active seats per org per billing period; expose usage-to-date in the UI ("3/10 exports used this month")
-- [ ] Wire `PlanTierGuard` across the relevant endpoints (custom asset upload, export quota from Sprint 20, collab participant limits, seat limits on invites) — reject with a clear, actionable error (not a generic 403) pointing to the upgrade flow
+- [ ] Wire `PlanTierGuard` across the relevant endpoints (custom asset upload, export quota from Sprint 32, collab participant limits, seat limits on invites) — reject with a clear, actionable error (not a generic 403) pointing to the upgrade flow
 - [ ] Build in-app billing UI: current plan display, usage meters, upgrade/downgrade flow, invoice history (Stripe-hosted portal is often sufficient here rather than building custom UI)
 - [ ] Test plan transitions explicitly: downgrade from Pro to Free while over the Free tier's storage limit — decide and implement the actual behavior (e.g., read-only lockout of excess projects vs. grace period) rather than leaving it undefined
 
@@ -538,7 +760,7 @@
 
 ---
 
-### Sprint 24 — Performance & Load Testing
+### Sprint 36 — Performance & Load Testing
 
 **Goal:** Confidence the system holds up under real concurrent usage before you invite real customers to depend on it.
 
@@ -548,8 +770,8 @@
 - [ ] Define and test against explicit target numbers (pick numbers appropriate to your actual go-to-market scale expectation, e.g., "500 concurrent editing sessions, p95 API latency under 300ms for CRUD operations")
 - [ ] Run the Sprint 12 engine-side stress-test scene (500 props/20 enemies) through a long-session memory leak check (2+ hour continuous Play Preview session, watch Chrome memory profiler for unbounded growth — a common r3f/Three.js pitfall is un-disposed geometries/materials on object deletion)
 - [ ] Audit and fix any editor bundle-size or initial-load performance issues (Lighthouse audit, code-splitting heavy panels like the Asset Library if it's not already lazy-loaded)
-- [ ] Tune CDN cache hit-rate for asset delivery (verify cache headers from Sprint 18 are actually effective, check Cloudflare analytics for hit ratio)
-- [ ] Load-test the collab server (Sprint 19) specifically for connection-count scaling, since it has a different scaling profile (long-lived connections) than the stateless API
+- [ ] Tune CDN cache hit-rate for asset delivery (verify cache headers from Sprint 30 are actually effective, check Cloudflare analytics for hit ratio)
+- [ ] Load-test the collab server (Sprint 31) specifically for connection-count scaling, since it has a different scaling profile (long-lived connections) than the stateless API
 
 **Deliverables:** Documented, tested performance targets across API, engine runtime, and collab server.
 
@@ -561,9 +783,9 @@
 
 ## PHASE 6 — CONTENT & BETA LAUNCH
 
-**Duration:** Sprints 25–26 (1 month) | **Outcome:** Real asset library, polished templates, closed beta running.
+**Duration:** Sprints 37–38 (1 month) | **Outcome:** Real asset library, polished templates, closed beta running.
 
-### Sprint 25 — Template & Asset Library Expansion
+### Sprint 37 — Template & Asset Library Expansion
 
 **Goal:** The product needs to feel complete and inspiring on day one, not like a tech demo with 10 placeholder assets.
 
@@ -581,7 +803,7 @@
 
 ---
 
-### Sprint 26 — Docs, Onboarding, Closed Beta
+### Sprint 38 — Docs, Onboarding, Closed Beta
 
 **Goal:** Real external users, real usage data, real friction points surfaced before GA.
 
@@ -604,16 +826,16 @@
 
 **Duration:** ~2 months post-beta (treat as 2-4 additional sprints depending on beta findings) | **Outcome:** Public launch, pricing live, support processes running.
 
-### Sprint 27 — Beta Findings Remediation
+### Sprint 39 — Beta Findings Remediation
 
 **Goal:** Fix what the closed beta actually revealed, prioritized by real friction data, not internal guesses.
 
 **Tasks:**
 
-- [ ] Triage the full beta feedback backlog + funnel analytics from Sprint 26; rank issues by (a) how many users hit it and (b) how severely it blocks the core flow
+- [ ] Triage the full beta feedback backlog + funnel analytics from Sprint 38; rank issues by (a) how many users hit it and (b) how severely it blocks the core flow
 - [ ] Fix the top-ranked friction points — this sprint's scope is intentionally defined by beta data rather than a pre-written task list, since you don't know yet what beta will surface
-- [ ] Re-run the Sprint 15 export QA suite and Sprint 24 load tests if any remediation touched engine/export/backend performance-sensitive code, to confirm no regressions
-- [ ] Finalize pricing page copy and plan-tier limits based on actual beta usage patterns observed (you now have real data on typical project sizes, export frequency, etc. — sanity check your Sprint 23 tier limits against reality)
+- [ ] Re-run the Sprint 23 export QA suite and Sprint 36 load tests if any remediation touched engine/export/backend performance-sensitive code, to confirm no regressions
+- [ ] Finalize pricing page copy and plan-tier limits based on actual beta usage patterns observed (you now have real data on typical project sizes, export frequency, etc. — sanity check your Sprint 35 tier limits against reality)
 
 **Deliverables:** Beta-informed product fixes, finalized pricing.
 
@@ -621,14 +843,14 @@
 
 ---
 
-### Sprint 28 — Public Launch Readiness
+### Sprint 40 — Public Launch Readiness
 
 **Goal:** Everything needed to support real public traffic and paying customers on day one.
 
 **Tasks:**
 
-- [ ] Finalize and QA the public marketing site (separate from the app itself) — pricing page, feature overview, template gallery showcasing Sprint 25's work
-- [ ] Set up production support processes: ticketing system (if not already from Sprint 26), documented SLA expectations per plan tier, escalation path for critical bugs
+- [ ] Finalize and QA the public marketing site (separate from the app itself) — pricing page, feature overview, template gallery showcasing Sprint 37's work
+- [ ] Set up production support processes: ticketing system (if not already from Sprint 38), documented SLA expectations per plan tier, escalation path for critical bugs
 - [ ] Run a final production readiness review: verify all Phase 5 observability/alerting is active on the actual production environment (not just staging), confirm backup/restore procedures for Postgres are tested (not just configured), confirm Stripe is in live mode with correct webhook endpoints
 - [ ] Prepare a launch-day monitoring plan: who's watching dashboards, what the rollback plan is if a critical issue emerges, communication plan for status updates if there's an incident
 - [ ] Execute launch (public sign-ups open, pricing live, marketing push per your go-to-market plan — outside the scope of this technical doc but coordinate timing with it)
