@@ -20,6 +20,7 @@ import {
 } from '@helaengine/engine';
 import type { CameraMode } from '@helaengine/schema';
 import { ASSET_BASE_URL } from '../engine/assetLibrary';
+import { cachedUiAssetUrl } from '../storage/uiAssets';
 import { useEditorStore } from '../store/editorStore';
 import { useSceneStore } from '../store/sceneStore';
 import {
@@ -71,6 +72,8 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
   const look = useRef({ yaw: 0, pitch: 0 });
   const lookDelta = useRef({ x: 0, y: 0 });
   const health = useRef<number | null>(null);
+  /** Seconds of actual play, for a HUD element bound to `timer`. Paused time does not count. */
+  const elapsed = useRef(0);
   const setCameraMode = useEditorStore((state) => state.setCameraMode);
   const setUiScreen = useEditorStore((state) => state.setUiScreen);
   // The one piece of the document this component subscribes to. Everything else it reads once, at
@@ -142,6 +145,11 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
           container: domElement.parentElement ?? domElement,
           config: scene.uiConfig,
           resolveAsset: (assetId) => {
+            // Uploaded UI assets first: a home screen background is something the author added,
+            // not something the ingest pipeline produced.
+            const uploaded = cachedUiAssetUrl(assetId);
+            if (uploaded) return uploaded;
+
             const entry = resolver.get(assetId);
             return entry?.thumbnailPath ? `${ASSET_BASE_URL}${entry.thumbnailPath}` : null;
           },
@@ -168,6 +176,7 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
         ui.current = shell;
         setUiScreen(shell.screen);
         setPauseHandler(() => shell.togglePause());
+        elapsed.current = 0;
 
         // A body to look at. First person hides it, because the camera is inside it.
         const body = createPlayerAvatar(scene.player);
@@ -326,8 +335,13 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
       health.current = current;
       useEditorStore.getState().setPlayerHealth(current);
     }
+    elapsed.current += delta;
     if (current !== null) {
-      shell?.setHud({ health: current, maxHealth: scene.player.health });
+      shell?.setHud({
+        health: current,
+        maxHealth: scene.player.health,
+        timer: elapsed.current,
+      });
     }
 
     if (avatar.current) {

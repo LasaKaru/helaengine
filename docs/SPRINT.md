@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–14 complete. Phases 1 (Editor MVP) and 2 (Behaviours, Physics, AI) done; **Phase 2B (Gameplay Runtime & UI, Sprints 13–20) is under way** — it was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–15 complete. Phases 1 (Editor MVP) and 2 (Behaviours, Physics, AI) done; **Phase 2B (Gameplay Runtime & UI, Sprints 13–20) is under way** — it was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -374,11 +374,14 @@
 
 **Tasks:**
 
-- [ ] Build the in-editor "Game UI" panel: home screen image/video/title, menu button list (add, remove, reorder, relabel, reassign action), HUD toggles
-- [ ] Custom HUD elements (`hud.customElements[]`): text and image overlays with anchor/position controls and variable binding (score, timer, ammo)
-- [ ] Extend the asset upload flow to accept images and video for UI use
+- [x] Build the in-editor "Game UI" panel: home screen image/video/title, menu button list (add, remove, reorder, relabel, reassign action), HUD toggles
+- [x] Custom HUD elements (`hud.customElements[]`): text and image overlays with anchor/position controls and variable binding (health, ammo, score, timer)
+- [x] Extend the asset upload flow to accept images and video for UI use — stored as Blobs in IndexedDB, because there is no server yet and the editor is local-first by design. Sprint 30 swaps the storage without any of this UI changing
+- [x] **Added:** the play clock behind the `timer` binding, and per-file validation on upload (accepted types, a 24 MB ceiling) with the reason shown rather than a silent refusal
 
 **Definition of Done:** A non-technical tester can change the home screen image, swap the intro video, rename and reorder menu buttons and add a custom HUD text element without help, and see it all in Play Preview.
+
+**Met**, with one honest gap: the _intro video_ path is exercised end to end as an upload, a reference and a skip, but there is no real video in the repository to play, so actual playback is not verified. Media ingest proper is Sprint 19's job. Everything else is driven in a browser — an uploaded PNG becomes the home screen background, buttons rename and reorder, and a bound HUD element shows a live value.
 
 ---
 

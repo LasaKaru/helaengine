@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { initPhysics } from '@helaengine/engine';
 import { loadAssetLibrary, type AssetLibrary } from './engine/assetLibrary';
 import { useEditorStore } from './store/editorStore';
+import { primeUiAssetUrls } from './storage/uiAssets';
 import { exposeDevApi } from './devApi';
 import { AssetLibraryPanel } from './components/AssetLibraryPanel';
 import { DragChip } from './components/DragChip';
@@ -49,6 +50,12 @@ export function App(): React.JSX.Element {
   // that here, once, is the sprint plan's "handle it at bootstrap" — by the time somebody presses
   // Walk the module is normally already there, and if it is not, the button says so rather than
   // every physics call having to ask whether it may run yet.
+  // Uploaded UI assets are Blobs; the shell resolves them synchronously while drawing a menu, so
+  // their object URLs have to exist before it asks.
+  useEffect(() => {
+    void primeUiAssetUrls();
+  }, []);
+
   useEffect(() => {
     const editor = useEditorStore.getState();
     editor.setPhysicsStatus('loading');

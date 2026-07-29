@@ -7,7 +7,7 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 14 — Phase 2B under way. A working editor, behaviours, physics, enemies, trigger
+**Status:** Sprint 15 — Phase 2B under way. A working editor, behaviours, physics, enemies, trigger
 volumes, a measured performance baseline, and now first/third/top-down cameras with one input layer
 covering keyboard, touch and gamepad, and a schema-driven menu/HUD shell. Weapons and combat are
 next; there is no backend yet, deliberately.
@@ -241,6 +241,13 @@ restyle a whole menu with one custom property all argue for it. Menu buttons nam
 Four themes ship (midnight, parchment, neon, mono) with three panel styles. Swapping one restyles
 every surface at once, because a theme that needed each button updating is a stylesheet with extra
 steps.
+
+All of it is editable from the **Game UI** panel without touching JSON: title, subtitle, play-button
+text, a home-screen background and intro video you upload from your machine, both menus' buttons
+(rename, reorder, reassign, add, remove), HUD toggles, and custom HUD elements anchored to a corner
+with an optional binding to health, ammo, score or the play clock. Uploads live in the browser
+alongside your projects — there is no server yet, and a home screen should work before anyone has
+signed in.
 
 ## Where this is going
 

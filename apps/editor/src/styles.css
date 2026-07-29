@@ -1382,3 +1382,62 @@ body,
 .add-behavior select {
   flex: 1;
 }
+
+/* Sprint 15: the Game UI panel's controls. */
+.ui-asset-row {
+  align-items: flex-start;
+}
+
+.ui-asset-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+}
+
+.ui-upload {
+  padding: 4px 8px;
+  color: var(--text-dim);
+  font-size: 11px;
+  text-align: center;
+  background: var(--panel-raised);
+  border: 1px dashed var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.ui-upload input {
+  display: none;
+}
+
+.ui-button-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.ui-button-actions button {
+  width: 24px;
+  padding: 2px 0;
+}
+
+.ui-add {
+  width: 100%;
+  padding: 6px;
+  margin-top: 4px;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.ui-add:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.panel-hint.error {
+  color: #d98a7a;
+}

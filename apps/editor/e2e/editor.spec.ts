@@ -1520,3 +1520,191 @@ test.describe('game shell', () => {
     expect(await page.locator('.hela-screen')).toHaveCount(0);
   });
 });
+
+/**
+ * Sprint 15 — authoring the shell.
+ *
+ * The definition of done names a non-technical tester doing four things without help: change the
+ * home screen image, edit the intro video, rename and reorder menu buttons, and add a custom HUD
+ * element. These drive the panel the way that person would, then check the result in Play Preview.
+ */
+test.describe('game UI authoring', () => {
+  test.beforeEach(async ({ page }) => {
+    await openEditor(page);
+    await page.waitForTimeout(700);
+  });
+
+  const panel = (page: Page) => page.getByRole('region', { name: 'Game UI' });
+
+  test('the panel is there with nothing selected', async ({ page }) => {
+    await expect(panel(page)).toBeVisible();
+    await expect(page.getByLabel('Game title')).toHaveValue('My Game');
+  });
+
+  test('renames and reorders menu buttons', async ({ page }) => {
+    await page.getByLabel('Main menu button 1 label').fill('Begin');
+    await page.getByLabel('Move Main menu button 1 down').click();
+
+    const buttons = await page.evaluate(
+      () => window.helaengine!.store.getState().scene.uiConfig.mainMenu.buttons,
+    );
+    expect(buttons.map((button) => button.label)).toEqual(['Settings', 'Begin']);
+  });
+
+  test('adds a button and points it at an action', async ({ page }) => {
+    await page.getByRole('button', { name: 'Add Main menu button' }).click();
+    const index = await page.evaluate(
+      () => window.helaengine!.store.getState().scene.uiConfig.mainMenu.buttons.length,
+    );
+
+    await page.getByLabel(`Main menu button ${index} label`).fill('Quit game');
+    await page.getByLabel(`Main menu button ${index} action`).selectOption('quit');
+
+    const buttons = await page.evaluate(
+      () => window.helaengine!.store.getState().scene.uiConfig.mainMenu.buttons,
+    );
+    expect(buttons.at(-1)).toEqual({ label: 'Quit game', action: 'quit' });
+  });
+
+  test('removes a button', async ({ page }) => {
+    await page.getByLabel('Remove Main menu button 2').click();
+
+    const buttons = await page.evaluate(
+      () => window.helaengine!.store.getState().scene.uiConfig.mainMenu.buttons,
+    );
+    expect(buttons).toHaveLength(1);
+  });
+
+  test('uploads a background image and shows it on the home screen', async ({ page }) => {
+    // A 1×1 PNG is enough: what is under test is the upload path and the resolve, not the picture.
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    await page.getByLabel('Upload background').setInputFiles({
+      name: 'title_screen.png',
+      mimeType: 'image/png',
+      buffer: png,
+    });
+    await page.waitForTimeout(600);
+
+    expect(
+      await page.evaluate(
+        () => window.helaengine!.store.getState().scene.uiConfig.homeScreen.backgroundImageAssetId,
+      ),
+    ).toBe('ui_title_screen');
+
+    await page.evaluate(() => window.helaengine!.store.getState().setPlayer({ spawn: [0, 0, 0] }));
+    await page.getByRole('button', { name: 'Walk' }).click();
+    await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
+      timeout: 20_000,
+    });
+    await page.waitForTimeout(500);
+
+    const background = await page.evaluate(
+      () => document.querySelector<HTMLElement>('.hela-home')?.style.backgroundImage ?? '',
+    );
+    expect(background).toContain('blob:');
+  });
+
+  test('refuses a file type it cannot use, and says why', async ({ page }) => {
+    await page.getByLabel('Upload background').setInputFiles({
+      name: 'notes.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('not an image'),
+    });
+
+    await expect(page.getByRole('alert')).toContainText('not supported');
+    expect(
+      await page.evaluate(
+        () => window.helaengine!.store.getState().scene.uiConfig.homeScreen.backgroundImageAssetId,
+      ),
+    ).toBeNull();
+  });
+
+  test('adds a custom HUD element and it appears in play preview', async ({ page }) => {
+    await panel(page).getByRole('button', { name: 'Add HUD element' }).click();
+    await page.getByLabel('HUD element 1 text').fill('Wave 1');
+    await page.getByLabel('HUD element 1 anchor').selectOption('topCenter');
+
+    await page.evaluate(() => window.helaengine!.store.getState().setPlayer({ spawn: [0, 0, 0] }));
+    await page.getByRole('button', { name: 'Walk' }).click();
+    await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
+      timeout: 20_000,
+    });
+    await startPlaying(page);
+
+    const element = page.locator('[data-element-id="hud_1"]');
+    await expect(element).toHaveText('Wave 1');
+    await expect(element).toHaveClass(/hela-anchor-topCenter/);
+  });
+
+  test('a timer element counts play time, and paused time does not count', async ({ page }) => {
+    await page.getByRole('button', { name: 'Add HUD element' }).click();
+    await page.getByLabel('HUD element 1 binding').selectOption('timer');
+
+    await page.evaluate(() => window.helaengine!.store.getState().setPlayer({ spawn: [0, 0, 0] }));
+    await page.getByRole('button', { name: 'Walk' }).click();
+    await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
+      timeout: 20_000,
+    });
+    await startPlaying(page);
+
+    // Read rather than matched against an exact second: a frame lands where it lands, and an
+    // assertion that insists on 00:02 rather than 00:03 is testing the scheduler, not the clock.
+    const clock = async (): Promise<number> => {
+      const text = (await page.locator('[data-element-id="hud_1"]').textContent()) ?? '00:00';
+      const [minutes, seconds] = text.split(':').map(Number);
+      return (minutes ?? 0) * 60 + (seconds ?? 0);
+    };
+
+    expect(await clock()).toBeLessThan(2);
+    await page.waitForTimeout(2400);
+    const running = await clock();
+    expect(running).toBeGreaterThanOrEqual(2);
+
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(2000);
+    await page.locator('.hela-panel button', { hasText: 'Resume' }).click();
+    await page.waitForTimeout(200);
+
+    // A pause is not play: two seconds of menu must not appear on the clock.
+    expect(await clock()).toBeLessThanOrEqual(running + 1);
+  });
+
+  test('a bound HUD element shows the live value, not its literal text', async ({ page }) => {
+    await panel(page).getByRole('button', { name: 'Add HUD element' }).click();
+    await page.getByLabel('HUD element 1 binding').selectOption('health');
+
+    await page.evaluate(() => window.helaengine!.store.getState().setPlayer({ spawn: [0, 0, 0] }));
+    await page.getByRole('button', { name: 'Walk' }).click();
+    await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
+      timeout: 20_000,
+    });
+    await startPlaying(page);
+
+    await expect(page.locator('[data-element-id="hud_1"]')).toHaveText('100');
+  });
+
+  test('the whole shell config survives a save and reload', async ({ page }) => {
+    await page.getByLabel('Game title').fill('Goblin Valley');
+    await page.getByLabel('Theme').selectOption('neon');
+    await panel(page).getByRole('button', { name: 'Add HUD element' }).click();
+
+    await page.keyboard.press('Control+s');
+    await expect(page.getByRole('status', { name: 'Save state' })).toHaveText('Saved');
+
+    await page.reload();
+    await page.waitForFunction(() => window.helaengine !== undefined);
+    await page
+      .getByRole('button', { name: /Untitled scene/ })
+      .first()
+      .click();
+    await expect(page.getByRole('banner')).toBeVisible();
+
+    const ui = await page.evaluate(() => window.helaengine!.store.getState().scene.uiConfig);
+    expect(ui.homeScreen.title).toBe('Goblin Valley');
+    expect(ui.theme.preset).toBe('neon');
+    expect(ui.hud.customElements).toHaveLength(1);
+  });
+});

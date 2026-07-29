@@ -12,6 +12,8 @@ import {
   type Terrain,
   type Transform,
   type Trigger,
+  type HudElement,
+  type UiButton,
   type UiConfig,
   type Vec3,
 } from '@helaengine/schema';
@@ -72,6 +74,9 @@ export interface SceneState {
   setPlayer(player: Partial<Player>): void;
   setGameConfig(config: Partial<GameConfig>): void;
   setUiConfig(config: UiConfigPatch): void;
+  setMenuButtons(menu: 'mainMenu' | 'pauseMenu', buttons: UiButton[]): void;
+  moveMenuButton(menu: 'mainMenu' | 'pauseMenu', index: number, direction: -1 | 1): void;
+  setHudElements(elements: HudElement[]): void;
   setTerrain(terrain: Partial<Terrain>): void;
   setTerrainData(heightmap: string | null, splatmap: string | null): void;
   setEnvironment(environment: Partial<Environment>): void;
@@ -352,6 +357,30 @@ export const useSceneStore = create<SceneState>()(
                 (draft.uiConfig as Record<string, unknown>)[key] = value;
               }
             }
+          }),
+
+        setMenuButtons: (menu, buttons) =>
+          commit('ui/setMenuButtons', (draft) => {
+            draft.uiConfig[menu].buttons = buttons;
+          }),
+
+        moveMenuButton: (menu, index, direction) =>
+          commit('ui/moveMenuButton', (draft) => {
+            const buttons = draft.uiConfig[menu].buttons;
+            const target = index + direction;
+            if (index < 0 || index >= buttons.length || target < 0 || target >= buttons.length) {
+              return;
+            }
+            // Swap rather than splice-and-insert: reordering by one place is the only motion the
+            // UI offers, and a swap cannot lose an entry the way a mis-indexed splice can.
+            const moved = buttons[index]!;
+            buttons[index] = buttons[target]!;
+            buttons[target] = moved;
+          }),
+
+        setHudElements: (elements) =>
+          commit('ui/setHudElements', (draft) => {
+            draft.uiConfig.hud.customElements = elements;
           }),
 
         setPlayer: (player) =>
