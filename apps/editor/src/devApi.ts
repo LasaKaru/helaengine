@@ -2,6 +2,7 @@ import { Vector3, type Camera, type WebGLRenderer } from 'three';
 import type { GameRuntime, LoadedScene, PlayerController } from '@helaengine/engine';
 import { SceneObjectSchema, type Vec3 } from '@helaengine/schema';
 import type { AssetLibrary } from './engine/assetLibrary';
+import { useEditorStore } from './store/editorStore';
 import { nextObjectId, useSceneStore } from './store/sceneStore';
 
 export interface DevApi {
@@ -35,6 +36,17 @@ export interface DevApi {
   setPlayerYaw(yaw: number): boolean;
   /** Player health while walking, or null. */
   playerHealth(): number | null;
+  /** Camera rig currently driving the view, or null when not walking. */
+  cameraMode(): string | null;
+  /** Whether the player is crouched, and how fast they are moving. */
+  playerMotion(): { speed: number; crouched: boolean; grounded: boolean } | null;
+  /**
+   * Where the camera actually is.
+   *
+   * The camera rigs are the whole deliverable of Sprint 13 and every claim about them — eye height,
+   * arm length, overhead distance — is a claim about this, not about the DOM.
+   */
+  cameraPose(): { position: [number, number, number]; fov: number } | null;
   /** Ids the running preview spawned — none of which are in the document. */
   spawnedIds(): string[];
   /** FSM state of every enemy behaviour currently running, keyed by object id. */
@@ -250,6 +262,25 @@ export function exposeDevApi(library: AssetLibrary): void {
     },
 
     playerHealth: () => currentGame?.playerHealth() ?? null,
+
+    cameraMode: () => useEditorStore.getState().cameraMode,
+
+    cameraPose: () =>
+      currentCamera
+        ? {
+            position: currentCamera.position.toArray() as [number, number, number],
+            fov: (currentCamera as { fov?: number }).fov ?? 0,
+          }
+        : null,
+
+    playerMotion: () =>
+      currentPlayer
+        ? {
+            speed: Number(currentPlayer.speed.toFixed(3)),
+            crouched: currentPlayer.crouched,
+            grounded: currentPlayer.grounded,
+          }
+        : null,
 
     spawnedIds: () => [...(currentGame?.spawnedIds ?? [])],
 

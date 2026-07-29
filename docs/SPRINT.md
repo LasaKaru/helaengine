@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–12 complete. Phases 1 (Editor MVP) and 2 (Behaviours, Physics, AI) done; **Phase 2B (Gameplay Runtime & UI, Sprints 13–20) is next** — it was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–13 complete. Phases 1 (Editor MVP) and 2 (Behaviours, Physics, AI) done; **Phase 2B (Gameplay Runtime & UI, Sprints 13–20) is under way** — it was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -324,20 +324,23 @@
 
 **Tasks:**
 
-- [ ] Build the FPS camera rig on top of Sprint 10's Rapier kinematic controller: head-height offset, pointer-lock mouse-look, optional head-bob
-- [ ] Build the TPS camera rig: spring-arm follow with collision avoidance, so the camera never ends up inside a wall
-- [ ] Build `InputManager` — one abstract action set (`moveForward`, `moveRight`, `look`, `jump`, `sprint`, `crouch`, `fire`, `interact`) fed by keyboard/mouse, touch (virtual joystick + buttons) and the Gamepad API
-- [ ] Add `gameConfig` to the schema (`cameraMode`, `allowModeSwitch`, multiplayer settings) and select the rig at scene load; implement the runtime toggle when `allowModeSwitch` is on
-- [ ] Extend the character controller with sprint and crouch
+- [x] Build the FPS camera rig on top of Sprint 10's Rapier kinematic controller: head-height offset, pointer-lock mouse-look, optional head-bob — the bob is driven by distance travelled rather than elapsed time, so it slows when the player does and stops in mid-air
+- [x] Build the TPS camera rig: spring-arm follow with collision avoidance, so the camera never ends up inside a wall — pulls in instantly, eases back out
+- [x] Build `InputManager` — one abstract action set fed by keyboard/mouse, touch (virtual joystick + buttons) and the Gamepad API. Plus a `topdown` rig, since the schema names three modes and shipping two would have left one lying
+- [x] Add `gameConfig` to the schema (`cameraMode`, `allowModeSwitch`, multiplayer settings) and select the rig at scene load; implement the runtime toggle when `allowModeSwitch` is on (**V**)
+- [x] Extend the character controller with sprint and crouch — crouch really resizes the capsule, and standing up is refused when there is no headroom
+- [x] **Added, not in the original task list:** a capsule stand-in body for the player. Third person with nothing to look at is not a camera mode, it is a bug; a real character model waits on Sprint 37's asset library
 
 **Tech notes:**
 
 - The input abstraction has to be designed once, generically. Bolting touch on per-platform later is how an engine ends up with three divergent control paths.
 - Pointer lock and the Gamepad API are both browser features a headless test cannot fully drive; plan on a dev-API hook for automated verification, as Sprint 10 needed for look.
 
-**Deliverables:** Two camera rigs, one input layer, `gameConfig` in the schema.
+**Deliverables:** Three camera rigs, one input layer, `gameConfig` in the schema.
 
 **Definition of Done:** A test scene is playable end to end in both FPS and TPS with keyboard and mouse, and verified functional with touch input on a mobile browser and with a connected gamepad.
+
+**Met, with one gap stated plainly:** keyboard/mouse is verified end to end in a real browser across all three rigs. **Touch and gamepad are verified by unit test, not on hardware** — this container has neither a touchscreen nor a controller, and Chromium's headless mode reports no gamepads. The touch overlay is exercised in jsdom (it builds, its buttons raise actions, it tears down) and the gamepad path is driven through a synthetic `Gamepad` covering sticks, deadzone, the standard button map and the refusal of non-standard mappings. Someone with the hardware should confirm before this is called done for real.
 
 ---
 

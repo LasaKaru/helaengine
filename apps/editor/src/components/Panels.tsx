@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type {
   AssetManifest,
   BodyType,
+  CameraMode,
   ColliderChoice,
   SceneObject,
   Transform,
@@ -106,6 +107,119 @@ function PhysicsSection({ object }: { object: SceneObject }): React.JSX.Element 
           ))}
         </select>
       </label>
+    </section>
+  );
+}
+
+const CAMERA_MODES: Array<{ value: CameraMode; label: string; hint: string }> = [
+  { value: 'fps', label: 'First', hint: 'Eyes in the head. Head-bob optional.' },
+  { value: 'tps', label: 'Third', hint: 'Spring arm behind the character, avoids walls.' },
+  { value: 'topdown', label: 'Top', hint: 'Fixed overhead view; look pitch is ignored.' },
+];
+
+/**
+ * How the scene plays: which camera, how it feels, whether the player may switch.
+ *
+ * Separate from the Player panel because these describe the *game* rather than the character's
+ * body — and the two genuinely answer different questions even though they meet in one controller.
+ */
+function GamePanel(): React.JSX.Element {
+  const config = useSceneStore((state) => state.scene.gameConfig);
+  const setGameConfig = useSceneStore((state) => state.setGameConfig);
+
+  return (
+    <section className="panel" aria-label="Game">
+      <h2>Game</h2>
+
+      <div className="gizmo-modes" role="group" aria-label="Camera mode">
+        {CAMERA_MODES.map((entry) => (
+          <button
+            key={entry.value}
+            type="button"
+            title={entry.hint}
+            className={config.cameraMode === entry.value ? 'active' : ''}
+            aria-pressed={config.cameraMode === entry.value}
+            onClick={() => setGameConfig({ cameraMode: entry.value })}
+          >
+            {entry.label}
+          </button>
+        ))}
+      </div>
+
+      <label className="param-check">
+        <input
+          type="checkbox"
+          checked={config.allowModeSwitch}
+          onChange={(event) => setGameConfig({ allowModeSwitch: event.target.checked })}
+        />
+        Player can switch camera (V)
+      </label>
+
+      <label className="param-check">
+        <input
+          type="checkbox"
+          checked={config.headBob}
+          onChange={(event) => setGameConfig({ headBob: event.target.checked })}
+        />
+        Head bob
+      </label>
+
+      <div className="param-row">
+        <span>Field of view</span>
+        <NumberField
+          label="Field of view"
+          scrubLabel=""
+          value={config.fieldOfView}
+          step={1}
+          suffix="°"
+          onChange={(value) => setGameConfig({ fieldOfView: Math.min(120, Math.max(30, value)) })}
+        />
+      </div>
+
+      <div className="param-row">
+        <span>Look sensitivity</span>
+        <NumberField
+          label="Look sensitivity"
+          scrubLabel=""
+          value={config.lookSensitivity}
+          step={0.1}
+          onChange={(value) =>
+            setGameConfig({ lookSensitivity: Math.min(10, Math.max(0.05, value)) })
+          }
+        />
+      </div>
+
+      {config.cameraMode === 'tps' && (
+        <div className="param-row">
+          <span>Camera distance</span>
+          <NumberField
+            label="Camera distance"
+            scrubLabel=""
+            value={config.thirdPersonDistance}
+            step={0.5}
+            suffix="m"
+            onChange={(value) =>
+              setGameConfig({ thirdPersonDistance: Math.min(30, Math.max(1, value)) })
+            }
+          />
+        </div>
+      )}
+
+      {config.cameraMode === 'topdown' && (
+        <div className="param-row">
+          <span>Camera height</span>
+          <NumberField
+            label="Camera height"
+            scrubLabel=""
+            value={config.topDownHeight}
+            step={1}
+            suffix="m"
+            onChange={(value) =>
+              setGameConfig({ topDownHeight: Math.min(120, Math.max(3, value)) })
+            }
+          />
+        </div>
+      )}
     </section>
   );
 }
@@ -260,6 +374,7 @@ export function InspectorPanel({ manifest }: { manifest: AssetManifest }): React
       {single && !single.trigger && <BehaviorPanel object={single} />}
 
       <TerrainPanel />
+      <GamePanel />
       <PlayerPanel />
     </aside>
   );

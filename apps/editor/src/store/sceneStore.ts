@@ -4,6 +4,7 @@ import {
   CURRENT_SCENE_VERSION,
   SceneSchema,
   type Environment,
+  type GameConfig,
   type ObjectPhysics,
   type Player,
   type Scene,
@@ -56,6 +57,7 @@ export interface SceneState {
   setObjectPhysics(objectId: string, physics: Partial<ObjectPhysics>): void;
   setTrigger(objectId: string, trigger: Partial<Trigger>): void;
   setPlayer(player: Partial<Player>): void;
+  setGameConfig(config: Partial<GameConfig>): void;
   setTerrain(terrain: Partial<Terrain>): void;
   setTerrainData(heightmap: string | null, splatmap: string | null): void;
   setEnvironment(environment: Partial<Environment>): void;
@@ -317,6 +319,11 @@ export const useSceneStore = create<SceneState>()(
               object.trigger = triggerDefaults(object.assetId);
             }
             Object.assign(object.trigger, trigger);
+          }),
+
+        setGameConfig: (config) =>
+          commit('scene/setGameConfig', (draft) => {
+            Object.assign(draft.gameConfig, config);
           }),
 
         setPlayer: (player) =>

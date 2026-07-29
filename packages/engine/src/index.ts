@@ -77,3 +77,16 @@ export {
 } from './ai/ChaseOnSightBehavior.js';
 export type { ChaseOnSightParams } from './ai/ChaseOnSightBehavior.js';
 export { BUILTIN_ASSET_ENTRIES, isBuiltinTriggerAsset } from './assets.js';
+export { InputManager, INPUT_ACTIONS, DEFAULT_KEY_BINDINGS } from './input/InputManager.js';
+export type { InputAction, InputManagerOptions, Axis2 } from './input/InputManager.js';
+export {
+  FirstPersonRig,
+  ThirdPersonRig,
+  TopDownRig,
+  createCameraRig,
+  nextCameraMode,
+  lookDirection,
+} from './camera/CameraRig.js';
+export type { CameraRig, CameraRigContext, CameraTarget, LookState } from './camera/CameraRig.js';
+export { createPlayerAvatar } from './camera/PlayerAvatar.js';
+export type { PlayerAvatar } from './camera/PlayerAvatar.js';

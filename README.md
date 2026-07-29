@@ -7,9 +7,9 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 12 — Phases 1 and 2 complete. A working editor, behaviours, physics you can walk
-around in, enemies that hunt you, trigger volumes, and a measured performance baseline. The export
-system is next; there is no backend yet, deliberately.
+**Status:** Sprint 13 — Phase 2B under way. A working editor, behaviours, physics, enemies, trigger
+volumes, a measured performance baseline, and now first/third/top-down cameras with one input layer
+covering keyboard, touch and gamepad. Menus and HUD are next; there is no backend yet, deliberately.
 
 ---
 
@@ -155,8 +155,27 @@ It is the same `BehaviorRuntime` an exported project will run.
 
 Press **Shift + P**, or the **Walk** button, to drop into the world as a person: a Rapier physics
 world is built from the scene, the sculpted terrain becomes a static heightfield, and a kinematic
-character controller handles gravity, slopes and stepping over low ledges. WASD moves, Space jumps,
-clicking captures the mouse to look around, and Escape returns to editing.
+character controller handles gravity, slopes and stepping over low ledges. WASD moves, **Shift**
+sprints, **C** crouches, Space jumps, **V** switches camera, clicking captures the mouse to look
+around, and Escape returns to editing.
+
+### Cameras and input
+
+Three rigs — first person, third person, top-down — chosen by the document's `gameConfig` and
+switchable at runtime unless the author turns that off. The first-person head bob is driven by
+distance travelled rather than by elapsed time, so it slows when you do and stops in mid-air. The
+third-person arm pulls in the instant something gets between the camera and the character, and eases
+back out when the way clears.
+
+Every source of input goes through one `InputManager` and comes out as one abstract action set, so
+nothing downstream ever asks "was W pressed" — it asks whether the player wants to move forward.
+Keyboard, mouse, the Gamepad API and an on-screen joystick for touch devices are four ways of
+answering that, and the engine builds the touch overlay itself in plain DOM, because an exported
+game on a phone has no React to build it with.
+
+Crouching really shrinks the physics capsule rather than only lowering the camera, and standing up
+is refused when there is no headroom — otherwise a player could stand up inside a ceiling and be
+ejected through it.
 
 Colliders come from the asset manifest — a pine is a capsule, a hut is a box — so a scene has
 sensible physics without anyone configuring anything. The inspector's Physics section overrides that

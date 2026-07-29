@@ -49,6 +49,12 @@ export const PlayerSchema = z
     radius: z.number().min(0.1).max(2).default(0.4),
     /** Ground speed in metres per second. */
     moveSpeed: z.number().min(0.5).max(50).default(6),
+    /** Multiplier applied to `moveSpeed` while sprinting. */
+    sprintMultiplier: z.number().min(1).max(5).default(1.7),
+    /** Multiplier applied to `moveSpeed` while crouched. */
+    crouchMultiplier: z.number().min(0.05).max(1).default(0.45),
+    /** Fraction of full height the capsule shrinks to when crouched. */
+    crouchHeightRatio: z.number().min(0.3).max(1).default(0.6),
     /** Launch speed of a jump in metres per second. */
     jumpSpeed: z.number().min(0).max(50).default(6),
     /** Downward acceleration in metres per second squared. */

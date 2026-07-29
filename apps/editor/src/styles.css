@@ -1167,6 +1167,17 @@ body,
   color: #8fd694;
 }
 
+.walk-hint .walk-mode {
+  padding: 1px 8px;
+  color: #0f1218;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: #8fd694;
+  border-radius: 999px;
+}
+
 .health-bar {
   position: absolute;
   bottom: 46px;

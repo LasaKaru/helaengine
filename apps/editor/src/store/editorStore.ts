@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { DEFAULT_PLACEMENT, type PlacementOptions } from '../placement';
 import type { SculptMode } from '@helaengine/engine';
+import type { CameraMode } from '@helaengine/schema';
 import type { GizmoMode } from '../transform';
 
 /** Where the asynchronous Rapier bootstrap has got to. */
@@ -68,6 +69,8 @@ export interface EditorState {
   physicsStatus: PhysicsStatus;
   /** Player health while walking, mirrored out of the runtime so the HUD can render it. */
   playerHealth: number | null;
+  /** Camera rig currently driving the view, or null when not walking. */
+  cameraMode: CameraMode | null;
   /** `objectId:index` of the behaviour whose waypoints are being edited, if any. */
   editingWaypoints: string | null;
 
@@ -87,6 +90,7 @@ export interface EditorState {
   setWalking(walking: boolean): void;
   setPhysicsStatus(status: PhysicsStatus): void;
   setPlayerHealth(health: number | null): void;
+  setCameraMode(mode: CameraMode | null): void;
   setEditingWaypoints(key: string | null): void;
 }
 
@@ -107,6 +111,7 @@ export const useEditorStore = create<EditorState>()(
       walking: false,
       physicsStatus: 'idle',
       playerHealth: null,
+      cameraMode: null,
       editingWaypoints: null,
 
       beginDrag: (assetId, clientX, clientY) =>
@@ -146,12 +151,13 @@ export const useEditorStore = create<EditorState>()(
         set(
           walking
             ? { walking: true, playing: true, editingWaypoints: null, tool: 'select' }
-            : { walking: false, playing: false, playerHealth: null },
+            : { walking: false, playing: false, playerHealth: null, cameraMode: null },
           false,
           'walk/set',
         ),
       setPhysicsStatus: (physicsStatus) => set({ physicsStatus }, false, 'physics/status'),
       setPlayerHealth: (playerHealth) => set({ playerHealth }, false, 'play/health'),
+      setCameraMode: (cameraMode) => set({ cameraMode }, false, 'play/cameraMode'),
       setEditingWaypoints: (editingWaypoints) =>
         set({ editingWaypoints }, false, 'waypoints/editing'),
     }),

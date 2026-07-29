@@ -1214,3 +1214,154 @@ test.describe('instancing and performance', () => {
     expect(simulation!.physicsMs + simulation!.gameplayMs).toBeLessThan(8);
   });
 });
+
+/**
+ * Sprint 13 — camera rigs and the input abstraction.
+ *
+ * Every claim here is about where the camera ended up and how far the character got, because those
+ * are the things the sprint actually delivers. Pointer lock and the Gamepad API cannot be driven
+ * headlessly, so the yaw hook stands in for looking and the gamepad path is covered by unit tests.
+ */
+test.describe('camera and controls', () => {
+  test.beforeEach(async ({ page }) => {
+    await openEditor(page, /Village outpost/);
+    await page.waitForTimeout(1500);
+    // The village puts a hut on the origin and the spawn defaults there, so the character would
+    // start inside solid geometry. That is a real trap for users, and Sprint 24's smoke test is
+    // meant to catch it; here we simply start somewhere open.
+    await page.evaluate(() => window.helaengine!.store.getState().setPlayer({ spawn: [0, 0, 14] }));
+    await page.waitForTimeout(400);
+  });
+
+  async function enterWalk(page: Page): Promise<void> {
+    await page.getByRole('button', { name: 'Walk' }).click();
+    await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
+      timeout: 20_000,
+    });
+    await page.waitForTimeout(600);
+    // Face open ground: walking into the hut would measure a wall rather than a speed.
+    await page.evaluate(() => window.helaengine!.setPlayerYaw(Math.PI));
+  }
+
+  async function walkFor(page: Page, ms: number, modifiers: string[] = []): Promise<number> {
+    const before = await page.evaluate(() => window.helaengine!.playerPosition()!);
+    for (const key of modifiers) await page.keyboard.down(key);
+    await page.keyboard.down('w');
+    await page.waitForTimeout(ms);
+    await page.keyboard.up('w');
+    for (const key of modifiers) await page.keyboard.up(key);
+    await page.waitForTimeout(200);
+    const after = await page.evaluate(() => window.helaengine!.playerPosition()!);
+    return Math.hypot(after.x - before.x, after.z - before.z);
+  }
+
+  test('the Game panel edits the document', async ({ page }) => {
+    await expect(page.getByRole('region', { name: 'Game' })).toBeVisible();
+    await page
+      .getByRole('group', { name: 'Camera mode' })
+      .getByRole('button', { name: 'Third' })
+      .click();
+
+    expect(
+      await page.evaluate(() => window.helaengine!.store.getState().scene.gameConfig.cameraMode),
+    ).toBe('tps');
+  });
+
+  test('first person puts the camera at eye height', async ({ page }) => {
+    await enterWalk(page);
+
+    expect(await page.evaluate(() => window.helaengine!.cameraMode())).toBe('fps');
+
+    const camera = (await page.evaluate(() => window.helaengine!.cameraPose()))!;
+    const player = (await page.evaluate(() => window.helaengine!.playerPosition()))!;
+    expect(camera.position[1] - player.y).toBeGreaterThan(1.4);
+    expect(camera.position[1] - player.y).toBeLessThan(1.9);
+    expect(camera.fov).toBe(70);
+  });
+
+  test('sprint covers more ground than a walk', async ({ page }) => {
+    await enterWalk(page);
+
+    const walked = await walkFor(page, 1200);
+    const sprinted = await walkFor(page, 1200, ['Shift']);
+
+    expect(walked).toBeGreaterThan(4);
+    expect(sprinted).toBeGreaterThan(walked * 1.3);
+  });
+
+  test('crouching lowers the view and standing restores it', async ({ page }) => {
+    await enterWalk(page);
+    const standing = (await page.evaluate(() => window.helaengine!.cameraPose()))!.position[1];
+
+    await page.keyboard.down('c');
+    await page.waitForTimeout(400);
+    const crouched = (await page.evaluate(() => window.helaengine!.cameraPose()))!.position[1];
+    expect(await page.evaluate(() => window.helaengine!.playerMotion()!.crouched)).toBe(true);
+    expect(crouched).toBeLessThan(standing - 0.4);
+
+    await page.keyboard.up('c');
+    await page.waitForTimeout(500);
+
+    const restored = (await page.evaluate(() => window.helaengine!.cameraPose()))!.position[1];
+    expect(restored).toBeCloseTo(standing, 1);
+  });
+
+  test('V cycles first, third and top-down', async ({ page }) => {
+    await enterWalk(page);
+
+    await page.keyboard.press('v');
+    await page.waitForTimeout(400);
+    expect(await page.evaluate(() => window.helaengine!.cameraMode())).toBe('tps');
+
+    // The arm sits the configured distance behind the character when nothing is in the way.
+    const distance = await page.evaluate(() => {
+      const pose = window.helaengine!.cameraPose()!;
+      const player = window.helaengine!.playerPosition()!;
+      return Math.hypot(pose.position[0] - player.x, pose.position[2] - player.z);
+    });
+    expect(distance).toBeGreaterThan(3);
+    expect(distance).toBeLessThanOrEqual(5.1);
+
+    await page.keyboard.press('v');
+    await page.waitForTimeout(400);
+    expect(await page.evaluate(() => window.helaengine!.cameraMode())).toBe('topdown');
+
+    const overhead = (await page.evaluate(() => window.helaengine!.cameraPose()))!;
+    const player = (await page.evaluate(() => window.helaengine!.playerPosition()))!;
+    expect(overhead.position[1] - player.y).toBeGreaterThan(20);
+
+    await page.keyboard.press('v');
+    await page.waitForTimeout(400);
+    expect(await page.evaluate(() => window.helaengine!.cameraMode())).toBe('fps');
+  });
+
+  test('the document can forbid switching', async ({ page }) => {
+    await page.evaluate(() =>
+      window.helaengine!.store.getState().setGameConfig({ allowModeSwitch: false }),
+    );
+    await enterWalk(page);
+
+    await page.keyboard.press('v');
+    await page.waitForTimeout(400);
+
+    expect(await page.evaluate(() => window.helaengine!.cameraMode())).toBe('fps');
+  });
+
+  test('the scene opens in the camera mode the document asks for', async ({ page }) => {
+    await page.evaluate(() =>
+      window.helaengine!.store.getState().setGameConfig({ cameraMode: 'topdown' }),
+    );
+    await enterWalk(page);
+
+    expect(await page.evaluate(() => window.helaengine!.cameraMode())).toBe('topdown');
+  });
+
+  test('leaving walk mode gives the edit camera back', async ({ page }) => {
+    await enterWalk(page);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+
+    expect(await page.evaluate(() => window.helaengine!.cameraMode())).toBeNull();
+    await expect(page.getByRole('button', { name: 'Walk' })).toBeVisible();
+  });
+});

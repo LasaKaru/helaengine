@@ -191,6 +191,38 @@ export class PhysicsWorld {
     if (at >= 0) this.#dynamic.splice(at, 1);
   }
 
+  /**
+   * Distance to the first thing along a ray, or null for a clear line.
+   *
+   * The one primitive every "is something in the way" question reduces to: a camera arm looking for
+   * a wall, a crouched player checking for headroom, an enemy checking line of sight. Returning the
+   * distance rather than a boolean is what lets a camera stop *just* short of the obstruction.
+   */
+  castDistance(
+    from: THREE.Vector3,
+    direction: THREE.Vector3,
+    maxDistance: number,
+    excludeColliderHandle?: number,
+  ): number | null {
+    const hit = this.world.castRay(
+      new this.rapier.Ray(
+        { x: from.x, y: from.y, z: from.z },
+        { x: direction.x, y: direction.y, z: direction.z },
+      ),
+      maxDistance,
+      true,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      excludeColliderHandle === undefined
+        ? undefined
+        : (collider) => collider.handle !== excludeColliderHandle,
+    );
+
+    return hit ? hit.timeOfImpact : null;
+  }
+
   /** Builds a character controller for the document's player. Stepped and synced with the world. */
   createPlayer(player: Player, spawn?: THREE.Vector3): PlayerController {
     const controller = new PlayerController(this, player, spawn);

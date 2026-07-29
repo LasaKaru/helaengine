@@ -2,15 +2,22 @@ import { useEffect, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import {
+  InputManager,
   PhysicsWorld,
+  createCameraRig,
+  createPlayerAvatar,
+  nextCameraMode,
   registerBuiltinBehaviors,
   startScene,
   type AssetResolver,
+  type CameraRig,
   type GameRuntime,
   type LoadedScene,
+  type PlayerAvatar,
   type PlayerController,
   type SceneLoader,
 } from '@helaengine/engine';
+import type { CameraMode } from '@helaengine/schema';
 import { useEditorStore } from '../store/editorStore';
 import { useSceneStore } from '../store/sceneStore';
 import {
@@ -23,28 +30,6 @@ import {
 
 registerBuiltinBehaviors();
 
-/** Keys the preview reads, and what each one means. Deliberately WASD-only — this is a test walk. */
-const KEY_BINDINGS: Record<string, keyof HeldKeys> = {
-  KeyW: 'forward',
-  ArrowUp: 'forward',
-  KeyS: 'back',
-  ArrowDown: 'back',
-  KeyA: 'left',
-  ArrowLeft: 'left',
-  KeyD: 'right',
-  ArrowRight: 'right',
-  Space: 'jump',
-};
-
-interface HeldKeys {
-  forward: boolean;
-  back: boolean;
-  left: boolean;
-  right: boolean;
-  jump: boolean;
-}
-
-const LOOK_SPEED = 0.0022;
 /** Just short of straight up/down, so the view never flips through the pole. */
 const MAX_PITCH = Math.PI / 2 - 0.05;
 
@@ -76,15 +61,13 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
   const [world, setWorld] = useState<PhysicsWorld | null>(null);
   const runtime = useRef<GameRuntime | null>(null);
   const controller = useRef<PlayerController | null>(null);
-  const held = useRef<HeldKeys>({
-    forward: false,
-    back: false,
-    left: false,
-    right: false,
-    jump: false,
-  });
+  const input = useRef<InputManager | null>(null);
+  const rig = useRef<CameraRig | null>(null);
+  const avatar = useRef<PlayerAvatar | null>(null);
   const look = useRef({ yaw: 0, pitch: 0 });
+  const lookDelta = useRef({ x: 0, y: 0 });
   const health = useRef<number | null>(null);
+  const setCameraMode = useEditorStore((state) => state.setCameraMode);
 
   useEffect(() => {
     if (!walking || !loadedScene) return;
@@ -145,6 +128,15 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
           look.current.yaw = yaw;
         });
 
+        rig.current = createCameraRig(scene.gameConfig.cameraMode);
+        setCameraMode(scene.gameConfig.cameraMode);
+
+        // A body to look at. First person hides it, because the camera is inside it.
+        const body = createPlayerAvatar(scene.player);
+        body.node.visible = scene.gameConfig.cameraMode !== 'fps';
+        loadedScene.threeScene.add(body.node);
+        avatar.current = body;
+
         setPhysicsStatus('ready');
         setWorld(physics);
       })
@@ -161,6 +153,10 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
       controller.current = null;
       setPlayer(null);
       setLookHandler(null);
+      rig.current = null;
+      avatar.current?.dispose();
+      avatar.current = null;
+      setCameraMode(null);
       runtime.current?.stop();
       runtime.current = null;
       setGameRuntime(null);
@@ -173,62 +169,23 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
       // Anything the solver moved goes back to where the document says it is.
       loadedScene.syncTransforms(useSceneStore.getState().scene);
     };
-  }, [walking, loadedScene, resolver, loader, camera, setPhysicsStatus, setWalking]);
+  }, [walking, loadedScene, resolver, loader, camera, setPhysicsStatus, setWalking, setCameraMode]);
 
-  // Keyboard. Held state rather than events-per-frame: physics wants "is W down right now".
+  // One input layer for every source. The engine owns it, because an exported game running on a
+  // phone needs the same virtual joystick and has no React to build it with.
   useEffect(() => {
     if (!walking) return;
 
-    const press =
-      (down: boolean) =>
-      (event: KeyboardEvent): void => {
-        const binding = KEY_BINDINGS[event.code];
-        if (!binding) return;
-        // Space scrolls the page and arrows scroll the panels; neither is wanted mid-walk.
-        event.preventDefault();
-        held.current[binding] = down;
-      };
+    const manager = new InputManager({
+      element: domElement,
+      lookSensitivity: useSceneStore.getState().scene.gameConfig.lookSensitivity,
+    });
+    manager.attach();
+    input.current = manager;
 
-    const keydown = press(true);
-    const keyup = press(false);
-    const blur = (): void => {
-      // A tab switch mid-stride otherwise leaves the player walking forever.
-      held.current = { forward: false, back: false, left: false, right: false, jump: false };
-    };
-
-    window.addEventListener('keydown', keydown);
-    window.addEventListener('keyup', keyup);
-    window.addEventListener('blur', blur);
     return () => {
-      window.removeEventListener('keydown', keydown);
-      window.removeEventListener('keyup', keyup);
-      window.removeEventListener('blur', blur);
-      blur();
-    };
-  }, [walking]);
-
-  // Mouse look, through the pointer lock every first-person control scheme uses.
-  useEffect(() => {
-    if (!walking) return;
-
-    const requestLock = (): void => {
-      if (document.pointerLockElement !== domElement) void domElement.requestPointerLock?.();
-    };
-    const move = (event: MouseEvent): void => {
-      if (document.pointerLockElement !== domElement) return;
-      look.current.yaw -= event.movementX * LOOK_SPEED;
-      look.current.pitch = Math.max(
-        -MAX_PITCH,
-        Math.min(MAX_PITCH, look.current.pitch - event.movementY * LOOK_SPEED),
-      );
-    };
-
-    domElement.addEventListener('click', requestLock);
-    document.addEventListener('mousemove', move);
-    return () => {
-      domElement.removeEventListener('click', requestLock);
-      document.removeEventListener('mousemove', move);
-      if (document.pointerLockElement === domElement) document.exitPointerLock();
+      manager.detach();
+      input.current = null;
     };
   }, [walking, domElement]);
 
@@ -248,13 +205,33 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
   useFrame((_state, delta) => {
     const physics = world;
     const player = controller.current;
-    if (!physics || !player) return;
+    const manager = input.current;
+    if (!physics || !player || !manager) return;
 
-    const keys = held.current;
-    const input = {
-      forward: (keys.forward ? 1 : 0) - (keys.back ? 1 : 0),
-      right: (keys.right ? 1 : 0) - (keys.left ? 1 : 0),
-      jump: keys.jump,
+    const config = useSceneStore.getState().scene.gameConfig;
+    manager.lookSensitivity = config.lookSensitivity;
+    manager.update(delta);
+
+    // Look is accumulated by the input layer and applied here, so a mouse delta and a thumbstick
+    // rate end up in the same place by the time the camera reads them.
+    const delta2 = manager.consumeLook(lookDelta.current);
+    look.current.yaw += delta2.x;
+    look.current.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, look.current.pitch + delta2.y));
+
+    if (config.allowModeSwitch && manager.wasPressed('switchCamera')) {
+      const mode: CameraMode = nextCameraMode(rig.current?.mode ?? config.cameraMode);
+      rig.current?.reset?.();
+      rig.current = createCameraRig(mode);
+      setCameraMode(mode);
+    }
+
+    const move = manager.move;
+    const moveInput = {
+      forward: move.y,
+      right: move.x,
+      jump: manager.isDown('jump'),
+      sprint: manager.isDown('sprint'),
+      crouch: manager.isDown('crouch'),
       yaw: look.current.yaw,
     };
 
@@ -262,7 +239,7 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
     // bodies and contacts, gameplay's with how many things are thinking. Conflating them would
     // hide which one a future regression came from.
     const beforePhysics = performance.now();
-    physics.step(delta, (step) => player.move(input, step));
+    physics.step(delta, (step) => player.move(moveInput, step));
     const afterPhysics = performance.now();
 
     // Gameplay advances after physics, so enemies read positions the solver has already settled.
@@ -277,8 +254,32 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
       useEditorStore.getState().setPlayerHealth(current);
     }
 
-    camera.position.set(player.position.x, player.position.y + player.eyeHeight, player.position.z);
-    camera.quaternion.setFromEuler(new THREE.Euler(look.current.pitch, look.current.yaw, 0, 'YXZ'));
+    if (avatar.current) {
+      avatar.current.update(player.position, look.current.yaw, player.crouched);
+      avatar.current.node.visible = rig.current?.mode !== 'fps';
+    }
+
+    rig.current?.update(
+      camera as THREE.PerspectiveCamera,
+      {
+        position: player.position,
+        eyeHeight: player.eyeHeight,
+        speed: player.speed,
+        grounded: player.grounded,
+      },
+      look.current,
+      delta,
+      {
+        fieldOfView: config.fieldOfView,
+        distance: config.thirdPersonDistance,
+        height: config.topDownHeight,
+        headBob: config.headBob,
+        probe: (from, direction, maxDistance) =>
+          physics.castDistance(from, direction, maxDistance, player.colliderHandle),
+      },
+    );
+
+    manager.endFrame();
   });
 
   return null;

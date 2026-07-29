@@ -15,6 +15,8 @@ export interface MoveInput {
   /** -1 left … 1 right. */
   right: number;
   jump: boolean;
+  sprint?: boolean;
+  crouch?: boolean;
   /**
    * Heading in radians: the camera's Y euler angle, so `0` faces -Z exactly as an unrotated
    * Three.js camera does. Sharing the convention is what keeps "forward" the same direction for
@@ -26,6 +28,7 @@ export interface MoveInput {
 const desired = new THREE.Vector3();
 const heading = new THREE.Vector3();
 const strafe = new THREE.Vector3();
+const UP = new THREE.Vector3(0, 1, 0);
 
 /**
  * A walking character, built on Rapier's kinematic character controller.
@@ -46,6 +49,10 @@ export class PlayerController {
   #verticalVelocity = 0;
   #grounded = false;
   #disposed = false;
+  #crouched = false;
+  #speed = 0;
+  readonly #standHalfHeight: number;
+  readonly #crouchHalfHeight: number;
 
   constructor(world: PhysicsWorld, player: Player, spawn?: THREE.Vector3) {
     const { rapier } = world;
@@ -55,6 +62,11 @@ export class PlayerController {
     const start = spawn ?? new THREE.Vector3(...player.spawn);
     const radius = player.radius;
     const halfHeight = Math.max(player.height / 2 - radius, 0.05);
+    this.#standHalfHeight = halfHeight;
+    this.#crouchHalfHeight = Math.max(
+      (player.height * player.crouchHeightRatio) / 2 - radius,
+      0.05,
+    );
 
     this.#body = world.world.createRigidBody(
       rapier.RigidBodyDesc.kinematicPositionBased().setTranslation(
@@ -92,7 +104,19 @@ export class PlayerController {
 
   /** Camera height: the top of the capsule, less a little so the view is not inside the crown. */
   get eyeHeight(): number {
-    return this.#player.height - 0.15;
+    const height = this.#crouched
+      ? this.#player.height * this.#player.crouchHeightRatio
+      : this.#player.height;
+    return height - 0.15;
+  }
+
+  /** Ground speed last frame, in metres per second — what a head bob and a footstep loop want. */
+  get speed(): number {
+    return this.#speed;
+  }
+
+  get crouched(): boolean {
+    return this.#crouched;
   }
 
   /**
@@ -122,6 +146,8 @@ export class PlayerController {
   move(input: MoveInput, step: number): void {
     if (this.#disposed) return;
 
+    this.#setCrouched(input.crouch === true);
+
     // Camera-relative movement: forward is where you are looking, flattened onto the ground.
     heading.set(-Math.sin(input.yaw), 0, -Math.cos(input.yaw));
     strafe.set(-heading.z, 0, heading.x);
@@ -129,7 +155,17 @@ export class PlayerController {
     desired.addScaledVector(heading, input.forward);
     desired.addScaledVector(strafe, input.right);
     if (desired.lengthSq() > 1) desired.normalize();
-    desired.multiplyScalar(this.#player.moveSpeed * step);
+
+    // Crouching wins over sprinting: a player holding both is trying to sneak, and a sprint-crouch
+    // that moved at full speed would be a exploit rather than a feature.
+    const speed =
+      this.#player.moveSpeed *
+      (this.#crouched
+        ? this.#player.crouchMultiplier
+        : input.sprint === true
+          ? this.#player.sprintMultiplier
+          : 1);
+    desired.multiplyScalar(speed * step);
 
     if (this.#grounded) {
       // A small downward bias while grounded keeps the character pressed onto slopes instead of
@@ -150,6 +186,8 @@ export class PlayerController {
       y: current.y + movement.y,
       z: current.z + movement.z,
     });
+
+    this.#speed = step > 0 ? Math.hypot(movement.x, movement.z) / step : 0;
 
     // Landing or hitting a ceiling: keep integrating gravity from a standstill rather than from a
     // velocity the character never actually reached.
@@ -178,9 +216,44 @@ export class PlayerController {
     this.#world.world.removeRigidBody(this.#body);
   }
 
+  /**
+   * Shrinks or restores the capsule.
+   *
+   * A real resize rather than only lowering the camera, because the point of crouching is fitting
+   * under things. Standing up is refused when there is no room — otherwise a player could stand up
+   * inside a ceiling and be ejected through it.
+   */
+  #setCrouched(wanted: boolean): void {
+    if (wanted === this.#crouched) return;
+
+    if (!wanted) {
+      const clearance = (this.#standHalfHeight - this.#crouchHalfHeight) * 2;
+      const translation = this.#body.translation();
+      const headroom = this.#world.castDistance(
+        new THREE.Vector3(translation.x, translation.y, translation.z),
+        UP,
+        this.#standHalfHeight + this.#player.radius + clearance,
+        this.#collider.handle,
+      );
+      if (headroom !== null) return;
+    }
+
+    this.#crouched = wanted;
+    this.#collider.setHalfHeight(wanted ? this.#crouchHalfHeight : this.#standHalfHeight);
+    // The body origin is the capsule centre, so resizing it without moving the body would sink the
+    // character into the floor by exactly the amount it shrank.
+    const delta = (this.#standHalfHeight - this.#crouchHalfHeight) * (wanted ? -1 : 1);
+    const translation = this.#body.translation();
+    this.#body.setTranslation(
+      { x: translation.x, y: translation.y + delta, z: translation.z },
+      true,
+    );
+    this.#readBack();
+  }
+
   #readBack(): void {
     const radius = this.#player.radius;
-    const halfHeight = Math.max(this.#player.height / 2 - radius, 0.05);
+    const halfHeight = this.#crouched ? this.#crouchHalfHeight : this.#standHalfHeight;
     const translation = this.#body.translation();
     this.#position.set(translation.x, translation.y - halfHeight - radius, translation.z);
   }

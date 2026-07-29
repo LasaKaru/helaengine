@@ -8,6 +8,7 @@ import { buildScenePhysics, resolveColliderType } from './buildScenePhysics.js';
 import { collectTrimesh } from './colliders.js';
 import { PhysicsWorld } from './PhysicsWorld.js';
 import { initPhysics, isPhysicsReady, type RapierModule } from './rapier.js';
+import type { MoveInput } from './PlayerController.js';
 
 const manifest = parseAssetManifest({
   version: 1,
@@ -321,7 +322,7 @@ describe('PlayerController', () => {
     world: PhysicsWorld,
     controller: ReturnType<PhysicsWorld['createPlayer']>,
     seconds: number,
-    input = { forward: 0, right: 0, jump: false, yaw: 0 },
+    input: MoveInput = { forward: 0, right: 0, jump: false, yaw: 0 },
   ) {
     const frames = Math.round(seconds * 60);
     for (let frame = 0; frame < frames; frame += 1) {
@@ -421,6 +422,99 @@ describe('PlayerController', () => {
     expect(midair).toBeGreaterThan(standing + 0.3);
     expect(controller.position.y).toBeCloseTo(standing, 1);
     expect(controller.grounded).toBe(true);
+    world.dispose();
+  });
+
+  it('sprints faster than it walks, and crouches slower', () => {
+    const distances: Record<string, number> = {};
+
+    for (const [name, input] of [
+      ['walk', { forward: 1, right: 0, jump: false, yaw: 0 }],
+      ['sprint', { forward: 1, right: 0, jump: false, yaw: 0, sprint: true }],
+      ['crouch', { forward: 1, right: 0, jump: false, yaw: 0, crouch: true }],
+    ] as const) {
+      const world = makeWorld();
+      world.addTerrain(new TerrainField({ segments: 8, size: [128, 128], maxHeight: 10 }));
+      const controller = world.createPlayer(player, new THREE.Vector3(0, 1, 0));
+      walk(world, controller, 1, input);
+      distances[name] = Math.abs(controller.position.z);
+      world.dispose();
+    }
+
+    expect(distances['sprint']!).toBeGreaterThan(distances['walk']! * 1.4);
+    expect(distances['crouch']!).toBeLessThan(distances['walk']! * 0.7);
+  });
+
+  it('holds a sprinting crouch to crouch speed — sneaking beats an exploit', () => {
+    const world = makeWorld();
+    world.addTerrain(new TerrainField({ segments: 8, size: [128, 128], maxHeight: 10 }));
+    const controller = world.createPlayer(player, new THREE.Vector3(0, 1, 0));
+
+    walk(world, controller, 1, {
+      forward: 1,
+      right: 0,
+      jump: false,
+      yaw: 0,
+      sprint: true,
+      crouch: true,
+    });
+
+    expect(Math.abs(controller.position.z)).toBeLessThan(4);
+    world.dispose();
+  });
+
+  it('lowers the eye height while crouched and restores it after', () => {
+    const world = makeWorld();
+    world.addTerrain(new TerrainField({ segments: 8, size: [128, 128], maxHeight: 10 }));
+    const controller = world.createPlayer(player, new THREE.Vector3(0, 1, 0));
+    const standing = controller.eyeHeight;
+
+    walk(world, controller, 0.5, { forward: 0, right: 0, jump: false, yaw: 0, crouch: true });
+    expect(controller.crouched).toBe(true);
+    expect(controller.eyeHeight).toBeLessThan(standing);
+
+    walk(world, controller, 0.5, { forward: 0, right: 0, jump: false, yaw: 0 });
+    expect(controller.crouched).toBe(false);
+    expect(controller.eyeHeight).toBeCloseTo(standing, 5);
+    world.dispose();
+  });
+
+  it('refuses to stand up under a low ceiling', () => {
+    // Standing into solid geometry would eject the player through it, which is the classic
+    // crouch bug. The controller simply stays crouched instead.
+    const world = makeWorld();
+    world.addTerrain(new TerrainField({ segments: 8, size: [128, 128], maxHeight: 10 }));
+
+    const ceiling = new THREE.Group();
+    ceiling.position.set(0, 1.2, 0);
+    world.addObject({
+      objectId: 'ceiling',
+      node: ceiling,
+      shape: 'box',
+      body: 'static',
+      size: [8, 0.4, 8],
+    });
+
+    const controller = world.createPlayer(player, new THREE.Vector3(0, 0, 0));
+    walk(world, controller, 0.5, { forward: 0, right: 0, jump: false, yaw: 0, crouch: true });
+    expect(controller.crouched).toBe(true);
+
+    walk(world, controller, 0.5, { forward: 0, right: 0, jump: false, yaw: 0 });
+
+    expect(controller.crouched).toBe(true);
+    world.dispose();
+  });
+
+  it('reports the speed it actually achieved, not the speed it asked for', () => {
+    const world = makeWorld();
+    world.addTerrain(new TerrainField({ segments: 8, size: [128, 128], maxHeight: 10 }));
+    const controller = world.createPlayer(player, new THREE.Vector3(0, 1, 0));
+
+    walk(world, controller, 0.5, { forward: 1, right: 0, jump: false, yaw: 0 });
+    expect(controller.speed).toBeGreaterThan(3);
+
+    walk(world, controller, 0.5, { forward: 0, right: 0, jump: false, yaw: 0 });
+    expect(controller.speed).toBeLessThan(0.5);
     world.dispose();
   });
 

@@ -86,6 +86,7 @@ export function Viewport({ loader, resolver }: ViewportProps): React.JSX.Element
   const editingWaypoints = useEditorStore((state) => state.editingWaypoints);
   const playerHealth = useEditorStore((state) => state.playerHealth);
   const maxHealth = useSceneStore((state) => state.scene.player.health);
+  const cameraMode = useEditorStore((state) => state.cameraMode);
 
   const handleLoaded = useCallback((loaded: LoadedScene) => {
     setStats({ objects: loaded.objects.size, missing: loaded.missingAssetIds.length });
@@ -148,7 +149,10 @@ export function Viewport({ loader, resolver }: ViewportProps): React.JSX.Element
       {walking && (
         <div className="walk-hint" role="status" aria-label="Walk mode">
           <strong>Walking</strong>
-          <span>WASD to move, Space to jump, click to look, Escape to return</span>
+          <span>
+            WASD move · Shift sprint · C crouch · Space jump · V camera · Escape to return
+          </span>
+          {cameraMode && <span className="walk-mode">{cameraMode}</span>}
         </div>
       )}
 
