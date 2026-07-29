@@ -7,9 +7,10 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 13 — Phase 2B under way. A working editor, behaviours, physics, enemies, trigger
+**Status:** Sprint 14 — Phase 2B under way. A working editor, behaviours, physics, enemies, trigger
 volumes, a measured performance baseline, and now first/third/top-down cameras with one input layer
-covering keyboard, touch and gamepad. Menus and HUD are next; there is no backend yet, deliberately.
+covering keyboard, touch and gamepad, and a schema-driven menu/HUD shell. Weapons and combat are
+next; there is no backend yet, deliberately.
 
 ---
 
@@ -224,6 +225,22 @@ pnpm bench
 
 Draw calls and CPU cost are the numbers to hold to account, because they are the same on every
 machine. Frame rate is not, and the document is explicit about what has and has not been verified.
+
+## The game shell
+
+Pressing Walk no longer drops you straight into the world — it opens the game's **home screen**,
+built from the document's `uiConfig` by a `UIRenderer` that stands in the same relation to that
+config as `SceneLoader` does to the scene. Data in, interface out, no per-project code. Home → menu
+→ play → pause → resume is a complete loop, and Escape pauses rather than quitting.
+
+DOM and CSS rather than meshes in the 3D scene: text quality, accessibility and the ability to
+restyle a whole menu with one custom property all argue for it. Menu buttons name an action from a
+**closed vocabulary** — `startGame`, `resume`, `restartCheckpoint`, `openSettings`, `mainMenu`,
+`quit` — for the same reason behaviours and trigger actions do.
+
+Four themes ship (midnight, parchment, neon, mono) with three panel styles. Swapping one restyles
+every surface at once, because a theme that needed each button updating is a stylesheet with extra
+steps.
 
 ## Where this is going
 

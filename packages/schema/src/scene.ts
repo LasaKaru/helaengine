@@ -3,6 +3,7 @@ import { EnvironmentSchema } from './environment.js';
 import { SceneObjectSchema } from './object.js';
 import { GameConfigSchema } from './game.js';
 import { PlayerSchema } from './physics.js';
+import { UiConfigSchema } from './ui.js';
 import { IdSchema } from './primitives.js';
 import { TerrainSchema } from './terrain.js';
 
@@ -22,6 +23,7 @@ export const SceneSchema = z
     objects: z.array(SceneObjectSchema).default([]),
     player: PlayerSchema,
     gameConfig: GameConfigSchema,
+    uiConfig: UiConfigSchema,
   })
   .superRefine((scene, ctx) => {
     const seen = new Set<string>();

@@ -6,9 +6,11 @@ import type {
   ColliderChoice,
   SceneObject,
   Transform,
+  UiTheme,
   Vec3,
 } from '@helaengine/schema';
 import { useEditorStore } from '../store/editorStore';
+import { THEME_PRESETS } from '@helaengine/engine';
 import { useSceneStore } from '../store/sceneStore';
 import { BehaviorPanel } from './BehaviorPanel';
 import { TriggerPanel } from './TriggerPanel';
@@ -224,6 +226,95 @@ function GamePanel(): React.JSX.Element {
   );
 }
 
+/**
+ * The game's shell, in its minimal form.
+ *
+ * Sprint 15 builds the full WYSIWYG panel — button lists, HUD elements, image and video upload.
+ * What is here is the part Sprint 14 has to be able to demonstrate: a title, and a theme swap that
+ * restyles every menu at once.
+ */
+function GameUiPanel(): React.JSX.Element {
+  const ui = useSceneStore((state) => state.scene.uiConfig);
+  const setUiConfig = useSceneStore((state) => state.setUiConfig);
+
+  return (
+    <section className="panel" aria-label="Game UI">
+      <h2>Game UI</h2>
+
+      <label className="param-check">
+        <input
+          type="checkbox"
+          checked={ui.enabled}
+          onChange={(event) => setUiConfig({ enabled: event.target.checked })}
+        />
+        Show menus and HUD
+      </label>
+
+      <label className="param-row">
+        <span>Title</span>
+        <input
+          type="text"
+          aria-label="Game title"
+          value={ui.homeScreen.title}
+          onChange={(event) => setUiConfig({ homeScreen: { title: event.target.value } })}
+        />
+      </label>
+
+      <label className="param-row">
+        <span>Theme</span>
+        <select
+          aria-label="Theme"
+          value={ui.theme.preset}
+          onChange={(event) =>
+            setUiConfig({ theme: { preset: event.target.value as UiTheme['preset'] } })
+          }
+        >
+          {THEME_PRESETS.map((preset) => (
+            <option key={preset} value={preset}>
+              {preset}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="param-row">
+        <span>Panels</span>
+        <select
+          aria-label="Panel style"
+          value={ui.theme.panelStyle}
+          onChange={(event) =>
+            setUiConfig({ theme: { panelStyle: event.target.value as UiTheme['panelStyle'] } })
+          }
+        >
+          {(['glass', 'solid', 'outline'] as const).map((style) => (
+            <option key={style} value={style}>
+              {style}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="param-check">
+        <input
+          type="checkbox"
+          checked={ui.hud.showCrosshair}
+          onChange={(event) => setUiConfig({ hud: { showCrosshair: event.target.checked } })}
+        />
+        Crosshair
+      </label>
+
+      <label className="param-check">
+        <input
+          type="checkbox"
+          checked={ui.hud.showHealthBar}
+          onChange={(event) => setUiConfig({ hud: { showHealthBar: event.target.checked } })}
+        />
+        Health bar
+      </label>
+    </section>
+  );
+}
+
 /** Where the player starts, and how they move, when the scene is walked or exported. */
 function PlayerPanel(): React.JSX.Element {
   const player = useSceneStore((state) => state.scene.player);
@@ -375,6 +466,7 @@ export function InspectorPanel({ manifest }: { manifest: AssetManifest }): React
 
       <TerrainPanel />
       <GamePanel />
+      <GameUiPanel />
       <PlayerPanel />
     </aside>
   );

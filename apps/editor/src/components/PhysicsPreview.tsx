@@ -9,6 +9,7 @@ import {
   nextCameraMode,
   registerBuiltinBehaviors,
   startScene,
+  UIRenderer,
   type AssetResolver,
   type CameraRig,
   type GameRuntime,
@@ -18,6 +19,7 @@ import {
   type SceneLoader,
 } from '@helaengine/engine';
 import type { CameraMode } from '@helaengine/schema';
+import { ASSET_BASE_URL } from '../engine/assetLibrary';
 import { useEditorStore } from '../store/editorStore';
 import { useSceneStore } from '../store/sceneStore';
 import {
@@ -27,6 +29,7 @@ import {
   setLookHandler,
   setPlayer,
 } from '../devApi';
+import { setPauseHandler } from '../useShortcuts';
 
 registerBuiltinBehaviors();
 
@@ -64,10 +67,15 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
   const input = useRef<InputManager | null>(null);
   const rig = useRef<CameraRig | null>(null);
   const avatar = useRef<PlayerAvatar | null>(null);
+  const ui = useRef<UIRenderer | null>(null);
   const look = useRef({ yaw: 0, pitch: 0 });
   const lookDelta = useRef({ x: 0, y: 0 });
   const health = useRef<number | null>(null);
   const setCameraMode = useEditorStore((state) => state.setCameraMode);
+  const setUiScreen = useEditorStore((state) => state.setUiScreen);
+  // The one piece of the document this component subscribes to. Everything else it reads once, at
+  // the moment play starts — but the shell is authored while it is on screen, so it has to follow.
+  const uiConfig = useSceneStore((state) => state.scene.uiConfig);
 
   useEffect(() => {
     if (!walking || !loadedScene) return;
@@ -92,10 +100,8 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
         // the player's feet inside a hill. Half a metre of clearance lets the controller settle.
         const [spawnX, spawnY, spawnZ] = scene.player.spawn;
         const ground = loadedScene.terrainField?.sampleHeight(spawnX, spawnZ) ?? 0;
-        controller.current = physics.createPlayer(
-          scene.player,
-          new THREE.Vector3(spawnX, Math.max(spawnY, ground + 0.5), spawnZ),
-        );
+        const spawnPoint = new THREE.Vector3(spawnX, Math.max(spawnY, ground + 0.5), spawnZ);
+        controller.current = physics.createPlayer(scene.player, spawnPoint);
         setPlayer(controller.current);
 
         // One runtime owns behaviours, triggers, physics and the player. The editor's job here is
@@ -131,6 +137,38 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
         rig.current = createCameraRig(scene.gameConfig.cameraMode);
         setCameraMode(scene.gameConfig.cameraMode);
 
+        // The shell: home -> menu -> play -> pause, rendered from the document.
+        const shell = new UIRenderer({
+          container: domElement.parentElement ?? domElement,
+          config: scene.uiConfig,
+          resolveAsset: (assetId) => {
+            const entry = resolver.get(assetId);
+            return entry?.thumbnailPath ? `${ASSET_BASE_URL}${entry.thumbnailPath}` : null;
+          },
+          onScreenChange: (screen) => {
+            setUiScreen(screen);
+            // The cursor belongs to whoever is being shown. Leaving it locked to the canvas while
+            // a menu is up makes every button in that menu unclickable — the click never reaches
+            // anything, because the pointer is captured rather than pointing at something.
+            const manager = input.current;
+            if (!manager) return;
+            manager.captureOnClick = screen === 'playing';
+            if (screen !== 'playing') manager.releasePointerLock();
+          },
+          onAction: (action) => {
+            // The renderer moved the screen; the host decides what that means for the simulation.
+            if (action === 'quit') setWalking(false);
+            if (action === 'restartCheckpoint') controller.current?.teleport(spawnPoint);
+            if (action === 'startGame' || action === 'resume' || action === 'restartCheckpoint') {
+              input.current?.requestPointerLock();
+            }
+          },
+        });
+        shell.mount();
+        ui.current = shell;
+        setUiScreen(shell.screen);
+        setPauseHandler(() => shell.togglePause());
+
         // A body to look at. First person hides it, because the camera is inside it.
         const body = createPlayerAvatar(scene.player);
         body.node.visible = scene.gameConfig.cameraMode !== 'fps';
@@ -154,6 +192,10 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
       setPlayer(null);
       setLookHandler(null);
       rig.current = null;
+      setPauseHandler(null);
+      ui.current?.unmount();
+      ui.current = null;
+      setUiScreen(null);
       avatar.current?.dispose();
       avatar.current = null;
       setCameraMode(null);
@@ -169,7 +211,24 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
       // Anything the solver moved goes back to where the document says it is.
       loadedScene.syncTransforms(useSceneStore.getState().scene);
     };
-  }, [walking, loadedScene, resolver, loader, camera, setPhysicsStatus, setWalking, setCameraMode]);
+  }, [
+    walking,
+    loadedScene,
+    resolver,
+    loader,
+    camera,
+    setPhysicsStatus,
+    setWalking,
+    setCameraMode,
+    setUiScreen,
+    domElement,
+  ]);
+
+  // Live-edit the shell: changing the theme or the title in the inspector repaints the menu that
+  // is currently on screen, which is the whole point of a schema-driven UI.
+  useEffect(() => {
+    ui.current?.setConfig(uiConfig);
+  }, [uiConfig]);
 
   // One input layer for every source. The engine owns it, because an exported game running on a
   // phone needs the same virtual joystick and has no React to build it with.
@@ -208,7 +267,21 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
     const manager = input.current;
     if (!physics || !player || !manager) return;
 
-    const config = useSceneStore.getState().scene.gameConfig;
+    const scene = useSceneStore.getState().scene;
+    const config = scene.gameConfig;
+    const shell = ui.current;
+
+    manager.captureOnClick = !shell || shell.screen === 'playing';
+
+    // A menu is not a pause button that happens to be visible — the world genuinely stops.
+    if (shell && shell.screen !== 'playing') {
+      if (manager.pointerLocked) manager.releasePointerLock();
+      manager.update(delta);
+      manager.consumeLook(lookDelta.current);
+      manager.endFrame();
+      return;
+    }
+
     manager.lookSensitivity = config.lookSensitivity;
     manager.update(delta);
 
@@ -252,6 +325,9 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
     if (current !== health.current) {
       health.current = current;
       useEditorStore.getState().setPlayerHealth(current);
+    }
+    if (current !== null) {
+      shell?.setHud({ health: current, maxHealth: scene.player.health });
     }
 
     if (avatar.current) {

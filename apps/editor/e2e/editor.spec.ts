@@ -24,6 +24,41 @@ async function openEditor(page: Page, template = /Empty field/): Promise<void> {
 }
 
 /**
+ * Clicks through the game shell into the world.
+ *
+ * From Sprint 14 on, Walk opens the home screen rather than dropping straight into play — that is
+ * the point of the shell. Every test that wants to *be* in the world goes through here, so the one
+ * place that knows about the menu is this function.
+ */
+async function exitWalk(page: Page): Promise<void> {
+  // Escape pauses from Sprint 14 on, rather than leaving. Quit is the gesture that leaves, and it
+  // lives on the pause menu — so getting out is Escape, then Quit.
+  if ((await page.locator('.hela-ui').count()) === 0) {
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    return;
+  }
+
+  if ((await page.evaluate(() => window.helaengine!.uiScreen())) === 'playing') {
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+  }
+  await page.locator('.hela-panel button', { hasText: 'Quit' }).click();
+  await page.waitForTimeout(500);
+}
+
+async function startPlaying(page: Page): Promise<void> {
+  const play = page.locator('.hela-panel button', { hasText: 'Play' });
+  if ((await play.count()) > 0) {
+    await play.first().click();
+    await page.waitForFunction(() => window.helaengine!.uiScreen() === 'playing', undefined, {
+      timeout: 10_000,
+    });
+  }
+  await page.waitForTimeout(300);
+}
+
+/**
  * Sprint 3 smoke test — it asserts the one thing this sprint claims: that a change to the store
  * puts a real asset in the viewport, through the shared engine, with no editor-side placement code.
  *
@@ -852,7 +887,7 @@ test.describe('play preview', () => {
     await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
       timeout: 20_000,
     });
-    await page.waitForTimeout(600);
+    await startPlaying(page);
   }
 
   test('the player lands on the sculpted ground instead of falling through it', async ({
@@ -905,7 +940,7 @@ test.describe('play preview', () => {
     expect(player.z).toBeLessThan(-4);
   });
 
-  test('walking is a rehearsal: the document is untouched and Escape returns to editing', async ({
+  test('walking is a rehearsal: the document is untouched and leaving returns to editing', async ({
     page,
   }) => {
     const before = await page.evaluate(() =>
@@ -918,7 +953,7 @@ test.describe('play preview', () => {
     await page.waitForTimeout(800);
     await page.keyboard.up('w');
 
-    await page.keyboard.press('Escape');
+    await exitWalk(page);
     await expect(page.getByRole('button', { name: 'Walk' })).toBeVisible();
     expect(await page.evaluate(() => window.helaengine!.playerPosition())).toBeNull();
     expect(
@@ -965,7 +1000,7 @@ test.describe('enemies and triggers', () => {
     await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
       timeout: 20_000,
     });
-    await page.waitForTimeout(500);
+    await startPlaying(page);
     await page.evaluate(() => window.helaengine!.setPlayerYaw(0));
   }
 
@@ -1099,8 +1134,7 @@ test.describe('enemies and triggers', () => {
     const documentBefore = await page.evaluate(
       () => window.helaengine!.store.getState().scene.objects.length,
     );
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(600);
+    await exitWalk(page);
 
     // The spawn was a rehearsal: the document never had it, and neither does the viewport now.
     expect(await page.evaluate(() => window.helaengine!.viewportObjectIds().length)).toBe(
@@ -1126,8 +1160,7 @@ test.describe('enemies and triggers', () => {
       'obj_0001',
     );
 
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(600);
+    await exitWalk(page);
 
     expect(await page.evaluate(() => window.helaengine!.viewportObjectIds())).toContain('obj_0001');
     expect(
@@ -1202,6 +1235,7 @@ test.describe('instancing and performance', () => {
     await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
       timeout: 30_000,
     });
+    await startPlaying(page);
     await page.waitForTimeout(2000);
 
     const states = await page.evaluate(() => window.helaengine!.enemyStates());
@@ -1238,7 +1272,7 @@ test.describe('camera and controls', () => {
     await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
       timeout: 20_000,
     });
-    await page.waitForTimeout(600);
+    await startPlaying(page);
     // Face open ground: walking into the hut would measure a wall rather than a speed.
     await page.evaluate(() => window.helaengine!.setPlayerYaw(Math.PI));
   }
@@ -1256,7 +1290,7 @@ test.describe('camera and controls', () => {
   }
 
   test('the Game panel edits the document', async ({ page }) => {
-    await expect(page.getByRole('region', { name: 'Game' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Game', exact: true })).toBeVisible();
     await page
       .getByRole('group', { name: 'Camera mode' })
       .getByRole('button', { name: 'Third' })
@@ -1358,10 +1392,131 @@ test.describe('camera and controls', () => {
 
   test('leaving walk mode gives the edit camera back', async ({ page }) => {
     await enterWalk(page);
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(500);
+    await exitWalk(page);
 
     expect(await page.evaluate(() => window.helaengine!.cameraMode())).toBeNull();
     await expect(page.getByRole('button', { name: 'Walk' })).toBeVisible();
+  });
+});
+
+/**
+ * Sprint 14 — the game shell.
+ *
+ * The loop the definition of done names (home → menu → play → pause → resume) plus the claim that
+ * makes a theme a theme: one preset change restyles every surface without touching any button.
+ */
+test.describe('game shell', () => {
+  test.beforeEach(async ({ page }) => {
+    await openEditor(page);
+    await page.waitForTimeout(900);
+    await page.evaluate(() => window.helaengine!.store.getState().setPlayer({ spawn: [0, 0, 0] }));
+    await page.getByRole('button', { name: 'Walk' }).click();
+    await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
+      timeout: 20_000,
+    });
+    await page.waitForTimeout(500);
+  });
+
+  const shellButton = (page: Page, label: string) =>
+    page.locator('.hela-panel button', { hasText: label });
+
+  test('walk mode opens on the home screen, not straight into the world', async ({ page }) => {
+    expect(await page.evaluate(() => window.helaengine!.uiScreen())).toBe('home');
+    await expect(page.locator('.hela-title')).toHaveText('My Game');
+  });
+
+  test('runs the whole loop and stops the world while paused', async ({ page }) => {
+    await shellButton(page, 'Play').click();
+    await page.waitForTimeout(400);
+    expect(await page.evaluate(() => window.helaengine!.uiScreen())).toBe('playing');
+    await expect(page.locator('.hela-hud')).toBeVisible();
+
+    const before = (await page.evaluate(() => window.helaengine!.playerPosition()))!;
+    await page.keyboard.down('w');
+    await page.waitForTimeout(700);
+    await page.keyboard.up('w');
+    await page.waitForTimeout(150);
+    const moved = (await page.evaluate(() => window.helaengine!.playerPosition()))!;
+    expect(Math.hypot(moved.x - before.x, moved.z - before.z)).toBeGreaterThan(2);
+
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    expect(await page.evaluate(() => window.helaengine!.uiScreen())).toBe('paused');
+
+    // A menu is not a pause button that happens to be visible: the world genuinely stops.
+    const paused = (await page.evaluate(() => window.helaengine!.playerPosition()))!;
+    await page.keyboard.down('w');
+    await page.waitForTimeout(700);
+    await page.keyboard.up('w');
+    const after = (await page.evaluate(() => window.helaengine!.playerPosition()))!;
+    expect(Math.hypot(after.x - paused.x, after.z - paused.z)).toBeLessThan(0.05);
+
+    await shellButton(page, 'Resume').click();
+    await page.waitForTimeout(300);
+    expect(await page.evaluate(() => window.helaengine!.uiScreen())).toBe('playing');
+  });
+
+  test('the pause menu is clickable — the pointer is handed back with the menu', async ({
+    page,
+  }) => {
+    // A regression guard with teeth: pointer lock left on the canvas makes every menu button
+    // unclickable, because the click never reaches anything.
+    await shellButton(page, 'Play').click();
+    await page.waitForTimeout(400);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+
+    await shellButton(page, 'Settings').click();
+    expect(await page.evaluate(() => window.helaengine!.uiScreen())).toBe('settings');
+
+    await shellButton(page, 'Back').click();
+    expect(await page.evaluate(() => window.helaengine!.uiScreen())).toBe('paused');
+  });
+
+  test('Quit leaves the preview entirely', async ({ page }) => {
+    await shellButton(page, 'Play').click();
+    await page.waitForTimeout(300);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    await shellButton(page, 'Quit').click();
+    await page.waitForTimeout(500);
+
+    await expect(page.getByRole('button', { name: 'Walk' })).toBeVisible();
+    expect(await page.locator('.hela-ui')).toHaveCount(0);
+  });
+
+  test('swapping the theme restyles every surface at once', async ({ page }) => {
+    const accent = () =>
+      page.evaluate(() =>
+        getComputedStyle(document.querySelector('.hela-ui')!).getPropertyValue('--hela-primary'),
+      );
+
+    const before = await accent();
+    await page.evaluate(() =>
+      window.helaengine!.store.getState().setUiConfig({ theme: { preset: 'neon' } }),
+    );
+    await page.waitForTimeout(300);
+
+    expect(await accent()).not.toBe(before);
+    // No button config was touched: the menu is still the one the document describes.
+    await expect(page.locator('.hela-panel button').first()).toBeVisible();
+  });
+
+  test('the title follows the document as it is typed', async ({ page }) => {
+    await page.evaluate(() =>
+      window.helaengine!.store.getState().setUiConfig({ homeScreen: { title: 'Goblin Valley' } }),
+    );
+    await page.waitForTimeout(300);
+
+    await expect(page.locator('.hela-title')).toHaveText('Goblin Valley');
+  });
+
+  test('a document can switch the shell off and drop straight into the world', async ({ page }) => {
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    await page.evaluate(() => window.helaengine!.store.getState().setUiConfig({ enabled: false }));
+    await page.waitForTimeout(300);
+
+    expect(await page.locator('.hela-screen')).toHaveCount(0);
   });
 });

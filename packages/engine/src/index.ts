@@ -90,3 +90,6 @@ export {
 export type { CameraRig, CameraRigContext, CameraTarget, LookState } from './camera/CameraRig.js';
 export { createPlayerAvatar } from './camera/PlayerAvatar.js';
 export type { PlayerAvatar } from './camera/PlayerAvatar.js';
+export { UIRenderer } from './ui/UIRenderer.js';
+export type { UiScreen, UIRendererOptions, HudState } from './ui/UIRenderer.js';
+export { themeVariables, panelStyleCss, THEME_PRESETS } from './ui/theme.js';

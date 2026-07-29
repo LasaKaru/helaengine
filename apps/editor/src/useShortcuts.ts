@@ -14,6 +14,9 @@ import { useSceneStore } from './store/sceneStore';
 export const SHORTCUTS: Array<{ keys: string; description: string }> = [
   { keys: 'P', description: 'Play / stop behaviours' },
   { keys: 'Shift + P', description: 'Walk the scene (Play Preview)' },
+  { keys: 'Shift', description: 'Sprint while walking' },
+  { keys: 'C', description: 'Crouch while walking' },
+  { keys: 'V', description: 'Switch camera while walking' },
   { keys: '1 / 2 / 3', description: 'Select, Sculpt, Paint tool' },
   { keys: 'W', description: 'Move tool' },
   { keys: 'E', description: 'Rotate tool' },
@@ -28,7 +31,7 @@ export const SHORTCUTS: Array<{ keys: string; description: string }> = [
   { keys: 'Ctrl/⌘ + D', description: 'Duplicate selection' },
   { keys: 'Ctrl/⌘ + A', description: 'Select all' },
   { keys: 'Delete / Backspace', description: 'Delete selection' },
-  { keys: 'Escape', description: 'Leave walk mode, or clear the selection' },
+  { keys: 'Escape', description: 'Pause the game while walking, or clear the selection' },
   { keys: '?', description: 'Show this list' },
 ];
 
@@ -49,6 +52,18 @@ export const BULK_DELETE_THRESHOLD = 5;
 export interface ShortcutOptions {
   /** Injectable so tests do not have to stub `window.confirm`. */
   confirm?: (message: string) => boolean;
+}
+
+/**
+ * The game shell's pause toggle, registered by the preview while it is running.
+ *
+ * A module-level handle rather than a store field because it is a function, and functions in a
+ * state store are a reliable way to end up with a stale one after a re-render.
+ */
+let pauseHandler: (() => void) | null = null;
+
+export function setPauseHandler(handler: (() => void) | null): void {
+  pauseHandler = handler;
 }
 
 export function useShortcuts(options: ShortcutOptions = {}): void {
@@ -102,7 +117,13 @@ export function useShortcuts(options: ShortcutOptions = {}): void {
       // Walk mode owns the keyboard: WASD is movement, not tool switching. Escape is the way out
       // and is handled below, so nothing else here should fire while the player is walking.
       if (editor.walking) {
-        if (event.key === 'Escape') editor.setWalking(false);
+        // Escape belongs to the game shell while walking: it pauses and resumes, which is what
+        // every player expects it to do. Leaving the preview is the pause menu's Quit button, or
+        // the toolbar, or Shift+P — all of which are still one gesture away.
+        if (event.key === 'Escape') {
+          if (editor.uiScreen === null) editor.setWalking(false);
+          else pauseHandler?.();
+        }
         return;
       }
 

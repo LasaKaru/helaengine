@@ -38,6 +38,8 @@ export interface DevApi {
   playerHealth(): number | null;
   /** Camera rig currently driving the view, or null when not walking. */
   cameraMode(): string | null;
+  /** Which shell screen is showing, or null when the game shell is not mounted. */
+  uiScreen(): string | null;
   /** Whether the player is crouched, and how fast they are moving. */
   playerMotion(): { speed: number; crouched: boolean; grounded: boolean } | null;
   /**
@@ -264,6 +266,8 @@ export function exposeDevApi(library: AssetLibrary): void {
     playerHealth: () => currentGame?.playerHealth() ?? null,
 
     cameraMode: () => useEditorStore.getState().cameraMode,
+
+    uiScreen: () => useEditorStore.getState().uiScreen,
 
     cameraPose: () =>
       currentCamera

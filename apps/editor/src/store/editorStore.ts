@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { DEFAULT_PLACEMENT, type PlacementOptions } from '../placement';
 import type { SculptMode } from '@helaengine/engine';
+import type { UiScreen } from '@helaengine/engine';
 import type { CameraMode } from '@helaengine/schema';
 import type { GizmoMode } from '../transform';
 
@@ -71,6 +72,8 @@ export interface EditorState {
   playerHealth: number | null;
   /** Camera rig currently driving the view, or null when not walking. */
   cameraMode: CameraMode | null;
+  /** Which shell screen is showing, or null when not walking. */
+  uiScreen: UiScreen | null;
   /** `objectId:index` of the behaviour whose waypoints are being edited, if any. */
   editingWaypoints: string | null;
 
@@ -91,6 +94,7 @@ export interface EditorState {
   setPhysicsStatus(status: PhysicsStatus): void;
   setPlayerHealth(health: number | null): void;
   setCameraMode(mode: CameraMode | null): void;
+  setUiScreen(screen: UiScreen | null): void;
   setEditingWaypoints(key: string | null): void;
 }
 
@@ -112,6 +116,7 @@ export const useEditorStore = create<EditorState>()(
       physicsStatus: 'idle',
       playerHealth: null,
       cameraMode: null,
+      uiScreen: null,
       editingWaypoints: null,
 
       beginDrag: (assetId, clientX, clientY) =>
@@ -151,13 +156,20 @@ export const useEditorStore = create<EditorState>()(
         set(
           walking
             ? { walking: true, playing: true, editingWaypoints: null, tool: 'select' }
-            : { walking: false, playing: false, playerHealth: null, cameraMode: null },
+            : {
+                walking: false,
+                playing: false,
+                playerHealth: null,
+                cameraMode: null,
+                uiScreen: null,
+              },
           false,
           'walk/set',
         ),
       setPhysicsStatus: (physicsStatus) => set({ physicsStatus }, false, 'physics/status'),
       setPlayerHealth: (playerHealth) => set({ playerHealth }, false, 'play/health'),
       setCameraMode: (cameraMode) => set({ cameraMode }, false, 'play/cameraMode'),
+      setUiScreen: (uiScreen) => set({ uiScreen }, false, 'play/uiScreen'),
       setEditingWaypoints: (editingWaypoints) =>
         set({ editingWaypoints }, false, 'waypoints/editing'),
     }),

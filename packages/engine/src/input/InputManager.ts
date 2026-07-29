@@ -108,6 +108,8 @@ export class InputManager {
   readonly #showTouchControls: boolean;
 
   lookSensitivity: number;
+  /** Whether a click on the element grabs the pointer. Turned off while a menu is showing. */
+  captureOnClick = true;
 
   #overlay: HTMLElement | null = null;
   #attached = false;
@@ -246,6 +248,17 @@ export class InputManager {
     if (document.pointerLockElement !== this.#element) void this.#element.requestPointerLock?.();
   }
 
+  /**
+   * Hands the cursor back.
+   *
+   * A menu is unusable while the pointer is locked — the click never reaches it, because the
+   * pointer is captured rather than pointing at anything. Anything that shows a menu has to call
+   * this, which is why it is public rather than something `detach` does on the way out.
+   */
+  releasePointerLock(): void {
+    if (document.pointerLockElement === this.#element) document.exitPointerLock?.();
+  }
+
   get pointerLocked(): boolean {
     return document.pointerLockElement === this.#element;
   }
@@ -288,7 +301,7 @@ export class InputManager {
   };
 
   readonly #onClick = (): void => {
-    this.requestPointerLock();
+    if (this.captureOnClick) this.requestPointerLock();
   };
 
   readonly #onMouseMove = (event: MouseEvent): void => {

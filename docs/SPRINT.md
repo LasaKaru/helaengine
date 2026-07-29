@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–13 complete. Phases 1 (Editor MVP) and 2 (Behaviours, Physics, AI) done; **Phase 2B (Gameplay Runtime & UI, Sprints 13–20) is under way** — it was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–14 complete. Phases 1 (Editor MVP) and 2 (Behaviours, Physics, AI) done; **Phase 2B (Gameplay Runtime & UI, Sprints 13–20) is under way** — it was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -350,10 +350,11 @@
 
 **Tasks:**
 
-- [ ] Build `UIRenderer` — a DOM+CSS overlay driven entirely by `uiConfig`, mounted alongside the WebGL canvas. Structurally the same idea as `SceneLoader`: data in, interface out, no per-project code
-- [ ] Home screen: background image, optional intro video (skippable, autoplay-muted then unmuted on interaction, respecting browser autoplay policy), title, Play button
-- [ ] Main menu and pause menu as button lists bound to a registered **UI action** vocabulary (`startGame`, `openSettings`, `quit`, `resume`, `restartCheckpoint`, `mainMenu`) — closed, exactly like behaviours
-- [ ] Theme system: font, colour palette and panel-style presets applied to every UI surface at once
+- [x] Build `UIRenderer` — a DOM+CSS overlay driven entirely by `uiConfig`, mounted alongside the WebGL canvas. Structurally the same idea as `SceneLoader`: data in, interface out, no per-project code
+- [x] Home screen: background image, optional intro video (skippable, autoplay-muted then unmuted on interaction, respecting browser autoplay policy), title, Play button
+- [x] Main menu and pause menu as button lists bound to a registered **UI action** vocabulary (`startGame`, `openSettings`, `quit`, `resume`, `restartCheckpoint`, `mainMenu`, `closeSettings`) — closed, exactly like behaviours
+- [x] Theme system: four presets plus optional accent/font overrides and three panel styles, applied as CSS custom properties so one swap restyles every surface
+- [x] **Added, not in the original list:** a HUD — crosshair, health bar, ammo counter and schema-described custom elements with value bindings. The `playing` screen had to render _something_, and a shell that showed menus but no HUD would have needed rebuilding in Sprint 16 anyway
 
 **Tech notes:**
 
@@ -362,6 +363,8 @@
 **Deliverables:** `UIRenderer`, home/main/pause screens, theme presets.
 
 **Definition of Done:** A full home → main menu → play → pause → resume loop works in preview, and swapping the theme preset restyles every menu without touching any individual button config.
+
+**Met.** Verified in a real browser end to end. Two notes: the intro-video path is covered by unit test rather than by a real file, because the asset pipeline has no video ingest until Sprint 19; and the editor-side authoring UI is deliberately minimal here — title, theme, panel style, HUD toggles — because building it properly is Sprint 15's entire job.
 
 ---
 

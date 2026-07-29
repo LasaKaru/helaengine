@@ -12,6 +12,7 @@ import {
   type Terrain,
   type Transform,
   type Trigger,
+  type UiConfig,
   type Vec3,
 } from '@helaengine/schema';
 import { isBuiltinTriggerAsset, triggerDefaults } from '../triggers';
@@ -35,6 +36,18 @@ import {
  * undone. Actions that bypass it are invisible to undo — which is correct for selection, and a
  * bug for anything else.
  */
+/**
+ * A patch for `uiConfig`, one level deep.
+ *
+ * The shell's config is a handful of sections and every edit belongs to exactly one of them, so a
+ * patch is "some sections, some of their fields". A plain `Partial` would force the caller to
+ * re-supply a whole section to change one field in it, which is how a theme swap ends up wiping
+ * somebody's menu buttons.
+ */
+export type UiConfigPatch = {
+  [K in keyof UiConfig]?: UiConfig[K] extends object ? Partial<UiConfig[K]> : UiConfig[K];
+};
+
 export interface SceneState {
   scene: Scene;
   /** Ids of the currently selected objects. Editor-only; never serialised, never undoable. */
@@ -58,6 +71,7 @@ export interface SceneState {
   setTrigger(objectId: string, trigger: Partial<Trigger>): void;
   setPlayer(player: Partial<Player>): void;
   setGameConfig(config: Partial<GameConfig>): void;
+  setUiConfig(config: UiConfigPatch): void;
   setTerrain(terrain: Partial<Terrain>): void;
   setTerrainData(heightmap: string | null, splatmap: string | null): void;
   setEnvironment(environment: Partial<Environment>): void;
@@ -324,6 +338,20 @@ export const useSceneStore = create<SceneState>()(
         setGameConfig: (config) =>
           commit('scene/setGameConfig', (draft) => {
             Object.assign(draft.gameConfig, config);
+          }),
+
+        setUiConfig: (config) =>
+          commit('scene/setUiConfig', (draft) => {
+            // Shallow-merged per section, so setting a theme does not wipe the menus and setting
+            // a title does not wipe the theme.
+            for (const [key, value] of Object.entries(config)) {
+              const current = draft.uiConfig[key as keyof UiConfig];
+              if (value && typeof value === 'object' && !Array.isArray(value) && current) {
+                Object.assign(current as object, value);
+              } else {
+                (draft.uiConfig as Record<string, unknown>)[key] = value;
+              }
+            }
           }),
 
         setPlayer: (player) =>

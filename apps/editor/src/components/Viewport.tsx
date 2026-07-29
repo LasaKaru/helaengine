@@ -87,6 +87,7 @@ export function Viewport({ loader, resolver }: ViewportProps): React.JSX.Element
   const playerHealth = useEditorStore((state) => state.playerHealth);
   const maxHealth = useSceneStore((state) => state.scene.player.health);
   const cameraMode = useEditorStore((state) => state.cameraMode);
+  const uiScreen = useEditorStore((state) => state.uiScreen);
 
   const handleLoaded = useCallback((loaded: LoadedScene) => {
     setStats({ objects: loaded.objects.size, missing: loaded.missingAssetIds.length });
@@ -153,10 +154,13 @@ export function Viewport({ loader, resolver }: ViewportProps): React.JSX.Element
             WASD move · Shift sprint · C crouch · Space jump · V camera · Escape to return
           </span>
           {cameraMode && <span className="walk-mode">{cameraMode}</span>}
+          {uiScreen && uiScreen !== 'playing' && <span className="walk-mode">{uiScreen}</span>}
         </div>
       )}
 
-      {walking && playerHealth !== null && (
+      {/* The game shell draws its own health bar from `uiConfig`. This one is the fallback for a
+          document that has the shell switched off. */}
+      {walking && uiScreen === null && playerHealth !== null && (
         <div className="health-bar" role="status" aria-label="Player health">
           <div
             className="health-fill"
