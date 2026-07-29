@@ -183,7 +183,8 @@ test.describe('drag to place', () => {
 
   test('search narrows the library', async ({ page }) => {
     await page.getByLabel('Search assets').fill('goblin');
-    await expect(page.getByText(/1 of 10/)).toBeVisible();
+    // Ten ingested assets plus the two built-in trigger volumes.
+    await expect(page.getByText(/1 of 12/)).toBeVisible();
     await expect(page.locator('[data-asset-id="enemy_goblin_01"]')).toBeVisible();
   });
 });
@@ -943,5 +944,194 @@ test.describe('play preview', () => {
         id,
       ),
     ).toBe('dynamic');
+  });
+});
+
+/**
+ * Sprint 11 — enemy AI and triggers.
+ *
+ * The definition of done is a sentence about behaviour over time: an enemy patrols until it sees
+ * the player, then chases; walking into a trigger spawns another. So these drive the real preview
+ * and read the simulation, rather than asserting on markup.
+ */
+test.describe('enemies and triggers', () => {
+  test.beforeEach(async ({ page }) => {
+    await openEditor(page);
+    await page.waitForTimeout(800);
+  });
+
+  async function enterWalk(page: Page): Promise<void> {
+    await page.getByRole('button', { name: 'Walk' }).click();
+    await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
+      timeout: 20_000,
+    });
+    await page.waitForTimeout(500);
+    await page.evaluate(() => window.helaengine!.setPlayerYaw(0));
+  }
+
+  test('the asset library offers trigger volumes under Logic', async ({ page }) => {
+    await page.getByPlaceholder('Search assets…').fill('trigger');
+    await expect(page.locator('[data-asset-id="logic_trigger_box"]')).toHaveCount(1);
+    await expect(page.locator('[data-asset-id="logic_trigger_sphere"]')).toHaveCount(1);
+  });
+
+  test('dropping a trigger places a volume, not a model', async ({ page }) => {
+    await page.getByPlaceholder('Search assets…').fill('trigger');
+    const card = page.locator('[data-asset-id="logic_trigger_box"]');
+    const box = (await page.locator('canvas').boundingBox())!;
+
+    await card.hover();
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.65, { steps: 10 });
+    await page.mouse.up();
+
+    const placed = await page.evaluate(() =>
+      window.helaengine!.store.getState().scene.objects.find((object) => object.trigger),
+    );
+    expect(placed?.trigger).toMatchObject({ shape: 'box', detects: 'player' });
+    // Big enough to walk into, rather than the one-metre speck a default scale would give.
+    expect(placed?.transform.scale).toEqual([4, 3, 4]);
+  });
+
+  test('the inspector wires a trigger to an action', async ({ page }) => {
+    const id = await page.evaluate(() => {
+      const api = window.helaengine!;
+      const created = api.addObject('logic_trigger_box', [0, 0, -6]);
+      api.store.getState().setTrigger(created, { shape: 'box' });
+      api.store.getState().select([created]);
+      return created;
+    });
+
+    await expect(page.getByRole('region', { name: 'Trigger' })).toBeVisible();
+    await page.getByLabel('Add On enter action').selectOption('emit');
+
+    const actions = await page.evaluate(
+      (objectId) =>
+        window.helaengine!.store.getState().scene.objects.find((object) => object.id === objectId)!
+          .trigger!.onEnter,
+      id,
+    );
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatchObject({ type: 'emit' });
+  });
+
+  test('an enemy patrols until it sees the player, then chases and attacks', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = window.helaengine!;
+      const store = api.store.getState();
+      store.setPlayer({ spawn: [0, 0, 0] });
+
+      const goblin = api.addObject('enemy_goblin_01', [0, 0, -30]);
+      store.setObjectPhysics(goblin, { body: 'kinematic' });
+      store.addBehavior(goblin, 'patrol', {
+        waypoints: [
+          [-6, 0, -30],
+          [6, 0, -30],
+        ],
+        speed: 3,
+        mode: 'pingPong',
+      });
+      // Sight range deliberately shorter than the 30m gap, so it starts out unaware.
+      store.addBehavior(goblin, 'chaseOnSight', {
+        sightRange: 14,
+        fieldOfView: 360,
+        chaseSpeed: 6,
+        attackRange: 2,
+        attackDamage: 12,
+        attackInterval: 0.5,
+      });
+    });
+    await page.waitForTimeout(800);
+
+    await enterWalk(page);
+    expect(await page.evaluate(() => window.helaengine!.enemyStates())).toMatchObject({
+      obj_0001: 'patrol',
+    });
+    expect(await page.evaluate(() => window.helaengine!.playerHealth())).toBe(100);
+
+    await page.keyboard.down('w');
+    await page.waitForTimeout(3500);
+    await page.keyboard.up('w');
+    await page.waitForTimeout(2500);
+
+    expect(await page.evaluate(() => window.helaengine!.enemyStates())).toMatchObject({
+      obj_0001: expect.stringMatching(/chase|attack/),
+    });
+    expect(await page.evaluate(() => window.helaengine!.playerHealth())).toBeLessThan(100);
+  });
+
+  test('walking into a trigger spawns an enemy, and leaving takes it away again', async ({
+    page,
+  }) => {
+    await page.evaluate(() => {
+      const api = window.helaengine!;
+      const store = api.store.getState();
+      store.setPlayer({ spawn: [0, 0, 0] });
+
+      const trigger = api.addObject('logic_trigger_box', [0, 0, -8]);
+      store.setTransform(trigger, { scale: [8, 4, 8] });
+      store.setTrigger(trigger, {
+        shape: 'box',
+        once: true,
+        onEnter: [
+          {
+            type: 'spawn',
+            assetId: 'enemy_goblin_01',
+            offset: [2, 0, 0],
+            behaviors: [],
+            physics: { body: 'kinematic', collider: 'auto' },
+          },
+        ],
+      });
+    });
+    await page.waitForTimeout(600);
+
+    await enterWalk(page);
+    expect(await page.evaluate(() => window.helaengine!.spawnedIds())).toHaveLength(0);
+
+    await page.keyboard.down('w');
+    await page.waitForTimeout(2000);
+    await page.keyboard.up('w');
+    await page.waitForTimeout(500);
+
+    expect(await page.evaluate(() => window.helaengine!.spawnedIds())).toHaveLength(1);
+
+    const documentBefore = await page.evaluate(
+      () => window.helaengine!.store.getState().scene.objects.length,
+    );
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(600);
+
+    // The spawn was a rehearsal: the document never had it, and neither does the viewport now.
+    expect(await page.evaluate(() => window.helaengine!.viewportObjectIds().length)).toBe(
+      documentBefore,
+    );
+  });
+
+  test('a killed enemy despawns, and comes back when the preview ends', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = window.helaengine!;
+      const goblin = api.addObject('enemy_goblin_01', [0, 0, -6]);
+      api.store.getState().addBehavior(goblin, 'chaseOnSight', { health: 10 });
+    });
+    await page.waitForTimeout(600);
+
+    await enterWalk(page);
+    await page.evaluate(() =>
+      window.helaengine!.emit('damage', { targetId: 'obj_0001', amount: 999 }),
+    );
+    await page.waitForTimeout(400);
+
+    expect(await page.evaluate(() => window.helaengine!.viewportObjectIds())).not.toContain(
+      'obj_0001',
+    );
+
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(600);
+
+    expect(await page.evaluate(() => window.helaengine!.viewportObjectIds())).toContain('obj_0001');
+    expect(
+      await page.evaluate(() => window.helaengine!.store.getState().scene.objects.length),
+    ).toBe(1);
   });
 });

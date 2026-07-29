@@ -268,3 +268,82 @@ describe('physics fields', () => {
     expect(parseScene({ ...base, player: { moveSpeed: 12 } }).player.moveSpeed).toBe(12);
   });
 });
+
+describe('trigger volumes', () => {
+  const base = { sceneId: 'scene_test', version: 1 as const };
+
+  it('defaults to a player-detecting box that does nothing yet', () => {
+    const scene = parseScene({
+      ...base,
+      objects: [{ id: 'obj_0001', assetId: 'logic_trigger_box', trigger: {} }],
+    });
+
+    expect(scene.objects[0]!.trigger).toMatchObject({
+      shape: 'box',
+      detects: 'player',
+      once: false,
+      onEnter: [],
+    });
+  });
+
+  it('is null for an ordinary object', () => {
+    const scene = parseScene({ ...base, objects: [{ id: 'obj_0001', assetId: 'tree_pine_01' }] });
+    expect(scene.objects[0]!.trigger).toBeNull();
+  });
+
+  it('rejects an event name that looks like code', () => {
+    for (const event of ['alert(1)', 'a b', '', 'window.location']) {
+      expect(() =>
+        parseScene({
+          ...base,
+          objects: [
+            {
+              id: 'obj_0001',
+              assetId: 'logic_trigger_box',
+              trigger: { onEnter: [{ type: 'emit', event }] },
+            },
+          ],
+        }),
+      ).toThrow();
+    }
+  });
+
+  it('rejects an action type it has never heard of', () => {
+    expect(() =>
+      parseScene({
+        ...base,
+        objects: [
+          {
+            id: 'obj_0001',
+            assetId: 'logic_trigger_box',
+            trigger: { onEnter: [{ type: 'runScript', source: 'rm -rf /' }] },
+          },
+        ],
+      }),
+    ).toThrow();
+  });
+
+  it('carries a spawn action with its behaviours', () => {
+    const scene = parseScene({
+      ...base,
+      objects: [
+        {
+          id: 'obj_0001',
+          assetId: 'logic_trigger_box',
+          trigger: {
+            onEnter: [
+              {
+                type: 'spawn',
+                assetId: 'enemy_goblin_01',
+                behaviors: [{ type: 'chaseOnSight', params: {} }],
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    const action = scene.objects[0]!.trigger!.onEnter[0]!;
+    expect(action).toMatchObject({ type: 'spawn', assetId: 'enemy_goblin_01', offset: [0, 0, 0] });
+  });
+});

@@ -87,7 +87,7 @@ export function App(): React.JSX.Element {
       <div className="workspace">
         <AssetLibraryPanel manifest={state.library.manifest} />
         <Viewport loader={state.library.loader} resolver={state.library.resolver} />
-        <InspectorPanel />
+        <InspectorPanel manifest={state.library.manifest} />
       </div>
       <DragChip />
       <ShortcutsModal />

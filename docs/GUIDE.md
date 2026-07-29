@@ -238,9 +238,9 @@ Even if starting solo, structure work as if these lanes exist — makes future h
 
 **Sprint 11: Enemy AI (Yuka.js) + triggers**
 
-- [ ] Yuka steering behaviors wired into engine tick loop (seek/flee/pursue/wander)
-- [ ] FSM per enemy type (idle → patrol → chase → attack → dead)
-- [ ] Trigger volumes (box/sphere) with onEnter/onExit events wired to a small event bus (door open, scene transition, spawn wave)
+- [x] Yuka steering behaviors wired into engine tick loop (seek/flee/pursue/wander)
+- [x] FSM per enemy type (idle → patrol → chase → attack → dead)
+- [x] Trigger volumes (box/sphere) with onEnter/onExit events wired to a small event bus (door open, scene transition, spawn wave)
 - **DoD:** Placing an enemy + a trigger volume in editor produces working "enemy chases player when trigger entered" behavior in preview.
 
 **Sprint 12: Behavior QA + performance pass**

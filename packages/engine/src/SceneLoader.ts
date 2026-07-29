@@ -113,6 +113,32 @@ export function terrainFieldFromDocument(terrain: Terrain): TerrainField {
   return field;
 }
 
+/**
+ * The outline drawn for a trigger volume.
+ *
+ * A unit box or unit sphere, sized entirely by the object's own scale — so the scale gizmo the
+ * user already knows is the tool for resizing a trigger, and there is only one answer to how big
+ * the volume is.
+ */
+function buildTriggerVisual(
+  shape: 'box' | 'sphere',
+  disposables: DisposableResource[],
+): THREE.Object3D {
+  const geometry =
+    shape === 'sphere' ? new THREE.SphereGeometry(0.5, 16, 12) : new THREE.BoxGeometry(1, 1, 1);
+  const edges = new THREE.EdgesGeometry(geometry, 20);
+  const material = new THREE.LineBasicMaterial({ color: '#f2c14e' });
+  geometry.dispose();
+  disposables.push(edges, material);
+
+  const outline = new THREE.LineSegments(edges, material);
+  // Volumes are centred on their object rather than sitting on it: a doorway trigger wants to
+  // straddle the threshold, not perch above it.
+  outline.position.y = 0.5;
+  outline.name = 'trigger-outline';
+  return outline;
+}
+
 /** Applies a document transform to a node. Rotation is authored in degrees, converted once here. */
 function applyTransform(node: THREE.Object3D, object: SceneObject): void {
   const { position, rotation, scale } = object.transform;
@@ -128,6 +154,7 @@ function applyTransform(node: THREE.Object3D, object: SceneObject): void {
 export class LoadedScene {
   readonly threeScene: THREE.Scene;
   readonly objects: ReadonlyMap<string, THREE.Object3D>;
+  readonly #objects: Map<string, THREE.Object3D>;
   readonly missingAssetIds: readonly string[];
   readonly #disposables: DisposableResource[];
   /** Exactly the nodes this load added to `threeScene`, so teardown touches nothing else. */
@@ -142,6 +169,7 @@ export class LoadedScene {
   }) {
     this.threeScene = init.threeScene;
     this.objects = init.objects;
+    this.#objects = init.objects;
     this.missingAssetIds = init.missingAssetIds;
     this.#disposables = init.disposables;
     this.#added = init.added;
@@ -203,6 +231,31 @@ export class LoadedScene {
 
     field.maxHeight = terrain.maxHeight;
     this.refreshTerrain(terrain.layers.map((layer) => layer.color));
+  }
+
+  /**
+   * Takes ownership of a node created after the initial load — something a trigger spawned.
+   *
+   * The runtime needs spawned objects to behave exactly like placed ones: pickable, transform-
+   * syncable, and disposed with the rest of the scene. Registering them here rather than adding
+   * them to `threeScene` directly is what makes that true.
+   */
+  adopt(objectId: string, node: THREE.Object3D, disposables: DisposableResource[] = []): void {
+    this.#objects.set(objectId, node);
+    this.threeScene.add(node);
+    this.#added.push(node);
+    this.#disposables.push(...disposables);
+  }
+
+  /** Removes a node this scene owns and takes it out of the world. */
+  release(objectId: string): void {
+    const node = this.#objects.get(objectId);
+    if (!node) return;
+
+    this.#objects.delete(objectId);
+    node.removeFromParent();
+    const at = this.#added.indexOf(node);
+    if (at >= 0) this.#added.splice(at, 1);
   }
 
   getContentBounds(): THREE.Box3 {
@@ -429,6 +482,21 @@ export class SceneLoader {
     return MISSING_ASSET_ENTRY;
   }
 
+  /**
+   * Instantiates one object into a scene that is already loaded.
+   *
+   * Spawning at runtime goes through the same construction path a placed object does, so a
+   * trigger-spawned enemy is indistinguishable from one the level designer put there — same
+   * transform handling, same placeholder fallback, same disposal.
+   */
+  instantiateInto(loaded: LoadedScene, object: SceneObject): THREE.Object3D {
+    const disposables: DisposableResource[] = [];
+    const entry = this.#resolver.get(object.assetId) ?? MISSING_ASSET_ENTRY;
+    const node = this.#buildObject(object, entry, new Map(), new Map(), disposables);
+    loaded.adopt(object.id, node, disposables);
+    return node;
+  }
+
   #buildObject(
     object: SceneObject,
     entry: AssetManifestEntry,
@@ -436,18 +504,19 @@ export class SceneLoader {
     materialCache: Map<string, THREE.Material>,
     disposables: DisposableResource[],
   ): THREE.Object3D {
-    // A preloaded model wins; otherwise the manifest's measured bounds become a placeholder box.
-    // Clones share the source geometry and materials, so a hundred trees cost one of each.
-    const model = this.#models.get(entry.id);
-    const visual = model
-      ? model.clone(true)
-      : new THREE.Mesh(
-          placeholderGeometry(entry, geometryCache, disposables),
-          placeholderMaterial(entry, materialCache, disposables),
-        );
+    // A trigger is not a thing you look at, so it gets an outline instead of a model.
+    const model = object.trigger ? undefined : this.#models.get(entry.id);
+    const visual = object.trigger
+      ? buildTriggerVisual(object.trigger.shape, disposables)
+      : model
+        ? model.clone(true)
+        : new THREE.Mesh(
+            placeholderGeometry(entry, geometryCache, disposables),
+            placeholderMaterial(entry, materialCache, disposables),
+          );
 
-    visual.castShadow = true;
-    visual.receiveShadow = true;
+    visual.castShadow = !object.trigger;
+    visual.receiveShadow = !object.trigger;
     // The manifest's default scale lives on an inner node, not on the object node itself.
     // Otherwise a scaled parent would silently multiply the size of everything nested under it —
     // a rendering detail leaking into the scene graph.
@@ -462,6 +531,9 @@ export class SceneLoader {
     // from a placeholder, and "does it have children" stopped being a reliable signal once every
     // object became a group.
     node.userData['hasModel'] = model !== undefined;
+    // Editor furniture, not scenery: the preview hides these the moment play starts, and an
+    // exported project never renders them at all.
+    if (object.trigger) node.userData['isTrigger'] = true;
     node.add(visual);
 
     applyTransform(node, object);

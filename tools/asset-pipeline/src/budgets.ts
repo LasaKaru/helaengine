@@ -11,6 +11,9 @@ export const polyBudgets: Record<AssetCategory, number> = {
   enemies: 4000,
   buildings: 8000,
   terrain: 8000,
+  // Logic assets are trigger volumes: the engine draws them as an outline and the pipeline never
+  // ingests one, so any triangle count at all means somebody has miscategorised a model.
+  logic: 0,
 };
 
 export const HARD_LIMIT_MULTIPLIER = 2;

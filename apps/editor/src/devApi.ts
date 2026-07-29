@@ -1,5 +1,5 @@
 import { Vector3, type Camera } from 'three';
-import type { LoadedScene, PlayerController } from '@helaengine/engine';
+import type { GameRuntime, LoadedScene, PlayerController } from '@helaengine/engine';
 import { SceneObjectSchema, type Vec3 } from '@helaengine/schema';
 import type { AssetLibrary } from './engine/assetLibrary';
 import { nextObjectId, useSceneStore } from './store/sceneStore';
@@ -33,6 +33,14 @@ export interface DevApi {
    * direction the edit camera happened to be facing.
    */
   setPlayerYaw(yaw: number): boolean;
+  /** Player health while walking, or null. */
+  playerHealth(): number | null;
+  /** Ids the running preview spawned — none of which are in the document. */
+  spawnedIds(): string[];
+  /** FSM state of every enemy behaviour currently running, keyed by object id. */
+  enemyStates(): Record<string, string>;
+  /** Raises an event on the running world's bus, the way a weapon or a script would. */
+  emit(event: string, payload?: unknown): boolean;
 }
 
 declare global {
@@ -66,6 +74,13 @@ let currentPlayer: PlayerController | null = null;
  */
 export function setPlayer(player: PlayerController | null): void {
   currentPlayer = player;
+}
+
+let currentGame: GameRuntime | null = null;
+
+/** Records the running game runtime, so tests can read AI state and raise events. */
+export function setGameRuntime(runtime: GameRuntime | null): void {
+  currentGame = runtime;
 }
 
 let lookHandler: ((yaw: number) => void) | null = null;
@@ -160,6 +175,29 @@ export function exposeDevApi(library: AssetLibrary): void {
     setPlayerYaw: (yaw) => {
       if (!lookHandler) return false;
       lookHandler(yaw);
+      return true;
+    },
+
+    playerHealth: () => currentGame?.playerHealth() ?? null,
+
+    spawnedIds: () => [...(currentGame?.spawnedIds ?? [])],
+
+    enemyStates: () => {
+      const states: Record<string, string> = {};
+      if (!currentGame) return states;
+
+      for (const objectId of currentLoadedScene?.objects.keys() ?? []) {
+        for (const behavior of currentGame.behaviors.behaviorsFor(objectId)) {
+          const state = (behavior as { state?: string | null }).state;
+          if (typeof state === 'string') states[objectId] = state;
+        }
+      }
+      return states;
+    },
+
+    emit: (event, payload) => {
+      if (!currentGame) return false;
+      currentGame.emit(event, payload);
       return true;
     },
 

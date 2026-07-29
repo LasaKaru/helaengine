@@ -10,8 +10,10 @@ import {
   type SceneObject,
   type Terrain,
   type Transform,
+  type Trigger,
   type Vec3,
 } from '@helaengine/schema';
+import { isBuiltinTriggerAsset, triggerDefaults } from '../triggers';
 import {
   commitToHistory,
   EMPTY_HISTORY,
@@ -52,6 +54,7 @@ export interface SceneState {
   removeBehavior(objectId: string, index: number): void;
   setBehaviorParams(objectId: string, index: number, params: Record<string, unknown>): void;
   setObjectPhysics(objectId: string, physics: Partial<ObjectPhysics>): void;
+  setTrigger(objectId: string, trigger: Partial<Trigger>): void;
   setPlayer(player: Partial<Player>): void;
   setTerrain(terrain: Partial<Terrain>): void;
   setTerrainData(heightmap: string | null, splatmap: string | null): void;
@@ -205,6 +208,11 @@ export const useSceneStore = create<SceneState>()(
                   params: { ...behavior.params },
                 })),
                 physics: { ...source.physics },
+                // A duplicated trigger keeps its wiring: copying a spawn point should give you a
+                // second spawn point, not an inert box.
+                trigger: source.trigger
+                  ? (JSON.parse(JSON.stringify(source.trigger)) as typeof source.trigger)
+                  : null,
                 metadata: {
                   ...source.metadata,
                   ...(source.metadata.label ? { label: `${source.metadata.label} copy` } : {}),
@@ -294,6 +302,21 @@ export const useSceneStore = create<SceneState>()(
           commit('object/setPhysics', (draft) => {
             const object = draft.objects.find((item) => item.id === objectId);
             if (object) Object.assign(object.physics, physics);
+          }),
+
+        setTrigger: (objectId, trigger) =>
+          commit('object/setTrigger', (draft) => {
+            const object = draft.objects.find((item) => item.id === objectId);
+            if (!object) return;
+
+            // An object placed from the Logic category arrives with its trigger already filled in,
+            // but an object that got there another way — the dev API, a hand-written document —
+            // should still become a volume rather than silently ignoring the edit.
+            if (!object.trigger) {
+              if (!isBuiltinTriggerAsset(object.assetId)) return;
+              object.trigger = triggerDefaults(object.assetId);
+            }
+            Object.assign(object.trigger, trigger);
           }),
 
         setPlayer: (player) =>

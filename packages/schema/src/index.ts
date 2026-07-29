@@ -3,6 +3,7 @@ export * from './terrain.js';
 export * from './environment.js';
 export * from './behavior.js';
 export * from './physics.js';
+export * from './trigger.js';
 export * from './object.js';
 export * from './scene.js';
 export * from './migrations.js';

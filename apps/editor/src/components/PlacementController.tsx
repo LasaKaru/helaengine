@@ -1,8 +1,14 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { pickTerrain, type LoadedScene, type SceneLoader } from '@helaengine/engine';
+import {
+  isBuiltinTriggerAsset,
+  pickTerrain,
+  type LoadedScene,
+  type SceneLoader,
+} from '@helaengine/engine';
 import { SceneObjectSchema } from '@helaengine/schema';
+import { triggerDefaults } from '../triggers';
 import { computePlacement } from '../placement';
 import { useEditorStore } from '../store/editorStore';
 import { nextObjectId, useSceneStore } from '../store/sceneStore';
@@ -129,11 +135,20 @@ export function PlacementController({ loader, loadedScene }: PlacementController
           useEditorStore.getState().placement,
         );
 
+        // A trigger has no model, so it lands as a volume: an outline the user can scale, with a
+        // starting size big enough to walk into rather than a one-metre speck.
+        const logic = isBuiltinTriggerAsset(drag.assetId);
+
         sceneState.addObject(
           SceneObjectSchema.parse({
             id: nextObjectId(sceneState.scene),
             assetId: drag.assetId,
-            transform: { position, rotation, scale: [1, 1, 1] },
+            transform: {
+              position,
+              rotation: logic ? [0, 0, 0] : rotation,
+              scale: logic ? [4, 3, 4] : [1, 1, 1],
+            },
+            ...(logic ? { trigger: triggerDefaults(drag.assetId) } : {}),
           }),
         );
       }

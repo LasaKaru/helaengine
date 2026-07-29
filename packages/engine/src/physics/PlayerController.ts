@@ -95,6 +95,16 @@ export class PlayerController {
     return this.#player.height - 0.15;
   }
 
+  /**
+   * Rapier handle of the character's own capsule.
+   *
+   * Line-of-sight traces need it: a ray aimed at the player hits the player, and without knowing
+   * which collider that is, every enemy would conclude it was looking at a wall.
+   */
+  get colliderHandle(): number {
+    return this.#collider.handle;
+  }
+
   get grounded(): boolean {
     return this.#grounded;
   }

@@ -1,5 +1,6 @@
 import type * as THREE from 'three';
 import type { z } from 'zod';
+import type { WorldHandle } from '../world.js';
 
 /**
  * The runtime handle a behaviour is given for the object it is attached to.
@@ -17,6 +18,23 @@ export interface GameObject {
   find(objectId: string): GameObject | undefined;
   /** Raises a named event on the world's event bus. */
   emit(event: string, payload?: unknown): void;
+  /** Everything that is a property of the world rather than of this object. */
+  readonly world: WorldHandle;
+
+  /**
+   * Claims the right to move this object this frame.
+   *
+   * Two behaviours on one object both writing to its transform is the oldest bug in component
+   * systems: the object either jitters between two answers or silently obeys whichever ran last.
+   * So moving is a claim. The highest priority wins, ties go to whoever asks, and a behaviour that
+   * loses the claim simply does not move — it is not an error, it is an enemy abandoning its patrol
+   * route because it has spotted something more interesting.
+   */
+  requestControl(priority?: number): boolean;
+  /** Gives up a claim, letting a lower-priority behaviour move the object again. */
+  releaseControl(): void;
+  /** Whether this behaviour currently holds the movement claim. */
+  hasControl(): boolean;
 }
 
 export interface BehaviorContext {

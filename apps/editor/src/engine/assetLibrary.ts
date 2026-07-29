@@ -1,4 +1,9 @@
-import { GltfModelSource, ManifestAssetResolver, SceneLoader } from '@helaengine/engine';
+import {
+  BUILTIN_ASSET_ENTRIES,
+  GltfModelSource,
+  ManifestAssetResolver,
+  SceneLoader,
+} from '@helaengine/engine';
 import { parseAssetManifest, type AssetManifest } from '@helaengine/schema';
 
 /** Where the ingest pipeline's output is mounted, in both dev and built output. */
@@ -26,7 +31,13 @@ export async function loadAssetLibrary(signal?: AbortSignal): Promise<AssetLibra
     );
   }
 
-  const manifest = parseAssetManifest(await response.json());
+  const ingested = parseAssetManifest(await response.json());
+  // The engine's own assets — trigger volumes — are merged in so the library panel can offer them
+  // exactly like a prop. They have no GLB and no thumbnail; the panel draws them from their name.
+  const manifest = {
+    ...ingested,
+    assets: [...BUILTIN_ASSET_ENTRIES, ...ingested.assets],
+  };
   const resolver = new ManifestAssetResolver(manifest);
   const loader = new SceneLoader({
     resolver,

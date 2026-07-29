@@ -53,6 +53,8 @@ export const PlayerSchema = z
     jumpSpeed: z.number().min(0).max(50).default(6),
     /** Downward acceleration in metres per second squared. */
     gravity: z.number().min(0).max(100).default(24),
+    /** Starting and maximum health. Damage comes from gameplay; the schema only sets the ceiling. */
+    health: z.number().min(1).max(10_000).default(100),
     /** Steepest ground the player can walk up, in degrees. */
     maxSlopeDegrees: z.number().min(0).max(89).default(50),
     /** Tallest ledge the player steps over without jumping, in metres. */

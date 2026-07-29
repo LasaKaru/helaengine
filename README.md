@@ -7,8 +7,9 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 10 (Phase 2 — Physics). Everything from Phase 1, plus behaviours and a physics
-world you can walk around in. Enemy AI is next; there is no backend yet, deliberately.
+**Status:** Sprint 11 (Phase 2 — AI and triggers). Everything from Phase 1, plus behaviours, a
+physics world you can walk around in, enemies that hunt you and trigger volumes that wire a level
+together. The export system is next; there is no backend yet, deliberately.
 
 ---
 
@@ -167,6 +168,26 @@ leaving the mode puts everything back exactly where the document says it is.
 
 Rapier is WebAssembly and loads asynchronously. That happens once at startup rather than being
 checked for at every call site; until it finishes, the Walk button says so.
+
+## Enemies and triggers
+
+`chaseOnSight` gives an object a small state machine — idle, patrol, chase, attack, dead. It checks
+range, then field of view, then line of sight with a physics raycast, throttled to about seven
+checks a second so a scene full of enemies does not become a scene full of raycasts. Yuka drives the
+steering; the result is applied to the object's Rapier body rather than straight to its transform,
+so an enemy is stopped by the same walls the player is.
+
+Attach `patrol` and `chaseOnSight` to the same object and it walks its route until it spots you.
+That works because moving is a **claim**: the highest-priority behaviour holding an object's
+movement gets to write its transform, and everyone else does nothing. Two behaviours fighting over
+one transform is the oldest bug in component systems, and it is worth a few lines to make it
+impossible rather than a convention nobody remembers.
+
+Trigger volumes are placed like props, from the **Logic** category. A volume is sized by the ordinary
+scale gizmo — there is no second size field, because there should not be two answers to how big it
+is — and it runs a list of actions on enter, on exit, or when a named event reaches the bus. Actions
+are a closed set (`emit`, `spawn`, `destroy`) for the same reason behaviours are: an exported
+project must never run something its author did not put in the document.
 
 ## Where this is going
 

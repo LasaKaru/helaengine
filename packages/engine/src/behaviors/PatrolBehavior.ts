@@ -20,6 +20,9 @@ export type PatrolParams = z.infer<typeof PatrolParamsSchema>;
 /** How close counts as arrived. Small enough to look precise, large enough to never orbit a point. */
 const ARRIVAL_EPSILON = 0.05;
 
+/** Patrolling is the baseline claim on an object's movement — everything else outranks it. */
+const PATROL_PRIORITY = 0;
+
 /**
  * Walks an object along a list of waypoints.
  *
@@ -53,6 +56,10 @@ export class PatrolBehavior implements Behavior {
   onUpdate(object: GameObject, deltaSeconds: number): void {
     const { waypoints, speed, mode, faceDirection, waitSeconds } = this.#params;
     if (waypoints.length < 2 || speed === 0) return;
+
+    // The lowest claim there is: a patrol route is what an object does when nothing more urgent
+    // is happening to it, so anything else on the object outranks it.
+    if (!object.requestControl(PATROL_PRIORITY)) return;
 
     if (this.#waiting > 0) {
       this.#waiting = Math.max(0, this.#waiting - deltaSeconds);

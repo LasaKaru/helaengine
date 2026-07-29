@@ -1,4 +1,5 @@
 import { behaviorRegistry, type BehaviorRegistry } from './BehaviorRegistry.js';
+import { chaseOnSightDefinition } from '../ai/ChaseOnSightBehavior.js';
 import { patrolDefinition } from './PatrolBehavior.js';
 
 /**
@@ -9,5 +10,7 @@ import { patrolDefinition } from './PatrolBehavior.js';
  * exactly the types they mean to exercise.
  */
 export function registerBuiltinBehaviors(registry: BehaviorRegistry = behaviorRegistry): void {
-  if (!registry.has(patrolDefinition.type)) registry.register(patrolDefinition);
+  for (const definition of [patrolDefinition, chaseOnSightDefinition]) {
+    if (!registry.has(definition.type)) registry.register(definition);
+  }
 }

@@ -8,6 +8,9 @@ export const AssetCategorySchema = z.enum([
   'enemies',
   'props',
   'terrain',
+  // Not a visual asset at all: trigger volumes and other world logic, which the editor lists
+  // alongside props because "place it in the world" is the same gesture.
+  'logic',
 ]);
 export type AssetCategory = z.infer<typeof AssetCategorySchema>;
 

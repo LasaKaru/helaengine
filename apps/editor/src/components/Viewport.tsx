@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { Grid, OrbitControls } from '@react-three/drei';
 import { useEditorStore } from '../store/editorStore';
+import { useSceneStore } from '../store/sceneStore';
 import type { AssetResolver, LoadedScene, SceneLoader } from '@helaengine/engine';
 import { setCamera, setLoadedScene } from '../devApi';
 import { useProjectStore } from '../store/projectStore';
@@ -76,6 +77,8 @@ export function Viewport({ loader, resolver }: ViewportProps): React.JSX.Element
   const playing = useEditorStore((state) => state.playing);
   const walking = useEditorStore((state) => state.walking);
   const editingWaypoints = useEditorStore((state) => state.editingWaypoints);
+  const playerHealth = useEditorStore((state) => state.playerHealth);
+  const maxHealth = useSceneStore((state) => state.scene.player.health);
 
   const handleLoaded = useCallback((loaded: LoadedScene) => {
     setStats({ objects: loaded.objects.size, missing: loaded.missingAssetIds.length });
@@ -96,8 +99,10 @@ export function Viewport({ loader, resolver }: ViewportProps): React.JSX.Element
         <ThumbnailReporter />
         <EngineBridge loader={loader} onLoaded={handleLoaded} />
         <PlacementController loader={loader} loadedScene={loadedScene} />
-        <BehaviorPreview loadedScene={loadedScene} />
-        <PhysicsPreview loadedScene={loadedScene} resolver={resolver} />
+        {/* Behaviours-only play. Walk mode runs them through the game runtime instead, so this
+            stays out of the way rather than driving the same objects twice. */}
+        {!walking && <BehaviorPreview loadedScene={loadedScene} />}
+        <PhysicsPreview loadedScene={loadedScene} resolver={resolver} loader={loader} />
         <WaypointEditor loadedScene={loadedScene} />
         {!playing && <SculptController loadedScene={loadedScene} />}
         {tool === 'select' && !playing && !editingWaypoints && (
@@ -137,6 +142,16 @@ export function Viewport({ loader, resolver }: ViewportProps): React.JSX.Element
         <div className="walk-hint" role="status" aria-label="Walk mode">
           <strong>Walking</strong>
           <span>WASD to move, Space to jump, click to look, Escape to return</span>
+        </div>
+      )}
+
+      {walking && playerHealth !== null && (
+        <div className="health-bar" role="status" aria-label="Player health">
+          <div
+            className="health-fill"
+            style={{ width: `${Math.max(0, (playerHealth / maxHealth) * 100)}%` }}
+          />
+          <span>{playerHealth <= 0 ? 'Down' : `${Math.round(playerHealth)} HP`}</span>
         </div>
       )}
 

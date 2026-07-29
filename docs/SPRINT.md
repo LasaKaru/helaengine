@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–10 complete. Phase 1 (Editor MVP) done; Phase 2 under way. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–11 complete. Phase 1 (Editor MVP) done; Phase 2 under way. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -270,12 +270,12 @@
 
 **Tasks:**
 
-- [ ] Integrate Yuka.js steering behaviors (seek, flee, pursue, wander, arrive) into the engine's per-frame update loop, driving Rapier kinematic bodies (not raw mesh transforms, so physics/collision stays consistent)
-- [ ] Build a simple FSM (finite state machine) wrapper for enemy AI states: `idle → patrol → chase → attack → dead`, using Yuka's built-in `StateMachine` utility or a lightweight custom one
-- [ ] Implement `ChaseOnSightBehavior`: uses a distance/line-of-sight check (raycast against terrain/obstacles to detect if the player is actually visible, not just in range) to trigger state transition from patrol to chase
-- [ ] Implement basic combat stub: `attack` state deals damage to player on proximity/timer, player has a `health` stat, `dead` state on enemy triggers a despawn/ragdoll-stub/loot-drop event
-- [ ] Build Trigger Volumes: new object type (box/sphere gizmo, non-rendering in play mode) with `onEnter`/`onExit`/`onEvent` schema fields; wire a simple in-engine event bus (`EventEmitter`-style) so triggers can fire named events (`spawnWave`, `openDoor`, `loadScene`, custom)
-- [ ] Editor UI: place trigger volumes like any other object (via a dedicated "Logic" category in the asset panel, even though triggers aren't visual assets), configure their event bindings via Inspector (dropdown of available event types + target object picker)
+- [x] Integrate Yuka.js steering behaviors (seek, flee, pursue, wander, arrive) into the engine's per-frame update loop, driving Rapier kinematic bodies (not raw mesh transforms, so physics/collision stays consistent) — `SteeringAgent` re-seats the Yuka vehicle from the body each frame and hands back a target position; **seek, arrive and wander** are wired, pursue/evade wait for something that needs them
+- [x] Build a simple FSM (finite state machine) wrapper for enemy AI states: `idle → patrol → chase → attack → dead`, using Yuka's built-in `StateMachine` utility or a lightweight custom one — the custom one, because Yuka's is generic over `GameEntity` and our states need the whole enemy context
+- [x] Implement `ChaseOnSightBehavior`: uses a distance/line-of-sight check (raycast against terrain/obstacles to detect if the player is actually visible, not just in range) to trigger state transition from patrol to chase — range, then field of view, then a Rapier raycast, throttled to ~7 checks a second
+- [x] Implement basic combat stub: `attack` state deals damage to player on proximity/timer, player has a `health` stat, `dead` state on enemy triggers a despawn/ragdoll-stub/loot-drop event — despawn and an `enemyDied` event; loot drops are a listener away and were left for whoever needs one
+- [x] Build Trigger Volumes: new object type (box/sphere gizmo, non-rendering in play mode) with `onEnter`/`onExit`/`onEvent` schema fields; wire a simple in-engine event bus (`EventEmitter`-style) so triggers can fire named events (`spawnWave`, `openDoor`, `loadScene`, custom)
+- [x] Editor UI: place trigger volumes like any other object (via a dedicated "Logic" category in the asset panel, even though triggers aren't visual assets), configure their event bindings via Inspector (dropdown of available event types + target object picker)
 
 **Tech notes:**
 

@@ -66,6 +66,8 @@ export interface EditorState {
   walking: boolean;
   /** Rapier is WASM and loads asynchronously; the Walk button reflects this. */
   physicsStatus: PhysicsStatus;
+  /** Player health while walking, mirrored out of the runtime so the HUD can render it. */
+  playerHealth: number | null;
   /** `objectId:index` of the behaviour whose waypoints are being edited, if any. */
   editingWaypoints: string | null;
 
@@ -84,6 +86,7 @@ export interface EditorState {
   setPlaying(playing: boolean): void;
   setWalking(walking: boolean): void;
   setPhysicsStatus(status: PhysicsStatus): void;
+  setPlayerHealth(health: number | null): void;
   setEditingWaypoints(key: string | null): void;
 }
 
@@ -103,6 +106,7 @@ export const useEditorStore = create<EditorState>()(
       playing: false,
       walking: false,
       physicsStatus: 'idle',
+      playerHealth: null,
       editingWaypoints: null,
 
       beginDrag: (assetId, clientX, clientY) =>
@@ -142,11 +146,12 @@ export const useEditorStore = create<EditorState>()(
         set(
           walking
             ? { walking: true, playing: true, editingWaypoints: null, tool: 'select' }
-            : { walking: false, playing: false },
+            : { walking: false, playing: false, playerHealth: null },
           false,
           'walk/set',
         ),
       setPhysicsStatus: (physicsStatus) => set({ physicsStatus }, false, 'physics/status'),
+      setPlayerHealth: (playerHealth) => set({ playerHealth }, false, 'play/health'),
       setEditingWaypoints: (editingWaypoints) =>
         set({ editingWaypoints }, false, 'waypoints/editing'),
     }),

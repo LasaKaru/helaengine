@@ -1,8 +1,16 @@
 import { useMemo } from 'react';
-import type { BodyType, ColliderChoice, SceneObject, Transform, Vec3 } from '@helaengine/schema';
+import type {
+  AssetManifest,
+  BodyType,
+  ColliderChoice,
+  SceneObject,
+  Transform,
+  Vec3,
+} from '@helaengine/schema';
 import { useEditorStore } from '../store/editorStore';
 import { useSceneStore } from '../store/sceneStore';
 import { BehaviorPanel } from './BehaviorPanel';
+import { TriggerPanel } from './TriggerPanel';
 import { NumberField } from './NumberField';
 import { TerrainPanel } from './TerrainPanel';
 
@@ -157,7 +165,7 @@ function PlayerPanel(): React.JSX.Element {
 }
 
 /** Inspector for the current selection, above the scene list. */
-export function InspectorPanel(): React.JSX.Element {
+export function InspectorPanel({ manifest }: { manifest: AssetManifest }): React.JSX.Element {
   const selectedIds = useSceneStore((state) => state.selectedIds);
   const objects = useSceneStore((state) => state.scene.objects);
   const setTransform = useSceneStore((state) => state.setTransform);
@@ -247,8 +255,9 @@ export function InspectorPanel(): React.JSX.Element {
         )}
       </section>
 
-      {single && <PhysicsSection object={single} />}
-      {single && <BehaviorPanel object={single} />}
+      {single?.trigger && <TriggerPanel object={single} manifest={manifest} />}
+      {single && !single.trigger && <PhysicsSection object={single} />}
+      {single && !single.trigger && <BehaviorPanel object={single} />}
 
       <TerrainPanel />
       <PlayerPanel />

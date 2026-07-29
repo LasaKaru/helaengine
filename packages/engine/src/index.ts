@@ -60,3 +60,20 @@ export type {
   ScenePhysicsReport,
   ScenePhysicsSkip,
 } from './physics/buildScenePhysics.js';
+export { GameRuntime, startScene } from './GameRuntime.js';
+export type { GameRuntimeOptions } from './GameRuntime.js';
+export { TriggerRuntime } from './TriggerRuntime.js';
+export type { TriggerRuntimeOptions, EventBus } from './TriggerRuntime.js';
+export { INERT_WORLD } from './world.js';
+export type { WorldHandle, SpawnRequest } from './world.js';
+export { StateMachine } from './ai/StateMachine.js';
+export type { State } from './ai/StateMachine.js';
+export { SteeringAgent } from './ai/SteeringAgent.js';
+export type { SteeringAgentOptions, SteeringMode } from './ai/SteeringAgent.js';
+export {
+  ChaseOnSightBehavior,
+  ChaseOnSightParamsSchema,
+  chaseOnSightDefinition,
+} from './ai/ChaseOnSightBehavior.js';
+export type { ChaseOnSightParams } from './ai/ChaseOnSightBehavior.js';
+export { BUILTIN_ASSET_ENTRIES, isBuiltinTriggerAsset } from './assets.js';

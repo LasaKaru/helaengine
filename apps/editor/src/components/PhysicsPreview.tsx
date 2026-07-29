@@ -2,15 +2,20 @@ import { useEffect, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import {
-  buildScenePhysics,
   PhysicsWorld,
+  registerBuiltinBehaviors,
+  startScene,
   type AssetResolver,
+  type GameRuntime,
   type LoadedScene,
   type PlayerController,
+  type SceneLoader,
 } from '@helaengine/engine';
 import { useEditorStore } from '../store/editorStore';
 import { useSceneStore } from '../store/sceneStore';
-import { setLookHandler, setPlayer } from '../devApi';
+import { setGameRuntime, setLookHandler, setPlayer } from '../devApi';
+
+registerBuiltinBehaviors();
 
 /** Keys the preview reads, and what each one means. Deliberately WASD-only — this is a test walk. */
 const KEY_BINDINGS: Record<string, keyof HeldKeys> = {
@@ -40,6 +45,7 @@ const MAX_PITCH = Math.PI / 2 - 0.05;
 interface PhysicsPreviewProps {
   loadedScene: LoadedScene | null;
   resolver: AssetResolver;
+  loader: SceneLoader;
 }
 
 /**
@@ -53,7 +59,7 @@ interface PhysicsPreviewProps {
  * A preview that rebuilt its physics world whenever the document changed would be rebuilding it
  * every time a dynamic body nudged something — and the document does not change while walking.
  */
-export function PhysicsPreview({ loadedScene, resolver }: PhysicsPreviewProps): null {
+export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreviewProps): null {
   const walking = useEditorStore((state) => state.walking);
   const setWalking = useEditorStore((state) => state.setWalking);
   const setPhysicsStatus = useEditorStore((state) => state.setPhysicsStatus);
@@ -62,6 +68,7 @@ export function PhysicsPreview({ loadedScene, resolver }: PhysicsPreviewProps): 
   const domElement = useThree((state) => state.gl.domElement);
 
   const [world, setWorld] = useState<PhysicsWorld | null>(null);
+  const runtime = useRef<GameRuntime | null>(null);
   const controller = useRef<PlayerController | null>(null);
   const held = useRef<HeldKeys>({
     forward: false,
@@ -71,6 +78,7 @@ export function PhysicsPreview({ loadedScene, resolver }: PhysicsPreviewProps): 
     jump: false,
   });
   const look = useRef({ yaw: 0, pitch: 0 });
+  const health = useRef<number | null>(null);
 
   useEffect(() => {
     if (!walking || !loadedScene) return;
@@ -90,11 +98,6 @@ export function PhysicsPreview({ loadedScene, resolver }: PhysicsPreviewProps): 
         }
         built = physics;
 
-        const report = buildScenePhysics({ world: physics, scene, loaded: loadedScene, resolver });
-        if (report.skipped.length > 0) {
-          console.warn('[helaengine] objects without colliders:', report.skipped);
-        }
-
         // Spawn on the ground rather than at the document's y, which is usually zero and would put
         // the player's feet inside a hill. Half a metre of clearance lets the controller settle.
         const [spawnX, spawnY, spawnZ] = scene.player.spawn;
@@ -104,6 +107,27 @@ export function PhysicsPreview({ loadedScene, resolver }: PhysicsPreviewProps): 
           new THREE.Vector3(spawnX, Math.max(spawnY, ground + 0.5), spawnZ),
         );
         setPlayer(controller.current);
+
+        // One runtime owns behaviours, triggers, physics and the player. The editor's job here is
+        // only to start it and drive its clock — exactly what an exported project will do.
+        const game = startScene({
+          loader,
+          loaded: loadedScene,
+          scene,
+          resolver,
+          physics,
+          player: controller.current,
+        });
+        runtime.current = game;
+        setGameRuntime(game);
+        if (game.behaviors.problems.length > 0) {
+          console.warn('[helaengine] behaviour problems:', game.behaviors.problems);
+        }
+
+        // Trigger outlines are editor furniture: useful while wiring a level, wrong while playing.
+        for (const node of loadedScene.objects.values()) {
+          if (node.userData['isTrigger']) node.visible = false;
+        }
 
         // Start looking the way the edit camera was, so entering the mode does not spin the view.
         const forward = camera.getWorldDirection(new THREE.Vector3());
@@ -130,13 +154,19 @@ export function PhysicsPreview({ loadedScene, resolver }: PhysicsPreviewProps): 
       controller.current = null;
       setPlayer(null);
       setLookHandler(null);
+      runtime.current?.stop();
+      runtime.current = null;
+      setGameRuntime(null);
+      for (const node of loadedScene.objects.values()) {
+        if (node.userData['isTrigger']) node.visible = true;
+      }
       built?.dispose();
       setWorld(null);
       setPhysicsStatus(built ? 'ready' : 'idle');
       // Anything the solver moved goes back to where the document says it is.
       loadedScene.syncTransforms(useSceneStore.getState().scene);
     };
-  }, [walking, loadedScene, resolver, camera, setPhysicsStatus, setWalking]);
+  }, [walking, loadedScene, resolver, loader, camera, setPhysicsStatus, setWalking]);
 
   // Keyboard. Held state rather than events-per-frame: physics wants "is W down right now".
   useEffect(() => {
@@ -222,6 +252,16 @@ export function PhysicsPreview({ loadedScene, resolver }: PhysicsPreviewProps): 
     };
 
     physics.step(delta, (step) => player.move(input, step));
+    // Gameplay advances after physics, so enemies read positions the solver has already settled.
+    runtime.current?.update(delta);
+
+    // Health is pushed into the store only when it changes: mirroring it every frame would mean a
+    // React render sixty times a second to display a number that moves once a second at most.
+    const current = runtime.current?.playerHealth() ?? null;
+    if (current !== health.current) {
+      health.current = current;
+      useEditorStore.getState().setPlayerHealth(current);
+    }
 
     camera.position.set(player.position.x, player.position.y + player.eyeHeight, player.position.z);
     camera.quaternion.setFromEuler(new THREE.Euler(look.current.pitch, look.current.yaw, 0, 'YXZ'));
