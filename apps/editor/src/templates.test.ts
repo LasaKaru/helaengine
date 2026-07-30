@@ -59,7 +59,12 @@ describe('skirmish template', () => {
   it('is playable the moment it loads: a weapon, pickups that grant it, and enemies', () => {
     const scene = templateById('skirmish')!.build();
 
-    expect(scene.inventory.weapons.map((weapon) => weapon.id)).toEqual(['weapon_0001']);
+    // The rifle is behind a secret (Sprint 17), so the catalogue has two entries but only the
+    // pistol is reachable by walking into something.
+    expect(scene.inventory.weapons.map((weapon) => weapon.id)).toEqual([
+      'weapon_0001',
+      'weapon_0002',
+    ]);
 
     const pickups = scene.objects.flatMap((object) =>
       object.behaviors.filter((behavior) => behavior.type === 'pickup'),
@@ -81,5 +86,40 @@ describe('skirmish template', () => {
       object.behaviors.some((behavior) => behavior.type === 'chaseOnSight'),
     );
     expect(enemies.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('skirmish secrets', () => {
+  it('ships both secret kinds, wired to real ids', () => {
+    const scene = templateById('skirmish')!.build();
+    const ids = new Set(scene.objects.map((object) => object.id));
+
+    expect(scene.unlockables.map((secret) => secret.unlockMethod.type)).toEqual([
+      'inputSequence',
+      'triggerVolume',
+    ]);
+
+    for (const secret of scene.unlockables) {
+      // A secret pointing at an object or a weapon that does not exist would do nothing at all,
+      // with nothing anywhere saying so — the schema cannot catch it, so the template must be right.
+      if (secret.unlockMethod.type === 'triggerVolume') {
+        expect(ids.has(secret.unlockMethod.triggerId)).toBe(true);
+      }
+      for (const action of secret.actions) {
+        if (action.type === 'revealArea') {
+          for (const objectId of action.objectIds) expect(ids.has(objectId)).toBe(true);
+        }
+        if (action.type === 'unlockInventoryItem') {
+          expect(scene.inventory.weapons.some((w) => w.id === action.weaponId)).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('gives the secret trigger volume an actual trigger', () => {
+    const scene = templateById('skirmish')!.build();
+    const alcove = scene.objects.find((object) => object.metadata.label === 'Alcove');
+
+    expect(alcove?.trigger).not.toBeNull();
   });
 });

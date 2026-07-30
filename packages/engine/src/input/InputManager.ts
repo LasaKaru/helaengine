@@ -1,3 +1,5 @@
+import type { UnlockKey } from '@helaengine/schema';
+
 /**
  * Everything the game can be told to do, independent of what told it.
  *
@@ -73,6 +75,46 @@ const GAMEPAD_BUTTONS: Readonly<Record<number, InputAction>> = {
   10: 'sprint', // left stick click
 };
 
+/**
+ * Keys that feed a secret sequence, by `KeyboardEvent.code`.
+ *
+ * Separate from the action bindings on purpose: a sequence is about *which button*, not about what
+ * that button normally does, and overlapping with movement is how console cheat codes have always
+ * worked. Pressing A both strafes and contributes an 'A' to any sequence in progress.
+ */
+const SEQUENCE_KEYS: Readonly<Record<string, UnlockKey>> = {
+  ArrowUp: 'Up',
+  ArrowDown: 'Down',
+  ArrowLeft: 'Left',
+  ArrowRight: 'Right',
+  KeyA: 'A',
+  KeyB: 'B',
+  KeyX: 'X',
+  KeyY: 'Y',
+  Enter: 'Start',
+};
+
+/** The same buttons on a standard-mapping gamepad: the d-pad, the four faces, and start. */
+const SEQUENCE_BUTTONS: Readonly<Record<number, UnlockKey>> = {
+  12: 'Up',
+  13: 'Down',
+  14: 'Left',
+  15: 'Right',
+  0: 'A',
+  1: 'B',
+  2: 'X',
+  3: 'Y',
+  9: 'Start',
+};
+
+/**
+ * Longest sequence the buffer keeps.
+ *
+ * A ring rather than an ever-growing list: the buffer only exists so a detector can ask "do the
+ * last N presses match", and a session's worth of keystrokes is a leak with no reader.
+ */
+const SEQUENCE_BUFFER = 32;
+
 /** Below this, a stick is at rest — analogue sticks never quite return to zero. */
 const STICK_DEADZONE = 0.15;
 
@@ -113,6 +155,8 @@ export class InputManager {
   readonly #touchMove: Axis2 = { x: 0, y: 0 };
   readonly #touchLook: Axis2 = { x: 0, y: 0 };
   readonly #touchActions = new Set<InputAction>();
+  /** Named button presses since the last `endFrame`, for secret sequences. */
+  readonly #sequence: UnlockKey[] = [];
   readonly #showTouchControls: boolean;
 
   lookSensitivity: number;
@@ -122,6 +166,8 @@ export class InputManager {
   #overlay: HTMLElement | null = null;
   #attached = false;
   #gamepadIndex: number | null = null;
+  /** Gamepad buttons held as of the last poll, so sequence keys are edges rather than levels. */
+  readonly #padDown = new Set<number>();
   /** Pointer id driving the virtual joystick, and where it started. */
   #joystickPointer: number | null = null;
   #joystickOrigin: Axis2 = { x: 0, y: 0 };
@@ -172,6 +218,16 @@ export class InputManager {
   /** True only on the frame an action went down. Cleared by `update()`. */
   wasPressed(action: InputAction): boolean {
     return this.#pressed.has(action);
+  }
+
+  /**
+   * Named buttons pressed this frame, oldest first.
+   *
+   * Reported rather than interpreted: this layer has no idea what a secret is, and the unlock
+   * runtime has no idea what a keyboard is. Cleared by `endFrame`, like every other edge.
+   */
+  get sequenceKeys(): readonly UnlockKey[] {
+    return this.#sequence;
   }
 
   attach(): void {
@@ -249,6 +305,7 @@ export class InputManager {
   /** Clears one-frame edges. Call at the very end of a frame. */
   endFrame(): void {
     this.#pressed.clear();
+    this.#sequence.length = 0;
   }
 
   /** Asks for pointer lock. Browsers only grant it inside a user gesture. */
@@ -277,6 +334,11 @@ export class InputManager {
   }
 
   readonly #onKeyDown = (event: KeyboardEvent): void => {
+    // Auto-repeat is one press held down, not a string of them: without this, holding Up fills a
+    // secret sequence with Ups and no code with a repeated key in it is ever enterable.
+    const key = event.repeat ? undefined : SEQUENCE_KEYS[event.code];
+    if (key) this.#pushSequence(key);
+
     const action = this.#keyBindings[event.code];
     if (!action) return;
     // Space scrolls the page and the arrows scroll panels; neither is wanted mid-game.
@@ -298,6 +360,8 @@ export class InputManager {
     this.#stickMove.y = 0;
     this.#touchMove.x = 0;
     this.#touchMove.y = 0;
+    this.#sequence.length = 0;
+    this.#padDown.clear();
   };
 
   readonly #onMouseDown = (event: MouseEvent): void => {
@@ -358,6 +422,21 @@ export class InputManager {
       if (button?.pressed) this.#press(action);
       else this.#held.delete(action);
     }
+
+    for (const [index, key] of Object.entries(SEQUENCE_BUTTONS)) {
+      const at = Number(index);
+      const pressed = pad.buttons[at]?.pressed === true;
+      // Edge-detected against last frame, because a gamepad reports a held button as pressed on
+      // every poll and a sequence wants presses.
+      if (pressed && !this.#padDown.has(at)) this.#pushSequence(key);
+      if (pressed) this.#padDown.add(at);
+      else this.#padDown.delete(at);
+    }
+  }
+
+  #pushSequence(key: UnlockKey): void {
+    this.#sequence.push(key);
+    if (this.#sequence.length > SEQUENCE_BUFFER) this.#sequence.shift();
   }
 
   /**

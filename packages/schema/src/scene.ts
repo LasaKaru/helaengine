@@ -7,6 +7,7 @@ import { PlayerSchema } from './physics.js';
 import { UiConfigSchema } from './ui.js';
 import { IdSchema } from './primitives.js';
 import { TerrainSchema } from './terrain.js';
+import { UnlockablesSchema } from './unlockable.js';
 
 /**
  * Current scene document version. Bump this whenever a change to `SceneSchema` cannot read an
@@ -24,6 +25,7 @@ export const SceneSchema = z
     objects: z.array(SceneObjectSchema).default([]),
     player: PlayerSchema,
     inventory: InventorySchema,
+    unlockables: UnlockablesSchema,
     gameConfig: GameConfigSchema,
     uiConfig: UiConfigSchema,
   })

@@ -6,6 +6,7 @@ export * from './game.js';
 export * from './ui.js';
 export * from './physics.js';
 export * from './inventory.js';
+export * from './unlockable.js';
 export * from './trigger.js';
 export * from './object.js';
 export * from './scene.js';

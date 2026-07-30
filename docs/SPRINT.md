@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–16 complete. Phases 1 (Editor MVP) and 2 (Behaviours, Physics, AI) done; **Phase 2B (Gameplay Runtime & UI, Sprints 13–20) is under way** — it was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–17 complete. Phases 1 (Editor MVP) and 2 (Behaviours, Physics, AI) done; **Phase 2B (Gameplay Runtime & UI, Sprints 13–20) is under way** — it was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -418,11 +418,23 @@ Two things worth recording. First, aiming turns out to be genuinely vertical: th
 
 **Tasks:**
 
-- [ ] Build the `unlockables` registry — closed vocabulary — starting with `inputSequence` (Konami-style) and `triggerVolume`
-- [ ] Build the unlock-action registry: `teleportPlayer`, `unlockInventoryItem`, `revealArea`
-- [ ] Editor "Secrets" panel so none of it requires touching raw JSON
+- [x] Build the `unlockables` vocabulary — `inputSequence` (Konami-style) and `triggerVolume`, plus `event` and `itemCount`, which the plan's "etc." named and which cost almost nothing once the bus is in play
+- [x] Build the unlock actions: `teleportPlayer`, `unlockInventoryItem`, `revealArea`, plus `emit`
+- [x] Editor "Secrets" panel so none of it requires touching raw JSON — both pickers are built from the schema's unions rather than a hand-kept list, so the panel cannot offer something the runtime cannot do
+- [x] **Added:** `triggerEntered` / `triggerExited` on the bus, so entering a volume is observable whether or not the author gave it any actions; `InputManager.sequenceKeys`, a named-button stream (keyboard, gamepad d-pad and faces, touch); and two secrets in the Skirmish template — a Konami code that grants a rifle, and an alcove that reveals a hidden hut
+
+**Tech notes:**
+
+- The closed vocabulary is a **Zod discriminated union plus an exhaustive switch**, not a `register()` map. That is the same guarantee behaviours get, obtained at both ends at once: Zod rejects a `type` it has never heard of when the document is parsed, and TypeScript refuses to compile a runtime that fails to handle every arm. A string-keyed registry can silently drift open; this cannot. `scene.test.ts` pins it by feeding the parser `{"type": "runScript", "source": "alert(1)"}` and asserting the document is rejected.
+- A `revealArea` action is *why* its objects start hidden — the runtime hides everything named by an unfired reveal at startup rather than making the author maintain a separate "hidden" flag that could disagree with the list. Hiding takes the collider with it, because an invisible wall the player still walks into is the most confusing possible reading of a secret area.
+- `unlockInventoryItem` goes through `world.collect`, the same door a pickup uses, so a secret weapon arrives with its ammo and obeys the carry limit instead of bypassing both.
+- Sequences are matched against a rolling window rather than by tracking an index. Index tracking gets the self-overlapping case wrong: `Up Up Down` against the sequence `Up Down` must succeed on the third key, and an index resets on the second `Up` and never matches.
 
 **Definition of Done:** A scene with both an input-sequence secret and a hidden-trigger secret works in Play Preview and is configurable entirely through the editor.
+
+**Met.** The Skirmish template carries one of each and both are played in a real browser: the hut is genuinely absent from the viewport until the player walks into the alcove, and the Konami code grants a rifle with 24 rounds in it. A third secret is authored from scratch through the panel — label, method, event name, a teleport action with coordinates — and the document saves, which is the only real proof it is valid.
+
+One thing recorded rather than fixed: a stray key **does** break a sequence in progress, because the window is the last N presses. `Up X Down` is not `Up Down`. That is a decision (it is what a rolling window means) rather than an accident, and there is a test asserting it so nobody has to guess later. Unlocks are also **not persisted** — finding a secret and reloading loses it. Persistence is Sprint 18's save system, and `unlockedIds` is already the shape it will want.
 
 ---
 

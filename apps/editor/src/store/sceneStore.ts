@@ -3,6 +3,7 @@ import { devtools } from 'zustand/middleware';
 import {
   CURRENT_SCENE_VERSION,
   SceneSchema,
+  UnlockableSchema,
   WeaponSchema,
   type Environment,
   type GameConfig,
@@ -15,6 +16,7 @@ import {
   type Trigger,
   type HudElement,
   type Inventory,
+  type Unlockable,
   type Weapon,
   type UiButton,
   type UiConfig,
@@ -80,6 +82,9 @@ export interface SceneState {
   removeWeapon(weaponId: string): void;
   setWeapon(weaponId: string, weapon: Partial<Weapon>): void;
   toggleStartingWeapon(weaponId: string): void;
+  addUnlockable(): string;
+  removeUnlockable(unlockableId: string): void;
+  setUnlockable(unlockableId: string, patch: Partial<Unlockable>): void;
   setGameConfig(config: Partial<GameConfig>): void;
   setUiConfig(config: UiConfigPatch): void;
   setMenuButtons(menu: 'mainMenu' | 'pauseMenu', buttons: UiButton[]): void;
@@ -433,6 +438,37 @@ export const useSceneStore = create<SceneState>()(
             else ids.push(weaponId);
           }),
 
+        addUnlockable: () => {
+          const id = nextUnlockableId(get().scene);
+          commit('unlockable/add', (draft) => {
+            draft.unlockables.push(
+              UnlockableSchema.parse({
+                id,
+                label: `Secret ${draft.unlockables.length + 1}`,
+                // The Konami code, because a secret with an empty sequence is not a secret and a
+                // panel that opens on an invalid document is worse than one that opens on a joke.
+                unlockMethod: {
+                  type: 'inputSequence',
+                  sequence: ['Up', 'Up', 'Down', 'Down', 'Left', 'Right', 'Left', 'Right', 'B', 'A'],
+                },
+                actions: [{ type: 'emit', event: 'secretFound' }],
+              }),
+            );
+          });
+          return id;
+        },
+
+        removeUnlockable: (unlockableId) =>
+          commit('unlockable/remove', (draft) => {
+            draft.unlockables = draft.unlockables.filter((entry) => entry.id !== unlockableId);
+          }),
+
+        setUnlockable: (unlockableId, patch) =>
+          commit('unlockable/set', (draft) => {
+            const found = draft.unlockables.find((entry) => entry.id === unlockableId);
+            if (found) Object.assign(found, patch);
+          }),
+
         setPlayer: (player) =>
           commit('scene/setPlayer', (draft) => {
             Object.assign(draft.player, player);
@@ -520,6 +556,16 @@ export function nextObjectId(scene: Scene): string {
     if (match) highest = Math.max(highest, Number(match[1]));
   }
   return `obj_${String(highest + 1).padStart(4, '0')}`;
+}
+
+/** Generates the next free `secret_NNNN` id. */
+export function nextUnlockableId(scene: Scene): string {
+  let highest = 0;
+  for (const unlockable of scene.unlockables) {
+    const match = /^secret_(\d+)$/.exec(unlockable.id);
+    if (match) highest = Math.max(highest, Number(match[1]));
+  }
+  return `secret_${String(highest + 1).padStart(4, '0')}`;
 }
 
 /**

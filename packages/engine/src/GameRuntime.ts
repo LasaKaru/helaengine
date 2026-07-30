@@ -8,8 +8,10 @@ import type { PlayerController } from './physics/PlayerController.js';
 import type { LoadedScene, SceneLoader } from './SceneLoader.js';
 import { TriggerRuntime } from './TriggerRuntime.js';
 import { Inventory } from './combat/Inventory.js';
+import { UnlockRuntime } from './unlock/UnlockRuntime.js';
 import { WeaponSystem, type ShotHit, type WeaponInput } from './combat/WeaponSystem.js';
 import type { PickupRequest, SpawnRequest, WorldHandle } from './world.js';
+import type { UnlockKey } from '@helaengine/schema';
 
 export interface GameRuntimeOptions {
   loader: SceneLoader;
@@ -50,6 +52,7 @@ export class GameRuntime implements WorldHandle {
   readonly triggers: TriggerRuntime;
   readonly inventory: Inventory;
   readonly weapons: WeaponSystem;
+  readonly unlocks: UnlockRuntime;
 
   readonly #loader: SceneLoader;
   readonly #loaded: LoadedScene;
@@ -100,6 +103,11 @@ export class GameRuntime implements WorldHandle {
       world: this,
       bus: this.behaviors,
     });
+    this.unlocks = new UnlockRuntime({
+      unlockables: options.scene.unlockables,
+      world: this,
+      bus: this.behaviors,
+    });
     this.weapons = new WeaponSystem({
       inventory: this.inventory,
       cast: (origin, direction, range) => this.#castShot(origin, direction, range),
@@ -126,6 +134,9 @@ export class GameRuntime implements WorldHandle {
     this.#started = true;
     this.behaviors.start();
     this.triggers.start();
+    // Last, so that hiding a secret area happens after the behaviours that might be attached to it
+    // have initialised — and so an unlock firing on frame one reaches a fully built world.
+    this.unlocks.start();
   }
 
   /**
@@ -135,7 +146,7 @@ export class GameRuntime implements WorldHandle {
    * inventory at all — have no aim to give. Combat then simply does not advance, which is the
    * truthful outcome rather than a shot fired from the origin.
    */
-  update(deltaSeconds: number, weapons?: WeaponInput): void {
+  update(deltaSeconds: number, weapons?: WeaponInput, sequenceKeys?: readonly UnlockKey[]): void {
     if (!this.#started) return;
 
     this.#damageCooldown = Math.max(0, this.#damageCooldown - deltaSeconds);
@@ -143,6 +154,7 @@ export class GameRuntime implements WorldHandle {
 
     this.triggers.update();
     this.behaviors.update(deltaSeconds);
+    this.unlocks.update(deltaSeconds, sequenceKeys ?? []);
     // Weapons last: a shot should see the world as it is at the end of the frame the player fired
     // in, not as it was before the enemies moved.
     if (weapons && this.playerAlive) this.weapons.update(deltaSeconds, weapons);
@@ -174,6 +186,7 @@ export class GameRuntime implements WorldHandle {
     if (!this.#started) return;
     this.#started = false;
 
+    this.unlocks.stop();
     this.triggers.stop();
     this.behaviors.stop();
     // Everything this runtime added goes away with it. A preview that left spawned enemies lying
@@ -235,6 +248,21 @@ export class GameRuntime implements WorldHandle {
         return true;
       }
     }
+  }
+
+  teleportPlayer(position: THREE.Vector3): void {
+    this.#player?.teleport(position);
+  }
+
+  setObjectHidden(objectId: string, hidden: boolean): boolean {
+    const node = this.#loaded.objects.get(objectId);
+    if (!node) return false;
+
+    node.visible = !hidden;
+    // The collider goes with it. An invisible wall the player still walks into is the most
+    // confusing possible reading of a secret area.
+    this.#physics?.setObjectEnabled(objectId, !hidden);
+    return true;
   }
 
   /**

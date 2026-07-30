@@ -22,6 +22,7 @@ interface Placement {
   label?: string;
   behaviors?: Array<{ type: string; params: Record<string, unknown> }>;
   body?: 'static' | 'dynamic' | 'kinematic';
+  trigger?: Record<string, unknown>;
 }
 
 /**
@@ -43,6 +44,7 @@ function buildScene(
   placements: Placement[],
   terrain: Partial<Scene['terrain']> = {},
   inventory: Partial<Scene['inventory']> = {},
+  unlockables: Scene['unlockables'] = [],
 ): Scene {
   counter = 0;
   return SceneSchema.parse({
@@ -51,6 +53,7 @@ function buildScene(
     name,
     terrain,
     inventory,
+    unlockables,
     objects: placements.map((placement) => ({
       id: objectId(),
       assetId: placement.assetId,
@@ -60,6 +63,7 @@ function buildScene(
         scale: [placement.scale ?? 1, placement.scale ?? 1, placement.scale ?? 1],
       },
       ...(placement.behaviors ? { behaviors: placement.behaviors } : {}),
+      ...(placement.trigger ? { trigger: placement.trigger } : {}),
       ...(placement.body ? { physics: { body: placement.body } } : {}),
       ...(placement.label ? { metadata: { label: placement.label } } : {}),
     })),
@@ -256,6 +260,21 @@ export const TEMPLATES: SceneTemplate[] = [
             },
           ],
         },
+        // Two secrets' worth of scenery. Placed before the generated treeline so their ids stay
+        // obj_0006 and obj_0007 no matter what the tree loop does.
+        {
+          assetId: 'building_hut_01',
+          position: [-16, 0, -26],
+          rotationY: 30,
+          label: 'Hidden hut',
+        },
+        {
+          assetId: 'logic_trigger_box',
+          position: [14, 0, -6],
+          scale: 4,
+          label: 'Alcove',
+          trigger: { shape: 'box', detects: 'player', once: false },
+        },
       ];
 
       // A treeline, so the fight has cover and the line-of-sight checks have something to do.
@@ -295,10 +314,47 @@ export const TEMPLATES: SceneTemplate[] = [
               reloadSeconds: 1.1,
               spreadDegrees: 1.2,
             },
+            {
+              id: 'weapon_0002',
+              name: 'Rifle',
+              damage: 45,
+              range: 120,
+              fireInterval: 0.12,
+              automatic: true,
+              clipSize: 24,
+              reserveAmmo: 96,
+              reloadSeconds: 1.8,
+              spreadDegrees: 2.5,
+            },
           ],
-          // Nothing to start with: finding the crate is the first thing the scene asks you to do.
+          // Nothing to start with: finding the crate is the first thing the scene asks you to do,
+          // and the rifle is behind a secret.
           startingWeaponIds: [],
         },
+        [
+          {
+            id: 'secret_0001',
+            label: 'Rifle cache',
+            unlockMethod: {
+              type: 'inputSequence',
+              sequence: ['Up', 'Up', 'Down', 'Down', 'Left', 'Right', 'Left', 'Right', 'B', 'A'],
+              withinSeconds: 2,
+            },
+            actions: [{ type: 'unlockInventoryItem', weaponId: 'weapon_0002' }],
+            once: true,
+          },
+          {
+            id: 'secret_0002',
+            label: 'Hidden hut',
+            // The alcove volume, which is invisible in play like every other trigger.
+            unlockMethod: { type: 'triggerVolume', triggerId: 'obj_0007' },
+            actions: [
+              { type: 'revealArea', objectIds: ['obj_0006'] },
+              { type: 'emit', event: 'hutRevealed', payload: {} },
+            ],
+            once: true,
+          },
+        ],
       );
     },
   },

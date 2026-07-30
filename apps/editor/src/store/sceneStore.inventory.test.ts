@@ -91,3 +91,40 @@ describe('weapon catalogue', () => {
     expect(() => SceneSchema.parse(useSceneStore.getState().scene)).not.toThrow();
   });
 });
+
+describe('secrets', () => {
+  beforeEach(() => {
+    useSceneStore.setState({ scene: createEmptyScene(), selectedIds: [] });
+  });
+
+  it('adds a valid secret rather than an empty one', () => {
+    // A panel that opens on an invalid document is worse than one that opens on a joke, so the
+    // default is the Konami code.
+    const id = useSceneStore.getState().addUnlockable();
+    const secret = useSceneStore.getState().scene.unlockables[0]!;
+
+    expect(secret.id).toBe(id);
+    expect(secret.unlockMethod.type).toBe('inputSequence');
+    expect(() => SceneSchema.parse(useSceneStore.getState().scene)).not.toThrow();
+  });
+
+  it('edits a secret in place and undoes as one step', () => {
+    useSceneStore.getState().addUnlockable();
+    useSceneStore.getState().setUnlockable('secret_0001', {
+      unlockMethod: { type: 'event', event: 'enemyDied' },
+    });
+    expect(useSceneStore.getState().scene.unlockables[0]!.unlockMethod.type).toBe('event');
+
+    useSceneStore.getState().undo();
+    expect(useSceneStore.getState().scene.unlockables[0]!.unlockMethod.type).toBe('inputSequence');
+  });
+
+  it('removes one without disturbing the others', () => {
+    useSceneStore.getState().addUnlockable();
+    useSceneStore.getState().addUnlockable();
+    useSceneStore.getState().removeUnlockable('secret_0001');
+
+    expect(useSceneStore.getState().scene.unlockables.map((s) => s.id)).toEqual(['secret_0002']);
+    expect(useSceneStore.getState().addUnlockable()).toBe('secret_0003');
+  });
+});

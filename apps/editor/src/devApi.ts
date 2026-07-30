@@ -78,6 +78,10 @@ export interface DevApi {
     carried: string[];
     shotsFired: number;
   } | null;
+  /** Secrets found so far, or null when nothing is playing. */
+  unlockedSecrets(): string[] | null;
+  /** Whether a node is currently visible — how a revealed area is asserted on. */
+  objectVisible(objectId: string): boolean | null;
   /** Ids the running preview spawned — none of which are in the document. */
   spawnedIds(): string[];
   /** FSM state of every enemy behaviour currently running, keyed by object id. */
@@ -341,6 +345,10 @@ export function exposeDevApi(library: AssetLibrary): void {
       currentGame.damagePlayer(amount);
       return true;
     },
+
+    unlockedSecrets: () => currentGame?.unlocks.unlockedIds ?? null,
+
+    objectVisible: (objectId) => currentLoadedScene?.objects.get(objectId)?.visible ?? null,
 
     playerInventory: () => {
       if (!currentGame) return null;

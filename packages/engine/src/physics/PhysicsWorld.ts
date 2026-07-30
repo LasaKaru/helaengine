@@ -184,6 +184,23 @@ export class PhysicsWorld {
     return true;
   }
 
+  /**
+   * Turns an object's colliders on or off without destroying them.
+   *
+   * Disabling rather than removing, because a hidden secret area is expected to come back exactly
+   * as it was: rebuilding a trimesh collider from scratch on reveal would be both slower and a
+   * chance for the rebuilt one to differ from the original. Returns whether there was such a body.
+   */
+  setObjectEnabled(objectId: string, enabled: boolean): boolean {
+    const record = this.#bodies.get(objectId);
+    if (!record) return false;
+
+    for (let index = 0; index < record.body.numColliders(); index += 1) {
+      record.body.collider(index).setEnabled(enabled);
+    }
+    return true;
+  }
+
   removeObject(objectId: string): void {
     const record = this.#bodies.get(objectId);
     if (!record) return;

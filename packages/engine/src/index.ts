@@ -70,6 +70,10 @@ export type {
   ScenePhysicsReport,
   ScenePhysicsSkip,
 } from './physics/buildScenePhysics.js';
+export { UnlockRuntime } from './unlock/UnlockRuntime.js';
+export type { UnlockRuntimeOptions } from './unlock/UnlockRuntime.js';
+export { createDetector, TRIGGER_ENTERED } from './unlock/detectors.js';
+export type { UnlockDetector } from './unlock/detectors.js';
 export { GameRuntime, startScene } from './GameRuntime.js';
 export type { GameRuntimeOptions } from './GameRuntime.js';
 export { TriggerRuntime } from './TriggerRuntime.js';

@@ -399,3 +399,93 @@ describe('player combat settings', () => {
     expect(player.damageCooldown).toBe(0.4);
   });
 });
+
+describe('unlockables', () => {
+  const base = { sceneId: 'scene_test', version: 1 };
+
+  it('defaults to none', () => {
+    expect(parseScene(base).unlockables).toEqual([]);
+  });
+
+  it('fills a secret in and keeps its closed vocabulary', () => {
+    const scene = parseScene({
+      ...base,
+      unlockables: [
+        {
+          id: 'secret_0001',
+          unlockMethod: { type: 'inputSequence', sequence: ['Up', 'Up', 'B', 'A'] },
+          actions: [{ type: 'teleportPlayer', target: [1, 2, 3] }],
+        },
+      ],
+    });
+
+    expect(scene.unlockables[0]).toMatchObject({ label: 'Secret', once: true });
+    expect(scene.unlockables[0]!.unlockMethod).toMatchObject({ withinSeconds: 2 });
+  });
+
+  it('refuses an unlock method it has never heard of', () => {
+    // The whole safety story: a document cannot name work the runtime does not already implement.
+    expect(
+      safeParseScene({
+        ...base,
+        unlockables: [
+          {
+            id: 'secret_0001',
+            unlockMethod: { type: 'runScript', source: 'alert(1)' },
+            actions: [{ type: 'emit', event: 'x' }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('refuses an unlock action it has never heard of', () => {
+    expect(
+      safeParseScene({
+        ...base,
+        unlockables: [
+          {
+            id: 'secret_0001',
+            unlockMethod: { type: 'event', event: 'x' },
+            actions: [{ type: 'eval', source: 'alert(1)' }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('refuses a one-key sequence, which is a keybinding rather than a secret', () => {
+    expect(
+      safeParseScene({
+        ...base,
+        unlockables: [
+          {
+            id: 'secret_0001',
+            unlockMethod: { type: 'inputSequence', sequence: ['A'] },
+            actions: [{ type: 'emit', event: 'x' }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('refuses a secret with no actions and two secrets with one id', () => {
+    const method = { type: 'event', event: 'x' };
+    expect(
+      safeParseScene({
+        ...base,
+        unlockables: [{ id: 'secret_0001', unlockMethod: method, actions: [] }],
+      }).success,
+    ).toBe(false);
+
+    expect(
+      safeParseScene({
+        ...base,
+        unlockables: [
+          { id: 'secret_0001', unlockMethod: method, actions: [{ type: 'emit', event: 'a' }] },
+          { id: 'secret_0001', unlockMethod: method, actions: [{ type: 'emit', event: 'b' }] },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+});

@@ -15,6 +15,7 @@ import { GameUiPanel } from './GameUiPanel';
 import { TriggerPanel } from './TriggerPanel';
 import { NumberField } from './NumberField';
 import { TerrainPanel } from './TerrainPanel';
+import { SecretsPanel } from './SecretsPanel';
 import { WeaponsPanel } from './WeaponsPanel';
 
 type Axis = 0 | 1 | 2;
@@ -378,6 +379,7 @@ export function InspectorPanel({ manifest }: { manifest: AssetManifest }): React
       <TerrainPanel />
       <GamePanel />
       <WeaponsPanel />
+      <SecretsPanel />
 
       <GameUiPanel />
       <PlayerPanel />

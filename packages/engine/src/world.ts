@@ -44,6 +44,17 @@ export interface WorldHandle {
    */
   collect(request: PickupRequest): boolean;
 
+  /** Moves the player. Used by respawns and by a secret that drops you somewhere else. */
+  teleportPlayer(position: THREE.Vector3): void;
+
+  /**
+   * Hides or shows an object, collider included.
+   *
+   * Returns whether there was such an object. Hiding has to take the collider with it: an invisible
+   * wall the player still walks into is the most confusing possible reading of a secret area.
+   */
+  setObjectHidden(objectId: string, hidden: boolean): boolean;
+
   /**
    * True when nothing solid stands between the two points.
    *
@@ -84,6 +95,8 @@ export const INERT_WORLD: WorldHandle = {
   playerHealth: () => null,
   damagePlayer: () => {},
   collect: () => false,
+  teleportPlayer: () => {},
+  setObjectHidden: () => false,
   lineOfSight: () => true,
   groundHeight: () => 0,
   moveTo: () => {},

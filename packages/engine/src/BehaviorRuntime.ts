@@ -49,6 +49,7 @@ export class BehaviorRuntime {
   readonly #objects = new Map<string, GameObject>();
   readonly #assetIds = new Map<string, string>();
   readonly #listeners = new Map<string, Set<(payload: unknown) => void>>();
+  readonly #anyListeners = new Set<(event: string, payload: unknown) => void>();
   readonly #claims = new Map<string, Claim>();
   readonly #context: { elapsed: number } = { elapsed: 0 };
   readonly #registry: BehaviorRegistry;
@@ -120,6 +121,7 @@ export class BehaviorRuntime {
       attachment.behavior.onEvent?.(attachment.object, event, payload);
     }
     for (const listener of [...(this.#listeners.get(event) ?? [])]) listener(payload);
+    for (const listener of [...this.#anyListeners]) listener(event, payload);
   }
 
   /** Subscribes to an event. Returns an unsubscribe function. */
@@ -128,6 +130,17 @@ export class BehaviorRuntime {
     listeners.add(listener);
     this.#listeners.set(event, listeners);
     return () => listeners.delete(listener);
+  }
+
+  /**
+   * Subscribes to every event. Returns an unsubscribe function.
+   *
+   * For listeners whose set of interesting events comes from the document rather than from code —
+   * the unlock runtime asks about all of them because which ones matter is a property of the scene.
+   */
+  onAny(listener: (event: string, payload: unknown) => void): () => void {
+    this.#anyListeners.add(listener);
+    return () => this.#anyListeners.delete(listener);
   }
 
   /**
@@ -173,6 +186,7 @@ export class BehaviorRuntime {
       behavior.onDestroy?.(object);
     }
     this.#listeners.clear();
+    this.#anyListeners.clear();
     this.#claims.clear();
   }
 

@@ -1736,7 +1736,7 @@ test.describe('combat', () => {
 
     await panel.getByLabel('Weapon 1 damage').fill('45');
     await panel.getByLabel('Weapon 1 damage').press('Enter');
-    await panel.getByLabel('Player starts with this').check();
+    await panel.getByLabel('Weapon 1 starting').check();
 
     const inventory = await page.evaluate(
       () => window.helaengine!.store.getState().scene.inventory,
@@ -1749,7 +1749,7 @@ test.describe('combat', () => {
     page,
   }) => {
     const panel = page.getByRole('region', { name: 'Weapons' });
-    await panel.getByLabel('Player starts with this').check();
+    await panel.getByLabel('Weapon 1 starting').check();
     await panel.getByRole('button', { name: 'Remove weapon 1' }).click();
 
     await page.keyboard.press('Control+s');
@@ -1949,5 +1949,143 @@ test.describe('combat', () => {
     const after = await page.evaluate(() => window.helaengine!.playerPosition()!);
     expect(Math.hypot(after.x - 0, after.z + 2)).toBeLessThan(2);
     expect(await page.evaluate(() => window.helaengine!.uiScreen())).toBe('playing');
+  });
+});
+
+/**
+ * Sprint 17 — unlockables.
+ *
+ * The Skirmish template carries one of each secret kind: a Konami code that grants the rifle, and
+ * a trigger volume that reveals a hidden hut. Both are played here, and both are edited through the
+ * Secrets panel without touching JSON.
+ */
+test.describe('secrets', () => {
+  test.beforeEach(async ({ page }) => {
+    await openEditor(page, /Skirmish/);
+  });
+
+  async function enterWalk(page: Page, spawn: [number, number, number]): Promise<void> {
+    await page.evaluate((at) => window.helaengine!.store.getState().setPlayer({ spawn: at }), spawn);
+    await page.waitForTimeout(300);
+    await page.getByRole('button', { name: 'Walk' }).click();
+    await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
+      timeout: 20_000,
+    });
+    await startPlaying(page);
+  }
+
+  const KONAMI = [
+    'ArrowUp',
+    'ArrowUp',
+    'ArrowDown',
+    'ArrowDown',
+    'ArrowLeft',
+    'ArrowRight',
+    'ArrowLeft',
+    'ArrowRight',
+    'b',
+    'a',
+  ];
+
+  test('the Secrets panel shows what the template ships', async ({ page }) => {
+    const panel = page.getByRole('region', { name: 'Secrets' });
+
+    await expect(panel.getByLabel('Secret 1 label')).toHaveValue('Rifle cache');
+    await expect(panel.getByLabel('Secret 1 method')).toHaveValue('inputSequence');
+    await expect(panel.getByLabel('Secret 2 method')).toHaveValue('triggerVolume');
+    // Ten chips, one per key of the code.
+    await expect(panel.getByLabel(/^Secret 1 key \d+$/)).toHaveCount(10);
+  });
+
+  test('a secret is authored end to end without touching JSON', async ({ page }) => {
+    const panel = page.getByRole('region', { name: 'Secrets' });
+    await panel.getByRole('button', { name: 'Add secret' }).click();
+
+    await panel.getByLabel('Secret 3 label').fill('My secret');
+    await panel.getByLabel('Secret 3 method').selectOption('event');
+    await panel.getByLabel('Secret 3 event').fill('enemyDied');
+    await panel.getByLabel('Secret 3 action 1 type').selectOption('teleportPlayer');
+    await panel.getByLabel('Secret 3 action 1 target X').fill('40');
+    await panel.getByLabel('Secret 3 action 1 target X').press('Enter');
+
+    const secret = await page.evaluate(
+      () => window.helaengine!.store.getState().scene.unlockables[2]!,
+    );
+    expect(secret).toMatchObject({
+      label: 'My secret',
+      unlockMethod: { type: 'event', event: 'enemyDied' },
+    });
+    expect(secret.actions[0]).toMatchObject({ type: 'teleportPlayer', target: [40, 0, 0] });
+
+    // And it saves, which is the only proof the document is actually valid.
+    await page.keyboard.press('Control+s');
+    await expect(page.getByRole('status', { name: 'Save state' })).toHaveText('Saved');
+  });
+
+  test('the method picker only offers the closed vocabulary', async ({ page }) => {
+    const options = await page
+      .getByRole('region', { name: 'Secrets' })
+      .getByLabel('Secret 1 method')
+      .locator('option')
+      .evaluateAll((nodes) => nodes.map((node) => (node as HTMLOptionElement).value));
+
+    // Four methods, no free-text field anywhere: there is no way to author a secret that runs code.
+    expect(options).toEqual(['inputSequence', 'triggerVolume', 'event', 'itemCount']);
+  });
+
+  test('the hidden hut starts hidden and is revealed by walking into the alcove', async ({
+    page,
+  }) => {
+    // The alcove volume sits at [14, 0, -6], four metres across. Spawn just short of it.
+    await enterWalk(page, [14, 0, 4]);
+
+    expect(await page.evaluate(() => window.helaengine!.objectVisible('obj_0006'))).toBe(false);
+    expect(await page.evaluate(() => window.helaengine!.unlockedSecrets())).toEqual([]);
+
+    await page.evaluate(() => window.helaengine!.setPlayerYaw(0));
+    await page.keyboard.down('w');
+    await page.waitForFunction(
+      () => (window.helaengine!.unlockedSecrets() ?? []).includes('secret_0002'),
+      undefined,
+      { timeout: 15_000 },
+    );
+    await page.keyboard.up('w');
+
+    expect(await page.evaluate(() => window.helaengine!.objectVisible('obj_0006'))).toBe(true);
+  });
+
+  test('the hut goes back to being hidden when the preview stops', async ({ page }) => {
+    // A rehearsal that left half a level invisible would be quietly editing the scene.
+    await enterWalk(page, [14, 0, 4]);
+    expect(await page.evaluate(() => window.helaengine!.objectVisible('obj_0006'))).toBe(false);
+
+    await exitWalk(page);
+    expect(await page.evaluate(() => window.helaengine!.objectVisible('obj_0006'))).toBe(true);
+  });
+
+  test('the Konami code grants the rifle', async ({ page }) => {
+    await enterWalk(page, [0, 0, 4]);
+    expect(await page.evaluate(() => window.helaengine!.playerInventory()!.carried)).toEqual([]);
+
+    for (const key of KONAMI) await page.keyboard.press(key);
+    await page.waitForTimeout(400);
+
+    expect(await page.evaluate(() => window.helaengine!.unlockedSecrets())).toContain('secret_0001');
+    const inventory = await page.evaluate(() => window.helaengine!.playerInventory()!);
+    expect(inventory.carried).toEqual(['weapon_0002']);
+    // It arrived through the same door a pickup uses, so it came with its ammo.
+    expect(inventory.ammo).toBe(24);
+  });
+
+  test('a wrong code grants nothing', async ({ page }) => {
+    await enterWalk(page, [0, 0, 4]);
+
+    for (const key of ['ArrowUp', 'ArrowUp', 'ArrowDown', 'a', 'b']) {
+      await page.keyboard.press(key);
+    }
+    await page.waitForTimeout(400);
+
+    expect(await page.evaluate(() => window.helaengine!.unlockedSecrets())).toEqual([]);
+    expect(await page.evaluate(() => window.helaengine!.playerInventory()!.carried)).toEqual([]);
   });
 });

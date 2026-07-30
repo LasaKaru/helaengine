@@ -351,7 +351,7 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
       nextWeapon: manager.wasPressed('nextWeapon'),
       origin: shotOrigin,
       direction: shotDirection,
-    });
+    }, manager.sequenceKeys);
     recordSimulationTiming(afterPhysics - beforePhysics, performance.now() - afterPhysics);
 
     // Health is pushed into the store only when it changes: mirroring it every frame would mean a

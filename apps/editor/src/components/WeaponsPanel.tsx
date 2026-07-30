@@ -53,6 +53,9 @@ function WeaponCard({ weapon, index }: { weapon: Weapon; index: number }): React
       <label className="param-check">
         <input
           type="checkbox"
+          // Labelled per weapon: a catalogue with two entries has two of each of these, and
+          // "Player starts with this" alone tells neither a screen reader nor a test which one.
+          aria-label={`Weapon ${index + 1} starting`}
           checked={starting.includes(weapon.id)}
           onChange={() => toggleStartingWeapon(weapon.id)}
         />
@@ -62,6 +65,7 @@ function WeaponCard({ weapon, index }: { weapon: Weapon; index: number }): React
       <label className="param-check">
         <input
           type="checkbox"
+          aria-label={`Weapon ${index + 1} automatic`}
           checked={weapon.automatic}
           onChange={(event) => setWeapon(weapon.id, { automatic: event.target.checked })}
         />

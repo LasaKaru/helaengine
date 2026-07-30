@@ -7,6 +7,14 @@ import type { WorldHandle } from './world.js';
 export interface EventBus {
   emit(event: string, payload?: unknown): void;
   on(event: string, listener: (payload: unknown) => void): () => void;
+  /**
+   * Subscribes to every event. Returns an unsubscribe function.
+   *
+   * Needed by anything that watches for one of a set of events chosen by the document rather than
+   * by the code — the unlock runtime, and Sprint 19's audio mapping. Subscribing per name would
+   * mean re-subscribing whenever the document changed.
+   */
+  onAny(listener: (event: string, payload: unknown) => void): () => void;
 }
 
 export interface TriggerRuntimeOptions {
@@ -137,10 +145,15 @@ export class TriggerRuntime {
       for (const id of inside) {
         if (volume.occupants.has(id)) continue;
         volume.fired = true;
+        // Announced whether or not the author configured any actions: "something entered this
+        // volume" is a fact about the world, and a secret or a sound cue wants it without the
+        // volume having to be given a dummy action to make it observable.
+        this.#bus.emit('triggerEntered', { triggerId: volume.objectId, subjectId: id });
         this.#run(volume, volume.trigger.onEnter, id);
       }
       for (const id of volume.occupants) {
         if (inside.has(id)) continue;
+        this.#bus.emit('triggerExited', { triggerId: volume.objectId, subjectId: id });
         this.#run(volume, volume.trigger.onExit, id);
       }
 

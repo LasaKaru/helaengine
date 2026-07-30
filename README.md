@@ -7,12 +7,12 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 16 — Phase 2B under way. A working editor, behaviours, physics, enemies, trigger
+**Status:** Sprint 17 — Phase 2B under way. A working editor, behaviours, physics, enemies, trigger
 volumes, a measured performance baseline, first/third/top-down cameras with one input layer covering
 keyboard, touch and gamepad, a schema-driven menu/HUD shell, and now combat: a weapon catalogue in
-the document, hitscan firing, ammo and reloading, pickups, player damage and respawn. The
-**Skirmish** template is a playable level built from all of it. Unlockables and checkpoints are
-next; there is no backend yet, deliberately.
+the document, hitscan firing, ammo and reloading, pickups, player damage and respawn — plus secrets
+that hide areas, grant weapons or teleport the player. The **Skirmish** template is a playable level
+built from all of it. Checkpoints and audio are next; there is no backend yet, deliberately.
 
 ---
 
@@ -278,6 +278,26 @@ nothing about its shape changes.
 
 The **Skirmish** template is all of it in one level: a pistol on a crate, ammo, a medkit, and two
 goblins that fight back.
+
+## Secrets
+
+`unlockables` is a list of "when this happens, do that". A secret is found by a **button sequence**
+(Konami-style, enterable on a keyboard or a gamepad), by **entering a trigger volume**, by **any
+named event** on the bus, or by **collecting a number of pickups**. Finding one can teleport the
+player, grant a weapon, reveal hidden objects, or raise an event.
+
+Both halves are a Zod discriminated union, and that union *is* the closed vocabulary — the same
+guarantee behaviours and trigger actions get, obtained at both ends at once. A document naming a
+method the engine has never heard of is rejected when it is parsed, and a runtime that failed to
+handle one of the arms would not compile. There is no expression to evaluate and no snippet to run,
+which matters most for exactly the feature whose whole appeal is being sneaky.
+
+Hidden objects start hidden *because* something reveals them: the runtime hides everything a
+`revealArea` names at startup rather than asking the author to keep a second flag in sync. Hiding
+takes the collider with it, so a secret area is not an invisible wall.
+
+The **Secrets** panel builds both its pickers from the schema, so it can offer exactly what the
+runtime can do and nothing else.
 
 ## Where this is going
 

@@ -1441,3 +1441,20 @@ body,
 .panel-hint.error {
   color: #d98a7a;
 }
+
+.secret-sequence {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0;
+}
+.secret-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.secret-keys select {
+  width: 62px;
+  padding: 2px 4px;
+  font-size: 11px;
+}

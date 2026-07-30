@@ -267,3 +267,73 @@ describe('InputManager', () => {
     expect(input.move.y).toBe(0);
   });
 });
+
+describe('secret sequence keys', () => {
+  let element: HTMLElement;
+  let input: InputManager;
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    element = document.createElement('div');
+    document.body.appendChild(element);
+    input = new InputManager({ element, touchControls: false });
+    input.attach();
+  });
+
+  it('reports named buttons rather than key codes', () => {
+    press('ArrowUp');
+    press('KeyB');
+    press('KeyA');
+
+    expect(input.sequenceKeys).toEqual(['Up', 'B', 'A']);
+  });
+
+  it('clears them at the end of a frame, like every other edge', () => {
+    press('ArrowUp');
+    input.update(1 / 60);
+    input.endFrame();
+
+    expect(input.sequenceKeys).toEqual([]);
+  });
+
+  it('ignores auto-repeat, or no code with a repeated key is ever enterable', () => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowUp', bubbles: true }));
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { code: 'ArrowUp', bubbles: true, repeat: true }),
+    );
+
+    expect(input.sequenceKeys).toEqual(['Up']);
+  });
+
+  it('lets a key both move the player and feed a sequence', () => {
+    // KeyA strafes left *and* contributes an 'A'. That overlap is how console cheat codes have
+    // always worked, and refusing it would leave the letter keys unusable in a secret.
+    press('KeyA');
+    input.update(1 / 60);
+
+    expect(input.isDown('moveLeft')).toBe(true);
+    expect(input.sequenceKeys).toEqual(['A']);
+  });
+
+  it('takes the same buttons from a gamepad, on the press rather than while held', () => {
+    const pad = fakePad({ buttons: [12] }); // d-pad up
+    vi.stubGlobal('navigator', { getGamepads: () => [pad], maxTouchPoints: 0 });
+
+    input.update(1 / 60);
+    expect(input.sequenceKeys).toEqual(['Up']);
+
+    // Still held on the next poll: a level, not a second press.
+    input.endFrame();
+    input.update(1 / 60);
+    expect(input.sequenceKeys).toEqual([]);
+
+    vi.unstubAllGlobals();
+  });
+
+  it('forgets a part-entered sequence when the window loses focus', () => {
+    press('ArrowUp');
+    window.dispatchEvent(new Event('blur'));
+
+    expect(input.sequenceKeys).toEqual([]);
+  });
+});
