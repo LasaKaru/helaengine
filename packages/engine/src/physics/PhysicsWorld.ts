@@ -59,6 +59,8 @@ export class PhysicsWorld {
   readonly rapier: RapierModule;
   readonly world: RapierWorld;
   readonly #bodies = new Map<string, BodyRecord>();
+  /** Rapier body handle -> scene object id, so a raycast hit can say *what* it hit. */
+  readonly #objectByBody = new Map<number, string>();
   readonly #dynamic: BodyRecord[] = [];
   readonly #fixedTimestep: number;
   readonly #maxSubsteps: number;
@@ -176,6 +178,7 @@ export class PhysicsWorld {
 
     const record: BodyRecord = { objectId: spec.objectId, node: spec.node, body, type: spec.body };
     this.#bodies.set(spec.objectId, record);
+    this.#objectByBody.set(body.handle, spec.objectId);
     // Only bodies the solver can move are worth reading back every frame.
     if (spec.body !== 'static') this.#dynamic.push(record);
     return true;
@@ -186,6 +189,7 @@ export class PhysicsWorld {
     if (!record) return;
 
     this.world.removeRigidBody(record.body);
+    this.#objectByBody.delete(record.body.handle);
     this.#bodies.delete(objectId);
     const at = this.#dynamic.indexOf(record);
     if (at >= 0) this.#dynamic.splice(at, 1);
@@ -221,6 +225,44 @@ export class PhysicsWorld {
     );
 
     return hit ? hit.timeOfImpact : null;
+  }
+
+  /**
+   * What a shot hits, and where.
+   *
+   * `objectId` is null when the ray lands on something that is not a scene object — the terrain,
+   * or a collider whose body this world did not create. That is a hit, not a miss, and reporting it
+   * as one is what lets a weapon spark off a hillside instead of shooting straight through it.
+   */
+  castObject(
+    from: THREE.Vector3,
+    direction: THREE.Vector3,
+    maxDistance: number,
+    excludeColliderHandle?: number,
+  ): { objectId: string | null; distance: number; point: THREE.Vector3 } | null {
+    const hit = this.world.castRay(
+      new this.rapier.Ray(
+        { x: from.x, y: from.y, z: from.z },
+        { x: direction.x, y: direction.y, z: direction.z },
+      ),
+      maxDistance,
+      true,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      excludeColliderHandle === undefined
+        ? undefined
+        : (collider) => collider.handle !== excludeColliderHandle,
+    );
+    if (!hit) return null;
+
+    const bodyHandle = hit.collider.parent()?.handle;
+    return {
+      objectId: bodyHandle === undefined ? null : (this.#objectByBody.get(bodyHandle) ?? null),
+      distance: hit.timeOfImpact,
+      point: from.clone().addScaledVector(direction, hit.timeOfImpact),
+    };
   }
 
   /** Builds a character controller for the document's player. Stepped and synced with the world. */
@@ -297,6 +339,7 @@ export class PhysicsWorld {
     if (this.#disposed) return;
     this.#disposed = true;
     this.#bodies.clear();
+    this.#objectByBody.clear();
     this.#dynamic.length = 0;
     this.#players.length = 0;
     this.#terrain = null;

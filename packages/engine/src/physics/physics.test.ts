@@ -242,6 +242,70 @@ describe('object bodies', () => {
   });
 });
 
+describe('castObject', () => {
+  it('names the object a shot lands on', () => {
+    const world = makeWorld();
+    const node = new THREE.Group();
+    node.position.set(0, 0, -10);
+    world.addObject({
+      objectId: 'obj_target',
+      node,
+      shape: 'box',
+      body: 'static',
+      size: [2, 2, 2],
+    });
+    // Rapier's queries read from the broad phase, which does not exist until the world has been
+    // stepped once — an hour of Sprint 10 went into learning that.
+    world.step(1 / 60);
+
+    const hit = world.castObject(
+      new THREE.Vector3(0, 1, 0),
+      new THREE.Vector3(0, 0, -1),
+      50,
+    );
+    expect(hit?.objectId).toBe('obj_target');
+    expect(hit?.distance).toBeCloseTo(9, 1);
+    expect(hit?.point.z).toBeCloseTo(-9, 1);
+    world.dispose();
+  });
+
+  it('reports a hit on the terrain as a hit with nothing behind it', () => {
+    const world = makeWorld();
+    world.addTerrain(new TerrainField({ segments: 8, size: [32, 32], maxHeight: 10 }));
+    world.step(1 / 60);
+
+    const hit = world.castObject(
+      new THREE.Vector3(0, 20, 0),
+      new THREE.Vector3(0, -1, 0),
+      50,
+    );
+    expect(hit).not.toBeNull();
+    expect(hit?.objectId).toBeNull();
+    world.dispose();
+  });
+
+  it('forgets an object id once its body is removed', () => {
+    const world = makeWorld();
+    const node = new THREE.Group();
+    node.position.set(0, 0, -10);
+    world.addObject({
+      objectId: 'obj_target',
+      node,
+      shape: 'box',
+      body: 'static',
+      size: [2, 2, 2],
+    });
+    world.step(1 / 60);
+    world.removeObject('obj_target');
+    world.step(1 / 60);
+
+    expect(
+      world.castObject(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, -1), 50),
+    ).toBeNull();
+    world.dispose();
+  });
+});
+
 describe('trimesh colliders', () => {
   it('bakes scale into the vertices, because a collider has none of its own', () => {
     const node = new THREE.Group();

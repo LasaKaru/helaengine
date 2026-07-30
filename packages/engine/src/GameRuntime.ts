@@ -7,7 +7,9 @@ import type { PhysicsWorld } from './physics/PhysicsWorld.js';
 import type { PlayerController } from './physics/PlayerController.js';
 import type { LoadedScene, SceneLoader } from './SceneLoader.js';
 import { TriggerRuntime } from './TriggerRuntime.js';
-import type { SpawnRequest, WorldHandle } from './world.js';
+import { Inventory } from './combat/Inventory.js';
+import { WeaponSystem, type ShotHit, type WeaponInput } from './combat/WeaponSystem.js';
+import type { PickupRequest, SpawnRequest, WorldHandle } from './world.js';
 
 export interface GameRuntimeOptions {
   loader: SceneLoader;
@@ -19,9 +21,17 @@ export interface GameRuntimeOptions {
   /** Optional: without one, `playerPosition()` answers null and enemies never find anybody. */
   player?: PlayerController | null;
   warn?: (message: string) => void;
+  /**
+   * Where a dead player comes back.
+   *
+   * Separate from `scene.player.spawn` because the host has usually already corrected that point
+   * against the terrain, and respawning a metre inside a hill is not an improvement on being dead.
+   */
+  spawnPoint?: THREE.Vector3;
 }
 
 const nextPosition = new THREE.Vector3();
+const shotOrigin = new THREE.Vector3();
 
 /**
  * Everything that has to be true for a scene to be *running* rather than merely loaded.
@@ -38,6 +48,8 @@ const nextPosition = new THREE.Vector3();
 export class GameRuntime implements WorldHandle {
   readonly behaviors: BehaviorRuntime;
   readonly triggers: TriggerRuntime;
+  readonly inventory: Inventory;
+  readonly weapons: WeaponSystem;
 
   readonly #loader: SceneLoader;
   readonly #loaded: LoadedScene;
@@ -52,10 +64,16 @@ export class GameRuntime implements WorldHandle {
   /** The document's own objects, by id — the set that must survive a preview unchanged. */
   readonly #documentObjects: Map<string, SceneObject>;
 
+  readonly #spawnPoint: THREE.Vector3;
+
   #player: PlayerController | null;
   #health: number;
   #spawnCounter = 0;
   #started = false;
+  /** Seconds until damage can land again — see `player.damageCooldown`. */
+  #damageCooldown = 0;
+  /** Seconds until a dead player is put back on their feet, or null when they are alive. */
+  #respawnIn: number | null = null;
 
   constructor(options: GameRuntimeOptions) {
     this.#loader = options.loader;
@@ -66,6 +84,8 @@ export class GameRuntime implements WorldHandle {
     this.#playerSettings = options.scene.player;
     this.#health = options.scene.player.health;
     this.#documentObjects = new Map(options.scene.objects.map((object) => [object.id, object]));
+    this.#spawnPoint = (options.spawnPoint ?? new THREE.Vector3(...options.scene.player.spawn)).clone();
+    this.inventory = new Inventory(options.scene.inventory);
     this.#warn = options.warn ?? ((message) => console.warn(`[helaengine] ${message}`));
 
     this.behaviors = new BehaviorRuntime({
@@ -79,6 +99,11 @@ export class GameRuntime implements WorldHandle {
       scene: options.scene,
       world: this,
       bus: this.behaviors,
+    });
+    this.weapons = new WeaponSystem({
+      inventory: this.inventory,
+      cast: (origin, direction, range) => this.#castShot(origin, direction, range),
+      emit: (event, payload) => this.emit(event, payload),
     });
   }
 
@@ -103,11 +128,46 @@ export class GameRuntime implements WorldHandle {
     this.triggers.start();
   }
 
-  /** One frame: triggers first, so a spawn is alive for the behaviours running right after it. */
-  update(deltaSeconds: number): void {
+  /**
+   * One frame: triggers first, so a spawn is alive for the behaviours running right after it.
+   *
+   * `weapons` is optional because plenty of callers — a headless behaviour test, a scene with no
+   * inventory at all — have no aim to give. Combat then simply does not advance, which is the
+   * truthful outcome rather than a shot fired from the origin.
+   */
+  update(deltaSeconds: number, weapons?: WeaponInput): void {
     if (!this.#started) return;
+
+    this.#damageCooldown = Math.max(0, this.#damageCooldown - deltaSeconds);
+    this.#tickRespawn(deltaSeconds);
+
     this.triggers.update();
     this.behaviors.update(deltaSeconds);
+    // Weapons last: a shot should see the world as it is at the end of the frame the player fired
+    // in, not as it was before the enemies moved.
+    if (weapons && this.playerAlive) this.weapons.update(deltaSeconds, weapons);
+  }
+
+  /**
+   * Puts a dead player back on their feet.
+   *
+   * The whole of Sprint 16's death handling, and deliberately a stub: Sprint 18 replaces the spawn
+   * point with the last checkpoint and restores inventory from a save, and neither of those changes
+   * the shape of this. What matters now is that dying is recoverable rather than terminal.
+   */
+  respawnPlayer(): void {
+    this.#health = this.#playerSettings.health;
+    this.#respawnIn = null;
+    this.#damageCooldown = this.#playerSettings.damageCooldown;
+    this.#player?.teleport(this.#spawnPoint);
+    this.behaviors.emit('playerRespawned', { position: this.#spawnPoint.toArray() });
+  }
+
+  #tickRespawn(deltaSeconds: number): void {
+    if (this.#respawnIn === null) return;
+
+    this.#respawnIn -= deltaSeconds;
+    if (this.#respawnIn <= 0) this.respawnPlayer();
   }
 
   stop(): void {
@@ -128,6 +188,8 @@ export class GameRuntime implements WorldHandle {
     }
     this.#removed.clear();
     this.#health = this.#playerSettings.health;
+    this.#respawnIn = null;
+    this.#damageCooldown = 0;
   }
 
   // ---- WorldHandle ----------------------------------------------------------------------
@@ -142,10 +204,52 @@ export class GameRuntime implements WorldHandle {
 
   damagePlayer(amount: number): void {
     if (!this.#player || amount <= 0 || this.#health <= 0) return;
+    // Two enemies swinging in the same frame would otherwise do double damage, and a crowd would
+    // kill the player in a way that reads as a bug rather than as a fight.
+    if (this.#damageCooldown > 0) return;
 
+    this.#damageCooldown = this.#playerSettings.damageCooldown;
     this.#health = Math.max(0, this.#health - amount);
     this.behaviors.emit('playerDamaged', { amount, health: this.#health });
-    if (this.#health === 0) this.behaviors.emit('playerDied', {});
+    if (this.#health === 0) {
+      this.#respawnIn = this.#playerSettings.respawnSeconds;
+      this.behaviors.emit('playerDied', {});
+    }
+  }
+
+  collect(request: PickupRequest): boolean {
+    if (!this.#player || this.#health <= 0) return false;
+
+    switch (request.kind) {
+      case 'weapon':
+        return this.inventory.give(request.weaponId);
+      case 'ammo':
+        return this.inventory.addAmmo(request.weaponId, request.amount);
+      case 'health': {
+        const maximum = this.#playerSettings.health;
+        // Full health means the medkit is worth keeping for later, so it stays in the world.
+        if (this.#health >= maximum || request.amount <= 0) return false;
+
+        this.#health = Math.min(maximum, this.#health + request.amount);
+        this.behaviors.emit('playerHealed', { amount: request.amount, health: this.#health });
+        return true;
+      }
+    }
+  }
+
+  /**
+   * Traces a shot, ignoring the shooter's own capsule.
+   *
+   * Without the exclusion every shot lands on the player at zero distance, because the ray starts
+   * inside the character controller's collider. It is the same trap `lineOfSight` fell into from
+   * the other direction in Sprint 11.
+   */
+  #castShot(origin: THREE.Vector3, direction: THREE.Vector3, range: number): ShotHit | null {
+    const physics = this.#physics;
+    if (!physics) return null;
+
+    shotOrigin.copy(origin);
+    return physics.castObject(shotOrigin, direction, range, this.#player?.colliderHandle);
   }
 
   lineOfSight(from: THREE.Vector3, to: THREE.Vector3, ignoreObjectId?: string): boolean {

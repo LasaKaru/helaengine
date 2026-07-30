@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–15 complete. Phases 1 (Editor MVP) and 2 (Behaviours, Physics, AI) done; **Phase 2B (Gameplay Runtime & UI, Sprints 13–20) is under way** — it was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–16 complete. Phases 1 (Editor MVP) and 2 (Behaviours, Physics, AI) done; **Phase 2B (Gameplay Runtime & UI, Sprints 13–20) is under way** — it was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -391,13 +391,24 @@
 
 **Tasks:**
 
-- [ ] Add `inventory` and `playerConfig` to the schema; implement runtime inventory state (current weapon, ammo counts, held items)
-- [ ] Wire weapon firing through `InputManager`: fire action → raycast or projectile → hit check → damage event on the existing bus
-- [ ] Extend the health/damage flow from Sprint 11 to the player; death triggers a respawn stub (full checkpoint integration lands in Sprint 18)
-- [ ] Pickup behaviour (`onPickup`): adds to inventory or health, despawns itself, raises an SFX event
-- [ ] Inspector support for weapon stats and starting inventory — new registered types, not a new UI paradigm
+- [x] Add `inventory` to the schema (a weapon catalogue plus a starting loadout) and implement runtime inventory state — held weapon, clip, reserve, carry limit. **`playerConfig` already exists as `scene.player`**, so the sprint's combat settings (`respawnSeconds`, `damageCooldown`) were added there rather than as a second, overlapping section
+- [x] Wire weapon firing through `InputManager`: fire action → hitscan ray → hit check → `damage` event on the existing bus, which is the message enemies already answer to
+- [x] Extend the health/damage flow from Sprint 11 to the player; death triggers a respawn stub (full checkpoint integration lands in Sprint 18)
+- [x] Pickup behaviour: adds to inventory or health, despawns or hides itself, raises a named SFX event
+- [x] Inspector support for weapon stats and starting inventory — a Weapons panel over the catalogue, and the Pickup behaviour's form generated from its schema like every other behaviour's
+- [x] **Added:** `reload` and `nextWeapon` input actions (R, Q, shoulder buttons, touch buttons); a `damageCooldown` so a crowd cannot chain-kill the player in one frame; and a **Skirmish** scene template that is this sprint's definition of done made into a level
+
+**Tech notes:**
+
+- **Hitscan only.** A ray with a range and a damage number is the shape almost every low-poly shooter needs, it costs one query per shot, and it is exactly reproducible in an export. Projectiles are a different simulation — travel time, gravity, a body per bullet — and folding them in as a `kind` field would leave half the weapon schema meaning nothing for one of the two options.
+- Damage leaves the weapon as a `damage` event with a `targetId`, so a weapon can hurt anything that listens, including things it has never heard of. Nothing in `WeaponSystem` imports an enemy behaviour, and it takes its ray cast as a callback rather than a `PhysicsWorld` — which keeps combat testable without WASM and keeps physics ignorant of weapons.
+- A pickup **asks** the world to take it and obeys the answer. A medkit at full health and an ammo box for a gun the player is not carrying both stay where they are. Swallowing the item and giving nothing is the single most annoying bug this kind of behaviour has.
 
 **Definition of Done:** A test scene with a weapon pickup, an enemy and health/ammo pickups is fully playable: pick up a weapon, shoot an enemy, take damage, heal with a medkit, all reflected in the HUD.
+
+**Met.** The Skirmish template is that scene, and it is played end to end in a real browser: walk onto the crate and the pistol arrives with eight rounds, shoot a goblin dead, R reloads out of the reserve, a medkit refuses to be taken at full health and heals 30 → 70 once the player is hurt, and dying respawns rather than throwing the player out to the editor.
+
+Two things worth recording. First, aiming turns out to be genuinely vertical: the player's eye sits at 1.65 m and a goblin capsule is 1.70 m tall, so a perfectly level shot grazes the tapering top of the capsule and misses. A human aims at the chest without thinking about it; a test has to be told to, which is why the dev API grew a `setPlayerLook(yaw, pitch)`. Second, the weapon **switch** path is only covered with one weapon carried, because nothing in the shipped content grants a second — the multi-weapon cycle is unit-tested rather than played.
 
 ---
 

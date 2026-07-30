@@ -1,5 +1,12 @@
 import type * as THREE from 'three';
-import type { BehaviorEntry, ObjectPhysics, Vec3 } from '@helaengine/schema';
+import type { BehaviorEntry, ObjectPhysics, PickupKind, Vec3 } from '@helaengine/schema';
+
+/** What a pickup is offering. `weaponId` is empty for health, and for ammo means "the held gun". */
+export interface PickupRequest {
+  kind: PickupKind;
+  weaponId: string;
+  amount: number;
+}
 
 export interface SpawnRequest {
   assetId: string;
@@ -27,6 +34,15 @@ export interface WorldHandle {
   playerHealth(): number | null;
   /** Applies damage to the player. Ignored when nothing is playing. */
   damagePlayer(amount: number): void;
+
+  /**
+   * Offers the player an item.
+   *
+   * Returns whether it was taken. A medkit at full health and an ammo box for a weapon the player
+   * is not carrying both return false, and the pickup stays in the world — the alternative is an
+   * item that vanishes having done nothing, which players read as a bug because it is one.
+   */
+  collect(request: PickupRequest): boolean;
 
   /**
    * True when nothing solid stands between the two points.
@@ -67,6 +83,7 @@ export const INERT_WORLD: WorldHandle = {
   playerPosition: () => null,
   playerHealth: () => null,
   damagePlayer: () => {},
+  collect: () => false,
   lineOfSight: () => true,
   groundHeight: () => 0,
   moveTo: () => {},

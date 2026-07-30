@@ -65,6 +65,20 @@ export const PlayerSchema = z
     maxSlopeDegrees: z.number().min(0).max(89).default(50),
     /** Tallest ledge the player steps over without jumping, in metres. */
     stepHeight: z.number().min(0).max(2).default(0.4),
+    /**
+     * Seconds face-down before respawning at the spawn point.
+     *
+     * A stub in the honest sense: Sprint 18 replaces "the spawn point" with "the last checkpoint"
+     * and nothing here changes shape. Zero means respawn on the next frame.
+     */
+    respawnSeconds: z.number().min(0).max(60).default(2),
+    /**
+     * Seconds after taking a hit during which further damage is ignored.
+     *
+     * Without it, two enemies swinging in the same frame do double damage and a crowd kills the
+     * player faster than any of them individually could — which reads as a bug rather than a fight.
+     */
+    damageCooldown: z.number().min(0).max(10).default(0.4),
   })
   .default({});
 export type Player = z.infer<typeof PlayerSchema>;

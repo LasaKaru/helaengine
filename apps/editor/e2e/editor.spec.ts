@@ -1708,3 +1708,246 @@ test.describe('game UI authoring', () => {
     expect(ui.hud.customElements).toHaveLength(1);
   });
 });
+
+/**
+ * Sprint 16 — weapons, health, ammo, combat.
+ *
+ * The Skirmish template is the sprint's definition of done made into a scene: a pistol on a crate,
+ * ammo, a medkit and two goblins that fight back. These tests play it.
+ */
+test.describe('combat', () => {
+  test.beforeEach(async ({ page }) => {
+    await openEditor(page, /Skirmish/);
+  });
+
+  async function enterWalk(page: Page, spawn: [number, number, number]): Promise<void> {
+    await page.evaluate((at) => window.helaengine!.store.getState().setPlayer({ spawn: at }), spawn);
+    await page.waitForTimeout(300);
+    await page.getByRole('button', { name: 'Walk' }).click();
+    await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
+      timeout: 20_000,
+    });
+    await startPlaying(page);
+  }
+
+  test('the Weapons panel edits the catalogue and the starting loadout', async ({ page }) => {
+    const panel = page.getByRole('region', { name: 'Weapons' });
+    await expect(panel.getByLabel('Weapon 1 name')).toHaveValue('Pistol');
+
+    await panel.getByLabel('Weapon 1 damage').fill('45');
+    await panel.getByLabel('Weapon 1 damage').press('Enter');
+    await panel.getByLabel('Player starts with this').check();
+
+    const inventory = await page.evaluate(
+      () => window.helaengine!.store.getState().scene.inventory,
+    );
+    expect(inventory.weapons[0]!.damage).toBe(45);
+    expect(inventory.startingWeaponIds).toEqual(['weapon_0001']);
+  });
+
+  test('deleting a weapon takes it out of the loadout too, so the scene still saves', async ({
+    page,
+  }) => {
+    const panel = page.getByRole('region', { name: 'Weapons' });
+    await panel.getByLabel('Player starts with this').check();
+    await panel.getByRole('button', { name: 'Remove weapon 1' }).click();
+
+    await page.keyboard.press('Control+s');
+    await expect(page.getByRole('status', { name: 'Save state' })).toHaveText('Saved');
+  });
+
+  test('walking into the crate picks up the pistol, and the HUD says so', async ({ page }) => {
+    // The crate is at [0, 0, -6]; spawn a couple of metres short of it and walk in.
+    await enterWalk(page, [0, 0, -2]);
+    expect(await page.evaluate(() => window.helaengine!.playerInventory()!.weaponId)).toBeNull();
+
+    await page.evaluate(() => window.helaengine!.setPlayerYaw(0));
+    await page.keyboard.down('w');
+    await page.waitForFunction(
+      () => window.helaengine!.playerInventory()!.weaponId !== null,
+      undefined,
+      { timeout: 10_000 },
+    );
+    await page.keyboard.up('w');
+
+    const inventory = await page.evaluate(() => window.helaengine!.playerInventory()!);
+    expect(inventory.weaponId).toBe('weapon_0001');
+    expect(inventory.ammo).toBe(8);
+
+    // And the ammo counter shows it. The HUD element is off by default, so turn it on first.
+    await page.evaluate(() =>
+      window.helaengine!.store.getState().setUiConfig({ hud: { showAmmoCounter: true } }),
+    );
+    await expect(page.locator('.hela-ammo')).toHaveText('8');
+  });
+
+  test('shooting an enemy kills it, and costs a round to do', async ({ page }) => {
+    // Lined up with the crate, not two metres to the side of it: the pickup radius is two metres,
+    // so a path that grazes the boundary picks the pistol up about half the time.
+    await enterWalk(page, [0, 0, -14]);
+
+    // Walk over the crate first — it is the only way to be armed, and it is two seconds away.
+    await page.evaluate(() => window.helaengine!.setPlayerYaw(Math.PI));
+    await page.keyboard.down('w');
+    await page.waitForFunction(
+      () => window.helaengine!.playerInventory()!.weaponId !== null,
+      undefined,
+      { timeout: 15_000 },
+    );
+    await page.keyboard.up('w');
+    await page.waitForTimeout(200);
+
+    // Aim at the goblin from wherever the walk actually ended, rather than assuming a yaw. Where
+    // the click lands on the canvas is irrelevant: the shot follows the camera, and a click is only
+    // how the trigger gets pulled.
+    const goblinId = await page.evaluate(
+      () =>
+        window
+          .helaengine!.store.getState()
+          .scene.objects.find((object) => object.metadata.label === 'Goblin')!.id,
+    );
+
+    const canvas = page.locator('canvas');
+    for (let shot = 0; shot < 8; shot += 1) {
+      // Re-aimed every shot, at the node rather than at the document: by now the goblin has seen
+      // the player and is closing, so its placed position is nowhere near where it is.
+      const aimed = await page.evaluate((id) => {
+        const target = window.helaengine!.viewportObjectPosition(id);
+        const player = window.helaengine!.playerPosition();
+        if (!target || !player) return false;
+
+        const dx = target.x - player.x;
+        const dz = target.z - player.z;
+        // Aimed at the chest, not the feet and not dead level. The eye sits at 1.65m and a goblin
+        // capsule is 1.70m tall, so a level shot grazes the tapering top of the capsule and misses.
+        const dy = target.y + 0.9 - (player.y + 1.65);
+        // `yaw` is the camera's Y euler, where 0 faces -Z — so heading is (-sin, 0, -cos).
+        window.helaengine!.setPlayerLook(
+          Math.atan2(-dx, -dz),
+          Math.atan2(dy, Math.hypot(dx, dz)),
+        );
+        return true;
+      }, goblinId);
+      if (!aimed) break; // already dead and despawned
+
+      await page.waitForTimeout(120);
+      await canvas.click({ position: { x: 400, y: 300 }, force: true });
+      await page.waitForTimeout(260);
+    }
+
+    const after = await page.evaluate(() => window.helaengine!.playerInventory()!);
+    expect(after.shotsFired).toBeGreaterThan(0);
+    // Every shot came out of the clip, and the clip is smaller than it was.
+    expect(after.ammo).toBeLessThan(8);
+
+    // 30 damage a shot against 60 health: the goblin is dead, and `despawnOnDeath` took it out of
+    // the world. Either reading counts — what must not happen is a goblin standing there unharmed.
+    const states = await page.evaluate(() => window.helaengine!.enemyStates());
+    const stillThere = await page.evaluate(
+      (id) => window.helaengine!.viewportObjectIds().includes(id),
+      goblinId,
+    );
+    expect(states[goblinId] === 'dead' || !stillThere).toBe(true);
+  });
+
+  test('R reloads and Q cycles weapons', async ({ page }) => {
+    await enterWalk(page, [0, 0, -2]);
+    await page.evaluate(() => window.helaengine!.setPlayerYaw(0));
+    await page.keyboard.down('w');
+    await page.waitForFunction(
+      () => window.helaengine!.playerInventory()!.weaponId !== null,
+      undefined,
+      { timeout: 10_000 },
+    );
+    await page.keyboard.up('w');
+
+    const canvas = page.locator('canvas');
+    await canvas.click({ position: { x: 400, y: 300 }, force: true });
+    await page.waitForTimeout(300);
+    expect(await page.evaluate(() => window.helaengine!.playerInventory()!.ammo)).toBe(7);
+
+    await page.keyboard.press('r');
+    await page.waitForTimeout(1600);
+    const reloaded = await page.evaluate(() => window.helaengine!.playerInventory()!);
+    expect(reloaded.ammo).toBe(8);
+    expect(reloaded.reserve).toBe(39);
+
+    // One weapon carried, so cycling is a no-op rather than an error.
+    await page.keyboard.press('q');
+    await page.waitForTimeout(200);
+    expect(await page.evaluate(() => window.helaengine!.playerInventory()!.weaponId)).toBe(
+      'weapon_0001',
+    );
+  });
+
+  test('a medkit heals a hurt player and stays put for a healthy one', async ({ page }) => {
+    // The medkit is at [-6, 0, -10], and gives 40 health.
+    await enterWalk(page, [-6, 0, -7]);
+    await page.evaluate(() => window.helaengine!.setPlayerYaw(0));
+
+    await page.keyboard.down('w');
+    await page.waitForTimeout(1600);
+    await page.keyboard.up('w');
+
+    // At full health the medkit is worth keeping, so it refused to be taken and health is
+    // unchanged rather than over the maximum.
+    expect(await page.evaluate(() => window.helaengine!.playerHealth())).toBe(100);
+    expect(
+      await page.evaluate(() => {
+        const medkit = window
+          .helaengine!.store.getState()
+          .scene.objects.find((object) => object.metadata.label === 'Medkit');
+        return window.helaengine!.viewportObjectIds().includes(medkit!.id);
+      }),
+    ).toBe(true);
+
+    // Back out of its radius *before* taking damage. Getting hurt while standing on a medkit is
+    // healed on the very next frame — which is correct, and makes the assertion below meaningless.
+    await page.evaluate(() => window.helaengine!.setPlayerYaw(Math.PI));
+    await page.keyboard.down('w');
+    await page.waitForTimeout(1200);
+    await page.keyboard.up('w');
+    await page.waitForTimeout(200);
+
+    await page.evaluate(() => window.helaengine!.damagePlayer(70));
+    expect(await page.evaluate(() => window.helaengine!.playerHealth())).toBe(30);
+
+    await page.evaluate(() => window.helaengine!.setPlayerYaw(0));
+    await page.keyboard.down('w');
+    await page.waitForFunction(() => (window.helaengine!.playerHealth() ?? 0) > 30, undefined, {
+      timeout: 10_000,
+    });
+    await page.keyboard.up('w');
+
+    // 30 + 40, not 30 + 40 capped wrongly or 100 outright.
+    expect(await page.evaluate(() => window.helaengine!.playerHealth())).toBe(70);
+  });
+
+  test('dying respawns the player rather than ending the preview', async ({ page }) => {
+    await enterWalk(page, [0, 0, -2]);
+    await page.evaluate(() =>
+      window.helaengine!.store.getState().setPlayer({ respawnSeconds: 1 }),
+    );
+
+    // Walk somewhere before dying, so "back at the spawn point" is a claim that can fail.
+    await page.evaluate(() => window.helaengine!.setPlayerYaw(Math.PI));
+    await page.keyboard.down('w');
+    await page.waitForTimeout(1500);
+    await page.keyboard.up('w');
+    const moved = await page.evaluate(() => window.helaengine!.playerPosition()!);
+    expect(Math.abs(moved.z + 2)).toBeGreaterThan(2);
+
+    await page.evaluate(() => window.helaengine!.damagePlayer(1000));
+    expect(await page.evaluate(() => window.helaengine!.playerHealth())).toBe(0);
+
+    await page.waitForFunction(() => window.helaengine!.playerHealth() === 100, undefined, {
+      timeout: 10_000,
+    });
+
+    // Back on their feet, back at the spawn point, and still in the world — not thrown out to the
+    // editor, which is what "the preview ended" would look like.
+    const after = await page.evaluate(() => window.helaengine!.playerPosition()!);
+    expect(Math.hypot(after.x - 0, after.z + 2)).toBeLessThan(2);
+    expect(await page.evaluate(() => window.helaengine!.uiScreen())).toBe('playing');
+  });
+});

@@ -1,6 +1,7 @@
 import { behaviorRegistry, type BehaviorRegistry } from './BehaviorRegistry.js';
 import { chaseOnSightDefinition } from '../ai/ChaseOnSightBehavior.js';
 import { patrolDefinition } from './PatrolBehavior.js';
+import { pickupDefinition } from './PickupBehavior.js';
 
 /**
  * Registers the behaviours the engine ships with.
@@ -10,7 +11,7 @@ import { patrolDefinition } from './PatrolBehavior.js';
  * exactly the types they mean to exercise.
  */
 export function registerBuiltinBehaviors(registry: BehaviorRegistry = behaviorRegistry): void {
-  for (const definition of [patrolDefinition, chaseOnSightDefinition]) {
+  for (const definition of [patrolDefinition, chaseOnSightDefinition, pickupDefinition]) {
     if (!registry.has(definition.type)) registry.register(definition);
   }
 }

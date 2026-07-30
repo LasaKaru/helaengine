@@ -16,6 +16,13 @@ export interface DevApi {
   viewportObjects(): Array<{ id: string; assetId: string; isModel: boolean }>;
   /** World X of a node in the viewport — proves a transform edit reached Three.js, not just state. */
   viewportObjectWorldX(objectId: string): number | null;
+  /**
+   * Where a node actually is right now.
+   *
+   * The document position is where an object was *placed*; once the scene is running, anything with
+   * a behaviour has moved. A test that aims at a chasing enemy has to ask the scene graph.
+   */
+  viewportObjectPosition(objectId: string): { x: number; y: number; z: number } | null;
   /** Whether a transform gizmo is currently attached in the scene. */
   hasGizmo(): boolean;
   /** World height of the live terrain at a world X/Z — proves a sculpt reached the geometry. */
@@ -34,6 +41,14 @@ export interface DevApi {
    * direction the edit camera happened to be facing.
    */
   setPlayerYaw(yaw: number): boolean;
+  /**
+   * Points the player, including up and down.
+   *
+   * Pitch matters more than it looks like it should. The player's eye sits at 1.65m and a goblin
+   * capsule is 1.70m tall, so a perfectly level shot grazes the tapering top of the capsule and
+   * misses — a real player aims at the chest without thinking about it, and a test has to as well.
+   */
+  setPlayerLook(yaw: number, pitch: number): boolean;
   /** Player health while walking, or null. */
   playerHealth(): number | null;
   /** Camera rig currently driving the view, or null when not walking. */
@@ -49,12 +64,34 @@ export interface DevApi {
    * arm length, overhead distance — is a claim about this, not about the DOM.
    */
   cameraPose(): { position: [number, number, number]; fov: number } | null;
+  /**
+   * What the player is carrying, or null when nothing is playing.
+   *
+   * Combat is a claim about state — this many rounds, that weapon held, this much health — and none
+   * of it is visible in the DOM beyond a HUD that rounds and formats it. Reading it directly is
+   * what lets a test assert that a shot actually cost a round.
+   */
+  playerInventory(): {
+    weaponId: string | null;
+    ammo: number | null;
+    reserve: number;
+    carried: string[];
+    shotsFired: number;
+  } | null;
   /** Ids the running preview spawned — none of which are in the document. */
   spawnedIds(): string[];
   /** FSM state of every enemy behaviour currently running, keyed by object id. */
   enemyStates(): Record<string, string>;
   /** Raises an event on the running world's bus, the way a weapon or a script would. */
   emit(event: string, payload?: unknown): boolean;
+  /**
+   * Hurts the player, the way an enemy's swing does.
+   *
+   * Getting a headless browser into a real fight is slow and flaky — it depends on two goblins
+   * finding the player and on their attack intervals lining up. Damage is a runtime path, not a
+   * pathfinding one, so a test drives it directly and asserts on what the runtime does about it.
+   */
+  damagePlayer(amount: number): boolean;
   /**
    * What the renderer actually did on the last frame.
    *
@@ -122,10 +159,10 @@ export function setGameRuntime(runtime: GameRuntime | null): void {
   currentGame = runtime;
 }
 
-let lookHandler: ((yaw: number) => void) | null = null;
+let lookHandler: ((yaw: number, pitch?: number) => void) | null = null;
 
 /** Registered by the walk preview while it owns the camera. */
-export function setLookHandler(handler: ((yaw: number) => void) | null): void {
+export function setLookHandler(handler: ((yaw: number, pitch?: number) => void) | null): void {
   lookHandler = handler;
 }
 
@@ -230,6 +267,13 @@ export function exposeDevApi(library: AssetLibrary): void {
         child.type.startsWith('TransformControls'),
       ) === true,
 
+    viewportObjectPosition: (objectId) => {
+      const node = currentLoadedScene?.objects.get(objectId);
+      if (!node) return null;
+      const { x, y, z } = node.getWorldPosition(new Vector3());
+      return { x, y, z };
+    },
+
     terrainHeightAt: (x, z) => currentLoadedScene?.terrainField?.sampleHeight(x, z) ?? null,
 
     projectObject: (objectId) => {
@@ -263,6 +307,12 @@ export function exposeDevApi(library: AssetLibrary): void {
       return true;
     },
 
+    setPlayerLook: (yaw, pitch) => {
+      if (!lookHandler) return false;
+      lookHandler(yaw, pitch);
+      return true;
+    },
+
     playerHealth: () => currentGame?.playerHealth() ?? null,
 
     cameraMode: () => useEditorStore.getState().cameraMode,
@@ -285,6 +335,24 @@ export function exposeDevApi(library: AssetLibrary): void {
             grounded: currentPlayer.grounded,
           }
         : null,
+
+    damagePlayer: (amount) => {
+      if (!currentGame) return false;
+      currentGame.damagePlayer(amount);
+      return true;
+    },
+
+    playerInventory: () => {
+      if (!currentGame) return null;
+      const { inventory, weapons } = currentGame;
+      return {
+        weaponId: inventory.current?.weapon.id ?? null,
+        ammo: inventory.ammo,
+        reserve: inventory.reserve,
+        carried: inventory.carried.map((entry) => entry.weapon.id),
+        shotsFired: weapons.shotsFired,
+      };
+    },
 
     spawnedIds: () => [...(currentGame?.spawnedIds ?? [])],
 

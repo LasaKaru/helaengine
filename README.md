@@ -7,9 +7,11 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 15 — Phase 2B under way. A working editor, behaviours, physics, enemies, trigger
-volumes, a measured performance baseline, and now first/third/top-down cameras with one input layer
-covering keyboard, touch and gamepad, and a schema-driven menu/HUD shell. Weapons and combat are
+**Status:** Sprint 16 — Phase 2B under way. A working editor, behaviours, physics, enemies, trigger
+volumes, a measured performance baseline, first/third/top-down cameras with one input layer covering
+keyboard, touch and gamepad, a schema-driven menu/HUD shell, and now combat: a weapon catalogue in
+the document, hitscan firing, ammo and reloading, pickups, player damage and respawn. The
+**Skirmish** template is a playable level built from all of it. Unlockables and checkpoints are
 next; there is no backend yet, deliberately.
 
 ---
@@ -248,6 +250,34 @@ text, a home-screen background and intro video you upload from your machine, bot
 with an optional binding to health, ammo, score or the play clock. Uploads live in the browser
 alongside your projects — there is no server yet, and a home screen should work before anyone has
 signed in.
+
+## Combat
+
+Weapons live in the document as a **catalogue** — `inventory.weapons` — and objects grant them by id.
+A pistol is described once and the nine crates that give you one all point at the same description,
+so a rebalance is one edit rather than a search. Firing is hitscan: a ray with a range, a damage
+number and an optional spread cone. That is the shape almost every low-poly shooter actually needs,
+it costs one query per shot, and it is exactly reproducible in an export.
+
+A shot that lands leaves as a `damage` event carrying a `targetId` — the same message an enemy
+already answers to, and the same one a trigger can raise. Nothing in the weapon system imports an
+enemy behaviour, so a weapon hurts anything that listens, including things it has never heard of.
+It takes its ray cast as a callback rather than a physics world, which keeps combat testable without
+WebAssembly and keeps physics ignorant of weapons.
+
+The **Pickup** behaviour is the interesting one. It *asks* the world to take the item and does what
+the answer says: a medkit at full health, or an ammo box for a gun you are not carrying, refuses and
+the pickup stays exactly where it is. Swallowing an item and giving nothing is the single most
+annoying bug this kind of behaviour has. Pickups can respawn on a timer, in which case they hide
+rather than being destroyed and rebuilt.
+
+Death is recoverable. Damage respects a cooldown — without it two enemies swinging in the same frame
+do double damage and a crowd kills you in a way that reads as a bug — and running out of health
+respawns you at the spawn point after a delay. Sprint 18 points that at the last checkpoint instead;
+nothing about its shape changes.
+
+The **Skirmish** template is all of it in one level: a pistol on a crate, ammo, a medkit, and two
+goblins that fight back.
 
 ## Where this is going
 

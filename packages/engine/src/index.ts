@@ -27,7 +27,17 @@ export {
   patrolDefinition,
 } from './behaviors/PatrolBehavior.js';
 export type { PatrolParams } from './behaviors/PatrolBehavior.js';
+export {
+  PickupBehavior,
+  PickupParamsSchema,
+  pickupDefinition,
+} from './behaviors/PickupBehavior.js';
+export type { PickupParams } from './behaviors/PickupBehavior.js';
 export { registerBuiltinBehaviors } from './behaviors/builtins.js';
+export { Inventory } from './combat/Inventory.js';
+export type { CarriedWeapon } from './combat/Inventory.js';
+export { WeaponSystem } from './combat/WeaponSystem.js';
+export type { WeaponSystemOptions, WeaponInput, ShotHit } from './combat/WeaponSystem.js';
 export type {
   SceneLoaderOptions,
   PreloadReport,
@@ -65,7 +75,7 @@ export type { GameRuntimeOptions } from './GameRuntime.js';
 export { TriggerRuntime } from './TriggerRuntime.js';
 export type { TriggerRuntimeOptions, EventBus } from './TriggerRuntime.js';
 export { INERT_WORLD } from './world.js';
-export type { WorldHandle, SpawnRequest } from './world.js';
+export type { WorldHandle, SpawnRequest, PickupRequest } from './world.js';
 export { StateMachine } from './ai/StateMachine.js';
 export type { State } from './ai/StateMachine.js';
 export { SteeringAgent } from './ai/SteeringAgent.js';

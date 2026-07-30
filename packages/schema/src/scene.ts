@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { EnvironmentSchema } from './environment.js';
 import { SceneObjectSchema } from './object.js';
 import { GameConfigSchema } from './game.js';
+import { InventorySchema } from './inventory.js';
 import { PlayerSchema } from './physics.js';
 import { UiConfigSchema } from './ui.js';
 import { IdSchema } from './primitives.js';
@@ -22,6 +23,7 @@ export const SceneSchema = z
     environment: EnvironmentSchema.default({}),
     objects: z.array(SceneObjectSchema).default([]),
     player: PlayerSchema,
+    inventory: InventorySchema,
     gameConfig: GameConfigSchema,
     uiConfig: UiConfigSchema,
   })

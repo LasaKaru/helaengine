@@ -37,6 +37,10 @@ registerBuiltinBehaviors();
 /** Just short of straight up/down, so the view never flips through the pole. */
 const MAX_PITCH = Math.PI / 2 - 0.05;
 
+/** Reused per frame: a shot's origin and direction, which would otherwise allocate 120 times a second. */
+const shotOrigin = new THREE.Vector3();
+const shotDirection = new THREE.Vector3();
+
 interface PhysicsPreviewProps {
   loadedScene: LoadedScene | null;
   resolver: AssetResolver;
@@ -116,6 +120,9 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
           resolver,
           physics,
           player: controller.current,
+          // The corrected point, not the document's: respawning at the raw spawn y would put a
+          // dead player back inside whatever hill they started on top of.
+          spawnPoint,
         });
         runtime.current = game;
         setGameRuntime(game);
@@ -133,8 +140,11 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
         look.current.yaw = Math.atan2(-forward.x, -forward.z);
         look.current.pitch = 0;
 
-        setLookHandler((yaw) => {
+        setLookHandler((yaw, pitch) => {
           look.current.yaw = yaw;
+          if (pitch !== undefined) {
+            look.current.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, pitch));
+          }
         });
 
         rig.current = createCameraRig(scene.gameConfig.cameraMode);
@@ -166,7 +176,9 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
           onAction: (action) => {
             // The renderer moved the screen; the host decides what that means for the simulation.
             if (action === 'quit') setWalking(false);
-            if (action === 'restartCheckpoint') controller.current?.teleport(spawnPoint);
+            // Respawning rather than only teleporting: health and the death countdown are as much
+            // a part of "restart" as position is, and Sprint 18 will point this at a checkpoint.
+            if (action === 'restartCheckpoint') runtime.current?.respawnPlayer();
             if (action === 'startGame' || action === 'resume' || action === 'restartCheckpoint') {
               input.current?.requestPointerLock();
             }
@@ -324,8 +336,22 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
     physics.step(delta, (step) => player.move(moveInput, step));
     const afterPhysics = performance.now();
 
+    // The camera is where the player is looking, so it is where the shot comes from. Third person
+    // and top-down included: aiming from the character while the view is behind them is what every
+    // over-the-shoulder shooter does, and aiming from the camera itself would shoot through walls
+    // the character is standing behind.
+    camera.getWorldPosition(shotOrigin);
+    camera.getWorldDirection(shotDirection);
+
     // Gameplay advances after physics, so enemies read positions the solver has already settled.
-    runtime.current?.update(delta);
+    runtime.current?.update(delta, {
+      fire: manager.isDown('fire'),
+      firePressed: manager.wasPressed('fire'),
+      reload: manager.wasPressed('reload'),
+      nextWeapon: manager.wasPressed('nextWeapon'),
+      origin: shotOrigin,
+      direction: shotDirection,
+    });
     recordSimulationTiming(afterPhysics - beforePhysics, performance.now() - afterPhysics);
 
     // Health is pushed into the store only when it changes: mirroring it every frame would mean a
@@ -340,6 +366,7 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
       shell?.setHud({
         health: current,
         maxHealth: scene.player.health,
+        ammo: runtime.current?.inventory.ammo ?? null,
         timer: elapsed.current,
       });
     }

@@ -3,6 +3,7 @@ import { devtools } from 'zustand/middleware';
 import {
   CURRENT_SCENE_VERSION,
   SceneSchema,
+  WeaponSchema,
   type Environment,
   type GameConfig,
   type ObjectPhysics,
@@ -13,6 +14,8 @@ import {
   type Transform,
   type Trigger,
   type HudElement,
+  type Inventory,
+  type Weapon,
   type UiButton,
   type UiConfig,
   type Vec3,
@@ -72,6 +75,11 @@ export interface SceneState {
   setObjectPhysics(objectId: string, physics: Partial<ObjectPhysics>): void;
   setTrigger(objectId: string, trigger: Partial<Trigger>): void;
   setPlayer(player: Partial<Player>): void;
+  setInventory(inventory: Partial<Inventory>): void;
+  addWeapon(): string;
+  removeWeapon(weaponId: string): void;
+  setWeapon(weaponId: string, weapon: Partial<Weapon>): void;
+  toggleStartingWeapon(weaponId: string): void;
   setGameConfig(config: Partial<GameConfig>): void;
   setUiConfig(config: UiConfigPatch): void;
   setMenuButtons(menu: 'mainMenu' | 'pauseMenu', buttons: UiButton[]): void;
@@ -383,6 +391,48 @@ export const useSceneStore = create<SceneState>()(
             draft.uiConfig.hud.customElements = elements;
           }),
 
+        setInventory: (inventory) =>
+          commit('scene/setInventory', (draft) => {
+            Object.assign(draft.inventory, inventory);
+          }),
+
+        addWeapon: () => {
+          const id = nextWeaponId(get().scene);
+          commit('inventory/addWeapon', (draft) => {
+            draft.inventory.weapons.push(
+              WeaponSchema.parse({ id, name: `Weapon ${draft.inventory.weapons.length + 1}` }),
+            );
+          });
+          return id;
+        },
+
+        removeWeapon: (weaponId) =>
+          commit('inventory/removeWeapon', (draft) => {
+            draft.inventory.weapons = draft.inventory.weapons.filter(
+              (weapon) => weapon.id !== weaponId,
+            );
+            // The starting loadout references weapons by id, and the schema rejects a document
+            // whose loadout names a weapon that is not in the catalogue — so the two have to be
+            // edited together or a delete would make the scene unsaveable.
+            draft.inventory.startingWeaponIds = draft.inventory.startingWeaponIds.filter(
+              (id) => id !== weaponId,
+            );
+          }),
+
+        setWeapon: (weaponId, weapon) =>
+          commit('inventory/setWeapon', (draft) => {
+            const found = draft.inventory.weapons.find((entry) => entry.id === weaponId);
+            if (found) Object.assign(found, weapon);
+          }),
+
+        toggleStartingWeapon: (weaponId) =>
+          commit('inventory/toggleStartingWeapon', (draft) => {
+            const ids = draft.inventory.startingWeaponIds;
+            const at = ids.indexOf(weaponId);
+            if (at >= 0) ids.splice(at, 1);
+            else ids.push(weaponId);
+          }),
+
         setPlayer: (player) =>
           commit('scene/setPlayer', (draft) => {
             Object.assign(draft.player, player);
@@ -470,4 +520,32 @@ export function nextObjectId(scene: Scene): string {
     if (match) highest = Math.max(highest, Number(match[1]));
   }
   return `obj_${String(highest + 1).padStart(4, '0')}`;
+}
+
+/**
+ * Generates the next free `weapon_NNNN` id.
+ *
+ * Ids are generated rather than derived from the name for the same reason object ids are: a weapon
+ * gets renamed, and every pickup that granted it would otherwise stop granting anything.
+ *
+ * The pickups are scanned as well as the catalogue, and that is the whole point of this function
+ * rather than a copy of `nextObjectId`. Deleting the highest-numbered weapon would otherwise free
+ * its id, and the next weapon added would inherit every pickup that used to grant the deleted one —
+ * a crate that quietly hands out the wrong gun, with nothing anywhere saying so.
+ */
+export function nextWeaponId(scene: Scene): string {
+  let highest = 0;
+  const consider = (id: string): void => {
+    const match = /^weapon_(\d+)$/.exec(id);
+    if (match) highest = Math.max(highest, Number(match[1]));
+  };
+
+  for (const weapon of scene.inventory.weapons) consider(weapon.id);
+  for (const object of scene.objects) {
+    for (const behavior of object.behaviors) {
+      const weaponId = (behavior.params as { weaponId?: unknown }).weaponId;
+      if (typeof weaponId === 'string') consider(weaponId);
+    }
+  }
+  return `weapon_${String(highest + 1).padStart(4, '0')}`;
 }

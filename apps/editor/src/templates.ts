@@ -42,6 +42,7 @@ function buildScene(
   name: string,
   placements: Placement[],
   terrain: Partial<Scene['terrain']> = {},
+  inventory: Partial<Scene['inventory']> = {},
 ): Scene {
   counter = 0;
   return SceneSchema.parse({
@@ -49,6 +50,7 @@ function buildScene(
     version: CURRENT_SCENE_VERSION,
     name,
     terrain,
+    inventory,
     objects: placements.map((placement) => ({
       id: objectId(),
       assetId: placement.assetId,
@@ -184,6 +186,120 @@ export const TEMPLATES: SceneTemplate[] = [
           field.paint(30, -30, 1, { radius: 24, strength: 0.8 });
         }),
       });
+    },
+  },
+  {
+    id: 'skirmish',
+    name: 'Skirmish',
+    description:
+      'A pistol on a crate, a goblin that fights back, and medkits. The shortest path to a playable game.',
+    build: () => {
+      const random = seeded(20260816);
+      const placements: Placement[] = [
+        {
+          assetId: 'prop_crate_01',
+          position: [0, 0, -6],
+          label: 'Pistol crate',
+          behaviors: [
+            { type: 'pickup', params: { kind: 'weapon', weaponId: 'weapon_0001', radius: 2 } },
+          ],
+        },
+        {
+          assetId: 'prop_barrel_01',
+          position: [6, 0, -10],
+          label: 'Ammo',
+          behaviors: [
+            {
+              type: 'pickup',
+              params: {
+                kind: 'ammo',
+                weaponId: 'weapon_0001',
+                amount: 24,
+                radius: 2,
+                respawnSeconds: 20,
+              },
+            },
+          ],
+        },
+        {
+          assetId: 'prop_crate_01',
+          position: [-6, 0, -10],
+          label: 'Medkit',
+          behaviors: [
+            {
+              type: 'pickup',
+              params: { kind: 'health', amount: 40, radius: 2, respawnSeconds: 25 },
+            },
+          ],
+        },
+        {
+          assetId: 'enemy_goblin_01',
+          position: [2, 0, -20],
+          rotationY: 180,
+          label: 'Goblin',
+          behaviors: [
+            {
+              type: 'chaseOnSight',
+              params: { sightRange: 24, chaseSpeed: 3.5, health: 60, attackDamage: 12 },
+            },
+          ],
+        },
+        {
+          assetId: 'enemy_goblin_01',
+          position: [-3, 0, -24],
+          rotationY: 170,
+          label: 'Goblin two',
+          behaviors: [
+            {
+              type: 'chaseOnSight',
+              params: { sightRange: 24, chaseSpeed: 3.5, health: 60, attackDamage: 12 },
+            },
+          ],
+        },
+      ];
+
+      // A treeline, so the fight has cover and the line-of-sight checks have something to do.
+      for (let index = 0; index < 14; index += 1) {
+        const angle = (index / 14) * Math.PI * 2 + random() * 0.3;
+        const distance = 26 + random() * 8;
+        placements.push({
+          assetId: random() > 0.5 ? 'tree_pine_01' : 'tree_oak_01',
+          position: [
+            Number((Math.cos(angle) * distance).toFixed(2)),
+            0,
+            Number((Math.sin(angle) * distance).toFixed(2)),
+          ],
+          rotationY: Number((random() * 360).toFixed(1)),
+        });
+      }
+
+      return buildScene(
+        'Skirmish',
+        placements,
+        sculptedTerrain((field) => {
+          // Flat where the fight happens: a first playable should not also be a hill climb.
+          field.sculpt(0, -12, 'flatten', { radius: 30, strength: 1 });
+          field.sculpt(34, 20, 'raise', { radius: 26, strength: 0.4 });
+        }),
+        {
+          weapons: [
+            {
+              id: 'weapon_0001',
+              name: 'Pistol',
+              damage: 30,
+              range: 60,
+              fireInterval: 0.28,
+              automatic: false,
+              clipSize: 8,
+              reserveAmmo: 40,
+              reloadSeconds: 1.1,
+              spreadDegrees: 1.2,
+            },
+          ],
+          // Nothing to start with: finding the crate is the first thing the scene asks you to do.
+          startingWeaponIds: [],
+        },
+      );
     },
   },
   {

@@ -15,6 +15,8 @@ export type InputAction =
   | 'sprint'
   | 'crouch'
   | 'fire'
+  | 'reload'
+  | 'nextWeapon'
   | 'interact'
   | 'switchCamera';
 
@@ -27,6 +29,8 @@ export const INPUT_ACTIONS: readonly InputAction[] = [
   'sprint',
   'crouch',
   'fire',
+  'reload',
+  'nextWeapon',
   'interact',
   'switchCamera',
 ];
@@ -46,6 +50,8 @@ export const DEFAULT_KEY_BINDINGS: Readonly<Record<string, InputAction>> = {
   ShiftRight: 'sprint',
   ControlLeft: 'crouch',
   KeyC: 'crouch',
+  KeyR: 'reload',
+  KeyQ: 'nextWeapon',
   KeyE: 'interact',
   KeyV: 'switchCamera',
 };
@@ -61,6 +67,8 @@ const GAMEPAD_BUTTONS: Readonly<Record<number, InputAction>> = {
   1: 'crouch', // B
   2: 'interact', // X
   3: 'switchCamera', // Y
+  4: 'reload', // left shoulder
+  5: 'nextWeapon', // right shoulder
   7: 'fire', // right trigger
   10: 'sprint', // left stick click
 };
@@ -401,7 +409,9 @@ export class InputManager {
     for (const [action, label, offset] of [
       ['jump', 'Jump', 24],
       ['fire', 'Fire', 100],
-      ['interact', 'Use', 176],
+      ['reload', 'Reload', 176],
+      ['nextWeapon', 'Swap', 252],
+      ['interact', 'Use', 328],
     ] as const) {
       const button = document.createElement('button');
       button.type = 'button';

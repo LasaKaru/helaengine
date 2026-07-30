@@ -452,8 +452,12 @@ describe('GameRuntime', () => {
     const loaded = loader.load(scene);
     const runtime = new GameRuntime({ loader, loaded, scene, resolver, warn: () => {} });
 
-    // A stand-in for the character controller: the runtime only ever reads `.position`.
-    runtime.setPlayer({ position: player } as never);
+    // A stand-in for the character controller: the runtime reads `.position` and, on a respawn,
+    // puts the character back with `teleport`.
+    runtime.setPlayer({
+      position: player,
+      teleport: (to: THREE.Vector3) => player.copy(to),
+    } as never);
     runtime.start();
     return runtime;
   }
@@ -512,12 +516,46 @@ describe('GameRuntime', () => {
     runtime.damagePlayer(60);
     expect(runtime.playerHealth()).toBe(40);
 
+    // Hits land no faster than `player.damageCooldown`, so the clock has to move between them.
+    runtime.update(1);
     runtime.damagePlayer(100);
     expect(runtime.playerHealth()).toBe(0);
     expect(runtime.playerAlive).toBe(false);
 
+    runtime.update(1);
     runtime.damagePlayer(10);
     expect(died).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a second hit inside the damage cooldown', () => {
+    // Two enemies swinging in the same frame would otherwise do double damage, which reads as a
+    // bug rather than as a fight.
+    const runtime = makeRuntime();
+
+    runtime.damagePlayer(10);
+    runtime.damagePlayer(10);
+    expect(runtime.playerHealth()).toBe(90);
+
+    runtime.update(1);
+    runtime.damagePlayer(10);
+    expect(runtime.playerHealth()).toBe(80);
+  });
+
+  it('puts a dead player back on their feet after the respawn delay', () => {
+    const runtime = makeRuntime();
+    const respawned = vi.fn();
+    runtime.behaviors.on('playerRespawned', respawned);
+
+    runtime.damagePlayer(1000);
+    expect(runtime.playerAlive).toBe(false);
+
+    // The default respawn is two seconds, and the runtime clamps its own delta the way the
+    // behaviour runtime does — so this is twenty frames of a very slow game, not one long one.
+    for (let frame = 0; frame < 30; frame += 1) runtime.update(0.1);
+
+    expect(runtime.playerAlive).toBe(true);
+    expect(runtime.playerHealth()).toBe(100);
+    expect(respawned).toHaveBeenCalledTimes(1);
   });
 
   it('answers "no walls" for line of sight when there is no physics world', () => {

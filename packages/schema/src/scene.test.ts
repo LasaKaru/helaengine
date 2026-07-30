@@ -347,3 +347,55 @@ describe('trigger volumes', () => {
     expect(action).toMatchObject({ type: 'spawn', assetId: 'enemy_goblin_01', offset: [0, 0, 0] });
   });
 });
+
+describe('inventory', () => {
+  const base = { sceneId: 'scene_test', version: 1 };
+
+  it('gives a scene an empty catalogue by default', () => {
+    const scene = parseScene(base);
+    expect(scene.inventory.weapons).toEqual([]);
+    expect(scene.inventory.startingWeaponIds).toEqual([]);
+    expect(scene.inventory.maxCarried).toBe(4);
+  });
+
+  it('fills a weapon in from one field', () => {
+    const scene = parseScene({
+      ...base,
+      inventory: { weapons: [{ id: 'weapon_0001' }] },
+    });
+    expect(scene.inventory.weapons[0]).toMatchObject({
+      id: 'weapon_0001',
+      name: 'Weapon',
+      damage: 25,
+      clipSize: 12,
+      automatic: false,
+    });
+  });
+
+  it('rejects a starting weapon that is not in the catalogue', () => {
+    // Otherwise the player spawns holding nothing with no error anywhere, which is exactly the
+    // silent-wrong the schema exists to catch.
+    const result = safeParseScene({
+      ...base,
+      inventory: { weapons: [{ id: 'weapon_0001' }], startingWeaponIds: ['weapon_0002'] },
+    });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toContain('weapon_0002');
+  });
+
+  it('rejects two weapons with the same id', () => {
+    const result = safeParseScene({
+      ...base,
+      inventory: { weapons: [{ id: 'weapon_0001' }, { id: 'weapon_0001' }] },
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('player combat settings', () => {
+  it('defaults the respawn delay and the damage cooldown', () => {
+    const player = parseScene({ sceneId: 'scene_test', version: 1 }).player;
+    expect(player.respawnSeconds).toBe(2);
+    expect(player.damageCooldown).toBe(0.4);
+  });
+});

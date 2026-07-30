@@ -54,3 +54,32 @@ describe('the stress benchmark scene', () => {
     expect(templateById('stress-test')?.name).toBe('Stress test');
   });
 });
+
+describe('skirmish template', () => {
+  it('is playable the moment it loads: a weapon, pickups that grant it, and enemies', () => {
+    const scene = templateById('skirmish')!.build();
+
+    expect(scene.inventory.weapons.map((weapon) => weapon.id)).toEqual(['weapon_0001']);
+
+    const pickups = scene.objects.flatMap((object) =>
+      object.behaviors.filter((behavior) => behavior.type === 'pickup'),
+    );
+    expect(pickups.map((pickup) => (pickup.params as { kind: string }).kind).sort()).toEqual([
+      'ammo',
+      'health',
+      'weapon',
+    ]);
+
+    // Every pickup that names a weapon names one that exists — the schema enforces this for the
+    // starting loadout but not for behaviour params, so the template has to be right by itself.
+    for (const pickup of pickups) {
+      const weaponId = (pickup.params as { weaponId?: string }).weaponId;
+      if (weaponId) expect(scene.inventory.weapons.some((w) => w.id === weaponId)).toBe(true);
+    }
+
+    const enemies = scene.objects.filter((object) =>
+      object.behaviors.some((behavior) => behavior.type === 'chaseOnSight'),
+    );
+    expect(enemies.length).toBeGreaterThanOrEqual(2);
+  });
+});
