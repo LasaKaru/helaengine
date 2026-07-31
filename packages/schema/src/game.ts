@@ -19,6 +19,21 @@ export const MultiplayerConfigSchema = z
      * them as coming rather than pretending they do not exist.
      */
     mode: z.enum(['coop', 'deathmatch', 'none']).default('none'),
+    /**
+     * Where the co-op server lives.
+     *
+     * In the document because an exported build has to know it without being recompiled, and
+     * empty by default because most scenes are single-player and a wrong URL that tries to connect
+     * is worse than one that never does.
+     */
+    serverUrl: z.string().max(300).default(''),
+    /**
+     * How often a client sends its input to the server, in hertz.
+     *
+     * Separate from the frame rate: sixty input packets a second is bandwidth spent on detail no
+     * player can perceive, and twenty is the rate most co-op games settle on.
+     */
+    inputHz: z.number().int().min(5).max(60).default(20),
   })
   .default({});
 export type MultiplayerConfig = z.infer<typeof MultiplayerConfigSchema>;

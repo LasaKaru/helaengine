@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import {
   AudioSystem,
+  CoopClient,
   InputManager,
   MixerStore,
   PhysicsWorld,
@@ -10,6 +11,7 @@ import {
   createPlayerAvatar,
   nextCameraMode,
   registerBuiltinBehaviors,
+  RemotePlayers,
   SaveStore,
   startScene,
   UIRenderer,
@@ -23,12 +25,14 @@ import {
 } from '@helaengine/engine';
 import type { CameraMode } from '@helaengine/schema';
 import { ASSET_BASE_URL } from '../engine/assetLibrary';
+import { ColyseusTransport } from '../net/colyseusTransport';
 import { cachedUiAssetUrl } from '../storage/uiAssets';
 import { useEditorStore } from '../store/editorStore';
 import { useSceneStore } from '../store/sceneStore';
 import {
   recordSimulationTiming,
   setAudioSystem,
+  setCoopClient,
   resetSimulationTiming,
   setGameRuntime,
   setLookHandler,
@@ -79,6 +83,8 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
   const ui = useRef<UIRenderer | null>(null);
   const saves = useRef<SaveStore | null>(null);
   const audio = useRef<AudioSystem | null>(null);
+  const coop = useRef<CoopClient | null>(null);
+  const remotes = useRef<RemotePlayers | null>(null);
   const look = useRef({ yaw: 0, pitch: 0 });
   const lookDelta = useRef({ x: 0, y: 0 });
   const health = useRef<number | null>(null);
@@ -246,6 +252,31 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
         loadedScene.threeScene.add(body.node);
         avatar.current = body;
 
+        // Co-op, when the document asks for it. A failure here drops to single player rather than
+        // refusing to start: somebody who wanted to play should be playing, even alone.
+        if (scene.gameConfig.multiplayer.enabled && scene.gameConfig.multiplayer.mode === 'coop') {
+          const others = new RemotePlayers(loadedScene.threeScene, scene.player);
+          remotes.current = others;
+
+          const net = new CoopClient({
+            config: scene.gameConfig.multiplayer,
+            transport: new ColyseusTransport(),
+            sceneId: scene.sceneId,
+            scene,
+            name: 'Editor',
+          });
+          coop.current = net;
+          setCoopClient(net);
+          void net.connect().then((joined) => {
+            if (!joined) return;
+            // The server owns destruction, so a peer's kill removes the object here too.
+            net.onMessage('objectDestroyed', (payload) => {
+              const objectId = (payload as { objectId?: string } | undefined)?.objectId;
+              if (objectId) game.destroy(objectId);
+            });
+          });
+        }
+
         setPhysicsStatus('ready');
         setWorld(physics);
       })
@@ -270,6 +301,11 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
       avatar.current?.dispose();
       avatar.current = null;
       setCameraMode(null);
+      void coop.current?.disconnect();
+      coop.current = null;
+      setCoopClient(null);
+      remotes.current?.dispose();
+      remotes.current = null;
       audio.current?.stop();
       audio.current = null;
       setAudioSystem(null);
@@ -440,6 +476,21 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
         timer: elapsed.current,
       });
     }
+
+    // Co-op: send this player's intent, and draw everyone else where the server says they are.
+    const net = coop.current;
+    if (net) {
+      net.update(delta, {
+        forward: moveInput.forward,
+        right: moveInput.right,
+        jump: moveInput.jump,
+        sprint: moveInput.sprint ?? false,
+        crouch: moveInput.crouch ?? false,
+        yaw: moveInput.yaw,
+      });
+      remotes.current?.sync(net.players, net.sessionId);
+    }
+    remotes.current?.update(delta);
 
     if (avatar.current) {
       avatar.current.update(player.position, look.current.yaw, player.crouched);

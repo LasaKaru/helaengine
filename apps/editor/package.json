@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "HelaEngine editor \u2014 React + react-three-fiber shell around the engine runtime.",
+  "description": "HelaEngine editor — React + react-three-fiber shell around the engine runtime.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -17,6 +17,7 @@
     "@helaengine/schema": "workspace:*",
     "@react-three/drei": "^9.120.4",
     "@react-three/fiber": "^8.17.10",
+    "colyseus.js": "0.15.26",
     "dexie": "^4.4.4",
     "immer": "^10.1.1",
     "react": "^18.3.1",

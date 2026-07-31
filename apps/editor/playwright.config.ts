@@ -30,10 +30,20 @@ export default defineConfig({
     },
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  webServer: {
-    command: 'pnpm dev --port 5174 --strictPort',
-    url: 'http://127.0.0.1:5174',
-    reuseExistingServer: !process.env['CI'],
-    timeout: 120_000,
-  },
+  webServer: [
+    {
+      command: 'pnpm dev --port 5174 --strictPort',
+      url: 'http://127.0.0.1:5174',
+      reuseExistingServer: !process.env['CI'],
+      timeout: 120_000,
+    },
+    {
+      // The co-op server (Sprint 20). Started for the whole run rather than per test, because it
+      // holds the room two browser contexts have to meet in.
+      command: 'pnpm --filter @helaengine/realtime start',
+      url: 'http://127.0.0.1:2567/health',
+      reuseExistingServer: !process.env['CI'],
+      timeout: 120_000,
+    },
+  ],
 });

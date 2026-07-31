@@ -1,5 +1,11 @@
 import { Vector3, type Camera, type WebGLRenderer } from 'three';
-import type { AudioSystem, GameRuntime, LoadedScene, PlayerController } from '@helaengine/engine';
+import type {
+  AudioSystem,
+  CoopClient,
+  GameRuntime,
+  LoadedScene,
+  PlayerController,
+} from '@helaengine/engine';
 import { SceneObjectSchema, type Vec3 } from '@helaengine/schema';
 import type { AssetLibrary } from './engine/assetLibrary';
 import { useEditorStore } from './store/editorStore';
@@ -89,6 +95,18 @@ export interface DevApi {
     musicState: string | null;
     inCombat: boolean;
     mixer: { master: number; music: number; sfx: number };
+  } | null;
+  /**
+   * The co-op session, or null when the scene is single-player.
+   *
+   * `players` is everyone the server says is present, this client included — which is what a test
+   * needs to assert that two browsers really are in the same world.
+   */
+  coopState(): {
+    status: string;
+    sessionId: string;
+    error: string | null;
+    players: Array<{ sessionId: string; name: string; x: number; z: number }>;
   } | null;
   /** Object id of the checkpoint the player currently holds, or null. */
   currentCheckpoint(): string | null;
@@ -184,6 +202,13 @@ let currentAudio: AudioSystem | null = null;
 /** Records the running audio system, so tests can read what it decided to play. */
 export function setAudioSystem(audio: AudioSystem | null): void {
   currentAudio = audio;
+}
+
+let currentCoop: CoopClient | null = null;
+
+/** Records the co-op client, so a test can read the session without a second browser. */
+export function setCoopClient(client: CoopClient | null): void {
+  currentCoop = client;
 }
 
 let lookHandler: ((yaw: number, pitch?: number) => void) | null = null;
@@ -375,6 +400,21 @@ export function exposeDevApi(library: AssetLibrary): void {
             musicState: currentAudio.music.state,
             inCombat: currentAudio.inCombat,
             mixer: { ...currentAudio.mixer },
+          }
+        : null,
+
+    coopState: () =>
+      currentCoop
+        ? {
+            status: currentCoop.status,
+            sessionId: currentCoop.sessionId,
+            error: currentCoop.error,
+            players: currentCoop.players.map((player) => ({
+              sessionId: player.sessionId,
+              name: player.name,
+              x: Number(player.x.toFixed(2)),
+              z: Number(player.z.toFixed(2)),
+            })),
           }
         : null,
 

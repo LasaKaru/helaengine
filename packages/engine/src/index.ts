@@ -41,6 +41,15 @@ export {
 export type { CheckpointParams } from './behaviors/CheckpointBehavior.js';
 export { registerBuiltinBehaviors } from './behaviors/builtins.js';
 export { SaveStore, saveKey } from './save/SaveStore.js';
+export { CoopClient } from './net/CoopClient.js';
+export type {
+  CoopClientOptions,
+  CoopTransport,
+  CoopInput,
+  CoopStatus,
+} from './net/CoopClient.js';
+export { RemotePlayers, interpolateAngle } from './net/RemotePlayers.js';
+export type { RemotePlayerSnapshot } from './net/RemotePlayers.js';
 export { AudioSystem } from './audio/AudioSystem.js';
 export type { AudioSystemOptions, SfxVoice } from './audio/AudioSystem.js';
 export { MixerStore, MIXER_KEY } from './audio/MixerStore.js';

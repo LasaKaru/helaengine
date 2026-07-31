@@ -2378,3 +2378,202 @@ test.describe('audio', () => {
     ).toBe(before);
   });
 });
+
+/**
+ * Sprint 20 — co-op multiplayer.
+ *
+ * Two *separate browser contexts*, which is the only honest way to test this: a second tab sharing
+ * the first one's storage and process would prove far less than it appears to. They connect to a
+ * real Colyseus server (started by the Playwright config) running the engine's own physics in Node.
+ */
+test.describe('co-op', () => {
+  const SERVER = 'ws://127.0.0.1:2567';
+
+  /** Opens the editor in a fresh context, turns co-op on, and walks into the world. */
+  async function joinSession(page: Page, sceneId: string): Promise<void> {
+    await page.goto('/');
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          const request = indexedDB.deleteDatabase('helaengine');
+          request.onsuccess = () => resolve();
+          request.onerror = () => resolve();
+          request.onblocked = () => resolve();
+        }),
+    );
+    await page.reload();
+    await page.getByRole('button', { name: /Empty field/ }).click();
+    await expect(page.getByRole('banner')).toBeVisible();
+    await page.waitForFunction(() => window.helaengine !== undefined);
+
+    // Both contexts must agree on the scene id, or the server refuses the second join — which is
+    // itself a behaviour worth having, and is asserted separately below.
+    await page.evaluate(
+      ([id, url]) => {
+        const state = window.helaengine!.store.getState();
+        state.setScene({ ...state.scene, sceneId: id! });
+        state.setGameConfig({
+          multiplayer: { enabled: true, mode: 'coop', maxPlayers: 4, serverUrl: url!, inputHz: 20 },
+        });
+      },
+      [sceneId, SERVER],
+    );
+    await page.waitForTimeout(300);
+
+    await page.getByRole('button', { name: 'Walk' }).click();
+    await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
+      timeout: 20_000,
+    });
+    await startPlaying(page);
+    await page.waitForFunction(() => window.helaengine!.coopState()?.status === 'connected', undefined, {
+      timeout: 20_000,
+    });
+  }
+
+  test('the Game panel turns co-op on and records the server', async ({ page }) => {
+    await openEditor(page);
+    const panel = page.getByRole('region', { name: 'Game', exact: true });
+
+    await panel.getByLabel('Co-op multiplayer').check();
+    await panel.getByLabel('Multiplayer server URL').fill(SERVER);
+
+    const config = await page.evaluate(
+      () => window.helaengine!.store.getState().scene.gameConfig.multiplayer,
+    );
+    // Enabling picks the one mode the runtime implements, rather than leaving a switch that does
+    // nothing.
+    expect(config).toMatchObject({ enabled: true, mode: 'coop', serverUrl: SERVER });
+  });
+
+  test('a single-player scene never connects', async ({ page }) => {
+    await openEditor(page);
+    await page.getByRole('button', { name: 'Walk' }).click();
+    await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
+      timeout: 20_000,
+    });
+    await startPlaying(page);
+
+    expect(await page.evaluate(() => window.helaengine!.coopState())).toBeNull();
+  });
+
+  test('two browsers join the same world and see each other move', async ({ browser }) => {
+    // The definition of done. Two full editor boots plus a WebGL context each, under a software
+    // renderer — the default thirty seconds is not a real budget for that.
+    test.setTimeout(180_000);
+    const sceneId = `scene_coop_${Date.now()}`;
+    const alice = await browser.newContext();
+    const bob = await browser.newContext();
+    const alicePage = await alice.newPage();
+    const bobPage = await bob.newPage();
+
+    try {
+      await joinSession(alicePage, sceneId);
+      await joinSession(bobPage, sceneId);
+
+      // Both see two people.
+      for (const page of [alicePage, bobPage]) {
+        await page.waitForFunction(
+          () => (window.helaengine!.coopState()?.players.length ?? 0) === 2,
+          undefined,
+          { timeout: 20_000 },
+        );
+      }
+
+      const aliceId = await alicePage.evaluate(() => window.helaengine!.coopState()!.sessionId);
+      const startZ = await bobPage.evaluate(
+        (id) => window.helaengine!.coopState()!.players.find((p) => p.sessionId === id)!.z,
+        aliceId,
+      );
+
+      // Alice walks. Bob's browser has to see it, and the position it sees came from the server.
+      await alicePage.evaluate(() => window.helaengine!.setPlayerYaw(0));
+      await alicePage.keyboard.down('w');
+      await bobPage.waitForFunction(
+        ([id, from]) => {
+          const player = window.helaengine!.coopState()!.players.find((p) => p.sessionId === id);
+          return player !== undefined && player.z < (from as number) - 2;
+        },
+        [aliceId, startZ] as [string, number],
+        { timeout: 20_000 },
+      );
+      await alicePage.keyboard.up('w');
+
+      // And Bob, who has not moved, is still where he started as far as Alice is concerned.
+      const bobId = await bobPage.evaluate(() => window.helaengine!.coopState()!.sessionId);
+      const bobSeen = await alicePage.evaluate(
+        (id) => window.helaengine!.coopState()!.players.find((p) => p.sessionId === id)!.z,
+        bobId,
+      );
+      expect(Math.abs(bobSeen)).toBeLessThan(3);
+    } finally {
+      await alice.close();
+      await bob.close();
+    }
+  });
+
+  test('leaving takes a player out of the other browser', async ({ browser }) => {
+    test.setTimeout(180_000);
+    const sceneId = `scene_coop_${Date.now()}_leave`;
+    const alice = await browser.newContext();
+    const bob = await browser.newContext();
+
+    try {
+      const alicePage = await alice.newPage();
+      const bobPage = await bob.newPage();
+      await joinSession(alicePage, sceneId);
+      await joinSession(bobPage, sceneId);
+      await alicePage.waitForFunction(
+        () => (window.helaengine!.coopState()?.players.length ?? 0) === 2,
+        undefined,
+        { timeout: 20_000 },
+      );
+
+      await bob.close();
+      await alicePage.waitForFunction(
+        () => (window.helaengine!.coopState()?.players.length ?? 0) === 1,
+        undefined,
+        { timeout: 20_000 },
+      );
+    } finally {
+      await alice.close();
+      await bob.close().catch(() => undefined);
+    }
+  });
+
+  test('an unreachable server drops to single player rather than refusing to start', async ({
+    page,
+  }) => {
+    // Somebody who wanted to play should be playing, even alone.
+    await openEditor(page);
+    await page.evaluate(() =>
+      window.helaengine!.store.getState().setGameConfig({
+        multiplayer: {
+          enabled: true,
+          mode: 'coop',
+          maxPlayers: 4,
+          serverUrl: 'ws://127.0.0.1:59999',
+          inputHz: 20,
+        },
+      }),
+    );
+    await page.waitForTimeout(300);
+
+    await page.getByRole('button', { name: 'Walk' }).click();
+    await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
+      timeout: 20_000,
+    });
+    await startPlaying(page);
+
+    await page.waitForFunction(() => window.helaengine!.coopState()?.status === 'failed', undefined, {
+      timeout: 20_000,
+    });
+    // Still playable: the player is in the world and can walk.
+    const before = await page.evaluate(() => window.helaengine!.playerPosition()!);
+    await page.evaluate(() => window.helaengine!.setPlayerYaw(0));
+    await page.keyboard.down('w');
+    await page.waitForTimeout(800);
+    await page.keyboard.up('w');
+    const after = await page.evaluate(() => window.helaengine!.playerPosition()!);
+    expect(Math.abs(after.z - before.z)).toBeGreaterThan(1);
+  });
+});

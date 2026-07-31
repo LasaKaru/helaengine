@@ -7,14 +7,14 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 19 — Phase 2B under way. A working editor, behaviours, physics, enemies, trigger
+**Status:** Sprint 20 — **Phase 2B complete**. A working editor, behaviours, physics, enemies, trigger
 volumes, a measured performance baseline, first/third/top-down cameras with one input layer covering
 keyboard, touch and gamepad, a schema-driven menu/HUD shell, and now combat: a weapon catalogue in
 the document, hitscan firing, ammo and reloading, pickups, player damage and respawn — plus secrets
 that hide areas, grant weapons or teleport the player, and checkpoints whose progress survives
 closing the tab, and sound — state-driven music with a crossfade, effects bound to engine events,
-and a volume mixer. The **Skirmish** template is a playable level built from all of it. A co-op
-multiplayer slice is next; there is no backend yet, deliberately.
+a volume mixer, and a co-op multiplayer slice with a server-authoritative Colyseus service. The
+**Skirmish** template is a playable level built from all of it. The export system is next.
 
 ---
 
@@ -88,6 +88,7 @@ tools/asset-pipeline   Ingest: raw GLBs in, compressed GLBs + thumbnails + manif
 raw-assets/            Hand-authored .glb sources. The artefacts under version control.
 apps/demo              Framework-free harness rendering a scene document. Proves the engine stands alone.
 apps/editor            The editor: React + react-three-fiber shell around the engine.
+apps/realtime          Colyseus co-op server. Runs the engine's own physics, in Node.
 apps/api               Empty until Sprint 28 (NestJS + Postgres).
 docs/                  GUIDE, DEVELOPMENT-PLAN, SPRINT, ASSET-CONVENTIONS — the plan of record.
 ```
@@ -342,6 +343,37 @@ The settings menu has master, music and effects sliders. Those are the *player's
 machine and not in `scene.json`: how loud somebody likes their music is a property of that person,
 and putting it in the document would carry one player's preference to everyone the project reaches.
 The author's own defaults live in the scene, and the two multiply.
+
+## Co-op multiplayer
+
+`apps/realtime` is a Colyseus server, and its own deployable service rather than a route on the API
+— it holds thousands of open sockets and runs a fixed physics tick, while an API answers short
+bursty requests. They scale on different axes and fail in different ways.
+
+It runs **the engine's own physics, in Node**. `PhysicsWorld`, `PlayerController` and `SceneLoader`
+— the same classes that draw the editor's preview — build and step with no browser and no DOM. That
+is the engine-isolation rule checked somewhere it cannot be faked, and it means geometry the client
+can see is geometry the server enforces.
+
+A client sends **intent only**: there is no "set position" message, so authority is the shape of the
+protocol rather than a rule the server applies. Inputs are clamped and out-of-order packets dropped.
+Remote players are interpolated towards wherever the server last said they were — never predicted,
+because a received position is a fact and a predicted one is a guess.
+
+**Scope, stated rather than implied.** This is co-op: shared world, shared enemies, everyone sees
+everyone move. It is not competitive netcode. There is no client-side prediction, no rollback and no
+lag compensation on shots, so a player with 150 ms of latency sees themselves move 150 ms late. For
+two friends exploring a level that is unremarkable; for a deathmatch it would be unplayable, which
+is why `mode: 'deathmatch'` exists in the schema and is refused by the runtime rather than silently
+treated as co-op.
+
+`colyseus.js` lives in the editor, behind an interface the engine defines. A networking dependency
+inside `packages/engine` would put a socket client in the bundle of every single-player game anybody
+ever makes.
+
+```bash
+pnpm --filter @helaengine/realtime start   # ws://localhost:2567
+```
 
 ## Where this is going
 

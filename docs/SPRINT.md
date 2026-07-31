@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–19 complete. Phases 1 (Editor MVP) and 2 (Behaviours, Physics, AI) done; **Phase 2B (Gameplay Runtime & UI, Sprints 13–20) is under way** — it was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–20 complete. **Phase 2B is done.** Phases 1 (Editor MVP) and 2 (Behaviours, Physics, AI) done; **Phase 2B (Gameplay Runtime & UI, Sprints 13–20) is under way** — it was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -499,16 +499,28 @@ Two further gaps, both real. **There is no transcoding**: ffmpeg is not installe
 
 **Tasks:**
 
-- [ ] Stand up a Colyseus server as its own deployable service — a different workload shape from the API, per the monolith-vs-services reasoning in DEVELOPMENT-PLAN.md
-- [ ] Authoritative room state: positions, health, shared world state. Clients send inputs; the server simulates and broadcasts
-- [ ] Wire `gameConfig.multiplayer` (enabled, maxPlayers, mode) through to the exported build's networking
-- [ ] Scope explicitly to co-op/shared-world. **Lag-compensated competitive combat — client prediction, rollback — is an explicit future item**, not silently included
+- [x] Stand up a Colyseus server as its own deployable service — `apps/realtime`, a different workload shape from the API
+- [x] Authoritative room state: positions, health, shared world state. Clients send inputs; the server simulates and broadcasts
+- [x] Wire `gameConfig.multiplayer` (enabled, maxPlayers, mode, and a new `serverUrl`/`inputHz`) through to the runtime's networking
+- [x] Scope explicitly to co-op/shared-world. **Lag-compensated competitive combat — client prediction, rollback — is an explicit future item**, and `mode: 'deathmatch'` is refused rather than silently treated as co-op
+- [x] **Added:** input sanitisation and clamping on the server; a scene-id check at join; remote-player interpolation with short-way-round angle blending; and a graceful drop to single player when the server cannot be reached
+
+**Tech notes:**
+
+- **The server runs the engine's own physics, in Node.** `PhysicsWorld`, `PlayerController` and `SceneLoader` — the very same classes that draw the editor's preview — build and step with no browser, no renderer and no DOM. That is the strongest test the "engine never imports the editor" rule has had, checked somewhere it cannot be faked. It also means geometry the client can see is geometry the server enforces: walking through a wall is not something a modified client can do.
+- A client sends **intent only**. There is no "set position" message at all, so the authority model is not a policy the server applies but a shape it has. Inputs are clamped (`forward: 1e9` is not a faster player) and out-of-order arrivals are dropped.
+- **No client-side prediction, deliberately.** A remote player's position is a fact received, never a guess. There is a test asserting that a client with no new packets holds still rather than extrapolating — a guard against somebody quietly adding simulation, which would be the first step of a competitive-netcode project rather than a tweak.
+- `colyseus.js` lives in the *editor*, behind a `CoopTransport` interface the engine defines. A hard networking dependency in `packages/engine` would put a socket client in the bundle of every single-player game anybody ever makes; there is a test asserting the import is absent.
 
 **Definition of Done:** Two browser clients join the same session and see each other move in real time, server-authoritative, with no obvious desync under normal network conditions.
 
+**Met.** Two *separate Playwright browser contexts* — not two tabs sharing a process, which would prove far less than it appears to — connect to a real Colyseus server, see each other in the player list, and one walks while the other watches the position change. The position the second browser reads came off the wire from a server that computed it. Leaving removes the player from the other browser's view, and an unreachable server drops to single player rather than refusing to start.
+
+What is **not** verified: behaviour under real network conditions. Everything here runs over loopback, so latency is microseconds and there is no packet loss, no jitter and no reordering in practice. "No obvious desync under normal network conditions" is therefore asserted against the best possible conditions, and the interpolation that would hide a 100 ms round trip has never had one to hide. Two further scope lines worth stating: enemies and triggers are still simulated **per client** rather than by the server — only players and destroyed objects are shared, so two people will see the same goblin in slightly different places — and the room takes its scene document from whichever client opens it, which is fine among invited players and is not a security model. Sprint 27's hosted play, where the server fetches a scene by id, is where that becomes one.
+
 ---
 
-**Phase 2B wrap check:** An exported build is now a complete playable product — menus, HUD, combat, checkpoints, audio, optional co-op. This, not the earlier static-scene export, is the milestone worth demoing widely.
+**Phase 2B wrap check — done.** The runtime is now a complete playable game: home screen, menus, HUD, first/third/top-down cameras, weapons and combat, pickups, secrets, checkpoints with progress that survives a reload, music and sound, and optional co-op. What it is *not* yet is exportable — everything above runs in the editor's Play Preview, which is the same code an export will run but is not itself an export. Phase 3 is what turns it into something a user can be handed.
 
 ---
 

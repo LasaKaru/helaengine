@@ -210,6 +210,91 @@ function GamePanel(): React.JSX.Element {
         </div>
       )}
 
+      <h3>Multiplayer</h3>
+      <label className="param-check">
+        <input
+          type="checkbox"
+          checked={config.multiplayer.enabled}
+          onChange={(event) =>
+            setGameConfig({
+              multiplayer: {
+                ...config.multiplayer,
+                enabled: event.target.checked,
+                // Turning it on with mode `none` would be a switch that does nothing, so enabling
+                // picks the one mode the runtime actually implements.
+                mode: event.target.checked && config.multiplayer.mode === 'none'
+                  ? 'coop'
+                  : config.multiplayer.mode,
+              },
+            })
+          }
+        />
+        Co-op multiplayer
+      </label>
+
+      {config.multiplayer.enabled && (
+        <>
+          <label className="param-row">
+            <span>Mode</span>
+            <select
+              aria-label="Multiplayer mode"
+              value={config.multiplayer.mode}
+              onChange={(event) =>
+                setGameConfig({
+                  multiplayer: {
+                    ...config.multiplayer,
+                    mode: event.target.value as typeof config.multiplayer.mode,
+                  },
+                })
+              }
+            >
+              <option value="coop">Co-op</option>
+              <option value="deathmatch">Deathmatch (not implemented)</option>
+            </select>
+          </label>
+
+          <label className="param-row">
+            <span>Server</span>
+            <input
+              type="text"
+              aria-label="Multiplayer server URL"
+              placeholder="ws://localhost:2567"
+              value={config.multiplayer.serverUrl}
+              onChange={(event) =>
+                setGameConfig({
+                  multiplayer: { ...config.multiplayer, serverUrl: event.target.value },
+                })
+              }
+            />
+          </label>
+
+          <div className="param-row">
+            <span>Max players</span>
+            <NumberField
+              label="Max players"
+              scrubLabel=""
+              value={config.multiplayer.maxPlayers}
+              step={1}
+              onChange={(value) =>
+                setGameConfig({
+                  multiplayer: {
+                    ...config.multiplayer,
+                    maxPlayers: Math.round(Math.min(64, Math.max(2, value))),
+                  },
+                })
+              }
+            />
+          </div>
+
+          {config.multiplayer.mode === 'deathmatch' && (
+            <p className="panel-hint">
+              Only co-op is implemented. Competitive play needs lag compensation and client-side
+              prediction, which are a project of their own — this setting records the intent.
+            </p>
+          )}
+        </>
+      )}
+
       {config.cameraMode === 'topdown' && (
         <div className="param-row">
           <span>Camera height</span>
