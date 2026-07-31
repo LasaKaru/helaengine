@@ -7,7 +7,7 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 21 — Phase 2B complete, export under way. A working editor, behaviours, physics, enemies, trigger
+**Status:** Sprint 22 — exports are playable games. A working editor, behaviours, physics, enemies, trigger
 volumes, a measured performance baseline, first/third/top-down cameras with one input layer covering
 keyboard, touch and gamepad, a schema-driven menu/HUD shell, and now combat: a weapon catalogue in
 the document, hitscan firing, ammo and reloading, pickups, player damage and respawn — plus secrets
@@ -15,7 +15,7 @@ that hide areas, grant weapons or teleport the player, and checkpoints whose pro
 closing the tab, and sound — state-driven music with a crossfade, effects bound to engine events,
 a volume mixer, and a co-op multiplayer slice with a server-authoritative Colyseus service. The
 **Skirmish** template is a playable level built from all of it, and **Export** produces a folder you
-can unzip and serve.
+can unzip, serve and play.
 
 ---
 
@@ -392,9 +392,23 @@ Paths inside an export are relative throughout, which is checked by extracting t
 it over HTTP and opening it rather than by reading the code. Browsers refuse ES modules over
 `file://`, so the README inside each export says to run `npx serve .` and why.
 
-Today this is a **static** export: it renders the world. Behaviours, physics, menus and sound are
-not started — the same `runtime.js` contains all of it, and Sprint 22 is what turns the export from
-a scene into a game.
+Export has two modes. **Static** draws the world and stops — small, and right for a level somebody
+wants to show. **Game** starts everything: physics, behaviours, enemy AI, menus, combat, checkpoints
+and sound. They need different engine bundles, which is why it is a mode rather than a checkbox.
+
+There is one thing worth knowing about the physics bundle: `rapier3d-compat` encodes its
+WebAssembly as base64 *inside* the JavaScript, so a game export has no physics `.wasm` file at all —
+that is most of why the bundle is 3 MB. The only real `.wasm` is Draco's model decoder, and each
+export's README says so rather than warning about a file that is not there.
+
+An optional **readable listing** writes your level out as literal `place('tree_pine_01', …)` calls.
+That is cosmetic, and the generated file says so: the engine is data-driven and the listing
+reproduces the document beside it. It exists because opening an export and finding
+`SceneLoader.load('scene.json')` teaches you nothing about your own level.
+
+Every export also carries a generated `CREDITS.md` — engine and third-party licences, plus per-asset
+attribution from the manifest, with anything unrecorded listed as unrecorded rather than omitted —
+and a `LICENSE.md` with your own project's licence left for you to choose.
 
 ## Where this is going
 

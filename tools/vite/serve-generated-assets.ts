@@ -12,8 +12,11 @@ const generatedAssetsDir = path.join(repoRoot, 'generated/assets');
  * into a zip verbatim. Bundling it into the editor's own JavaScript would embed a second whole copy
  * of Three.js in the editor for no reason.
  */
-const runtimeBundle = path.join(repoRoot, 'packages/engine/dist/runtime.js');
-const RUNTIME_ROUTE = '/engine-runtime.js';
+const runtimeBundles: Record<string, string> = {
+  '/engine-runtime.js': path.join(repoRoot, 'packages/engine/dist/runtime.js'),
+  // The same engine with Rapier inlined, for exports that run the game rather than only draw it.
+  '/engine-runtime-full.js': path.join(repoRoot, 'packages/engine/dist/runtime-full.js'),
+};
 
 const MIME_TYPES: Record<string, string> = {
   '.json': 'application/json; charset=utf-8',
@@ -45,14 +48,16 @@ export function serveGeneratedAssets(): Plugin {
     },
 
     configureServer(server) {
-      server.middlewares.use(RUNTIME_ROUTE, (_request, response, next) => {
-        if (!fs.existsSync(runtimeBundle)) {
-          next();
-          return;
-        }
-        response.setHeader('content-type', 'text/javascript; charset=utf-8');
-        fs.createReadStream(runtimeBundle).pipe(response);
-      });
+      for (const [route, file] of Object.entries(runtimeBundles)) {
+        server.middlewares.use(route, (_request, response, next) => {
+          if (!fs.existsSync(file)) {
+            next();
+            return;
+          }
+          response.setHeader('content-type', 'text/javascript; charset=utf-8');
+          fs.createReadStream(file).pipe(response);
+        });
+      }
 
       server.middlewares.use('/assets', (request, response, next) => {
         const requestPath = decodeURIComponent((request.url ?? '/').split('?')[0] ?? '/');
@@ -85,9 +90,10 @@ export function serveGeneratedAssets(): Plugin {
           'generated/assets is missing — run `pnpm ingest-assets` or the build will ship without models.',
         );
       }
-      if (!fs.existsSync(runtimeBundle)) {
+      for (const file of Object.values(runtimeBundles)) {
+        if (fs.existsSync(file)) continue;
         this.warn(
-          'packages/engine/dist/runtime.js is missing — run `pnpm --filter @helaengine/engine build` or exports will fail.',
+          `${path.relative(repoRoot, file)} is missing — run \`pnpm --filter @helaengine/engine build\` or exports will fail.`,
         );
       }
     },
@@ -97,8 +103,8 @@ export function serveGeneratedAssets(): Plugin {
       if (!fs.existsSync(generatedAssetsDir)) return;
       const outDir = path.resolve(config.root, config.build.outDir);
       fs.cpSync(generatedAssetsDir, path.join(outDir, 'assets'), { recursive: true });
-      if (fs.existsSync(runtimeBundle)) {
-        fs.copyFileSync(runtimeBundle, path.join(outDir, 'engine-runtime.js'));
+      for (const [route, file] of Object.entries(runtimeBundles)) {
+        if (fs.existsSync(file)) fs.copyFileSync(file, path.join(outDir, route.slice(1)));
       }
     },
   };

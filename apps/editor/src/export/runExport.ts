@@ -1,6 +1,7 @@
 import type { AssetManifest, Scene } from '@helaengine/schema';
 import { ASSET_BASE_URL } from '../engine/assetLibrary';
 import { buildExport, slugify, type ExportOptions, type ExportPlan } from './bundle';
+import type { ExportMode } from './mainJs';
 import { downloadZip, zipExport } from './zip';
 
 /**
@@ -11,7 +12,12 @@ import { downloadZip, zipExport } from './zip';
  * for every export, which is what makes an export reproducible: two people exporting the same scene
  * from the same editor build get byte-identical output.
  */
-export const RUNTIME_URL = './engine-runtime.js';
+export const RUNTIME_URLS: Record<ExportMode, string> = {
+  // Two files rather than one, because a game export needs Rapier and a static one has no use for
+  // two megabytes of physics WASM it will never execute.
+  static: './engine-runtime.js',
+  game: './engine-runtime-full.js',
+};
 
 export interface RunExportResult {
   plan: ExportPlan;
@@ -43,7 +49,7 @@ export async function runExport(
   manifest: AssetManifest,
   options: ExportOptions,
 ): Promise<RunExportResult> {
-  const runtimeSource = await fetchText(RUNTIME_URL);
+  const runtimeSource = await fetchText(RUNTIME_URLS[options.mode]);
   const plan = await buildExport({
     scene,
     manifest,

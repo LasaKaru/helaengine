@@ -53,6 +53,19 @@ function textOf(result: ExportPlan, path: string): string {
   return result.files.find((file) => file.path === path)?.text ?? '';
 }
 
+/**
+ * Parses generated code for real, rather than pattern-matching it.
+ *
+ * `new Function` compiles a *script*, and the generated file is a *module* — so the import block
+ * and any `export` keyword are stripped first. That is a limitation of the only parser available
+ * here, not a licence to skip the check: the bug this exists for shipped a `main.js` whose import
+ * list had been silently deleted, and every regex assertion in the world passed.
+ */
+function parseAsScript(source: string): void {
+  const body = source.replace(/^import[\s\S]*?;\n/, '').replace(/^export /gm, '');
+  new Function(`return async () => {\n${body}\n}`);
+}
+
 describe('slugify', () => {
   it('makes a filename out of a project name', () => {
     expect(slugify('My Great Game')).toBe('my-great-game');
@@ -112,6 +125,8 @@ describe('buildExport', () => {
     const result = await plan();
 
     expect(pathsOf(result)).toEqual([
+      'CREDITS.md',
+      'LICENSE.md',
       'README.md',
       'assets/draco/draco_decoder.js',
       'assets/draco/draco_decoder.wasm',
@@ -190,21 +205,20 @@ describe('buildExport', () => {
     expect(main).not.toContain('*/');
     // Parsed for real rather than pattern-matched: the only assertion that catches the next
     // variation of the same mistake.
-    expect(() => new Function(`return async () => {\n${main.replace(/^import[\s\S]*?;\n/, '')}\n}`))
-      .not.toThrow();
+    expect(() => parseAsScript(main)).not.toThrow();
   });
 
   it('keeps main.js readable even when minified', async () => {
     // Running a real minifier over the one file the user is invited to read would work against
-    // the point of writing it out at all.
+    // the point of writing it out at all: the code survives, only the prose goes.
     const minified = await plan(scene(), { ...DEFAULT_EXPORT_OPTIONS, minify: true });
     const main = textOf(minified, 'main.js');
 
     expect(main).toContain('new SceneLoader');
-    expect(main).not.toContain('This file is yours');
+    expect(main).not.toContain('A HelaEngine game');
 
     const readable = await plan(scene(), { ...DEFAULT_EXPORT_OPTIONS, minify: false });
-    expect(textOf(readable, 'main.js')).toContain('This file is yours');
+    expect(textOf(readable, 'main.js')).toContain('A HelaEngine game');
   });
 
   it('puts the scene name in the page title, escaped', async () => {
@@ -221,8 +235,8 @@ describe('buildExport', () => {
 
     expect(readme).toContain('npx serve');
     expect(readme).toContain('file://');
-    // And is honest about what a static export leaves out.
-    expect(readme).toContain('static export');
+    // And says what the controls are, since a game export opens on a menu.
+    expect(readme).toContain('WASD');
   });
 
   it('warns rather than failing when an asset cannot be read', async () => {
@@ -254,5 +268,146 @@ describe('buildExport', () => {
       }),
     );
     expect(pathsOf(result)).toContain('assets/audio/pickup.wav');
+  });
+});
+
+describe('export modes', () => {
+  it('starts nothing in a static export, and everything in a game one', async () => {
+    const still = await plan(scene(), { ...DEFAULT_EXPORT_OPTIONS, mode: 'static' });
+    const staticMain = textOf(still, 'main.js');
+    expect(staticMain).not.toContain('PhysicsWorld');
+    expect(staticMain).not.toContain('UIRenderer');
+
+    const playable = await plan(scene(), { ...DEFAULT_EXPORT_OPTIONS, mode: 'game' });
+    const gameMain = textOf(playable, 'main.js');
+    for (const piece of ['PhysicsWorld', 'UIRenderer', 'startScene', 'InputManager', 'SaveStore']) {
+      expect(gameMain).toContain(piece);
+    }
+  });
+
+  it('tells a game export how to serve WebAssembly, because getting it wrong is silent', async () => {
+    const playable = await plan(scene(), { ...DEFAULT_EXPORT_OPTIONS, mode: 'game' });
+    const readme = textOf(playable, 'README.md');
+
+    expect(readme).toContain('application/wasm');
+    // And is accurate about *which* WASM: `rapier3d-compat` inlines its own as base64 inside the
+    // JavaScript, so there is no physics `.wasm` file to misconfigure. Only Draco's is real.
+    expect(readme).toContain('draco_decoder.wasm');
+    expect(readme).toContain('no separate');
+
+    const still = await plan(scene(), { ...DEFAULT_EXPORT_OPTIONS, mode: 'static' });
+    expect(textOf(still, 'README.md')).toContain('static export');
+  });
+
+  it('writes the level out as readable code when asked, and not otherwise', async () => {
+    const readable = await plan(scene(), {
+      ...DEFAULT_EXPORT_OPTIONS,
+      codeStyle: 'readable',
+      minify: false,
+    });
+    const main = textOf(readable, 'main.js');
+
+    expect(main).toContain('export function describeLevel');
+    expect(main).toContain("place('building_hut_01'");
+    expect(main).toContain("id: 'obj_0001'");
+    // Cosmetic and honest about it: the engine is data-driven and this reproduces the document.
+    expect(main).toContain('already in scene.json');
+
+    const plain = await plan(scene(), { ...DEFAULT_EXPORT_OPTIONS, codeStyle: 'document' });
+    expect(textOf(plain, 'main.js')).not.toContain('describeLevel');
+  });
+
+  it('lists behaviours and triggers in the readable listing', async () => {
+    const withGameplay = scene({
+      objects: [
+        {
+          id: 'obj_0001',
+          assetId: 'building_hut_01',
+          transform: { position: [1, 2, 3], rotation: [0, 45, 0] },
+          behaviors: [{ type: 'patrol', params: { speed: 3 } }],
+        },
+      ],
+    });
+    const main = textOf(
+      await plan(withGameplay, { ...DEFAULT_EXPORT_OPTIONS, codeStyle: 'readable', minify: false }),
+      'main.js',
+    );
+
+    expect(main).toContain('position: [1, 2, 3]');
+    expect(main).toContain('rotation: [0, 45, 0]');
+    expect(main).toContain('behaviour: patrol');
+  });
+
+  it('still parses when a readable game export is minified', async () => {
+    // The combination most likely to break: two templates concatenated, then comment-stripped.
+    const main = textOf(
+      await plan(scene(), {
+        ...DEFAULT_EXPORT_OPTIONS,
+        mode: 'game',
+        codeStyle: 'readable',
+        minify: true,
+      }),
+      'main.js',
+    );
+
+    expect(main).not.toContain('/*');
+    expect(main).not.toContain('*/');
+    expect(() => parseAsScript(main)).not.toThrow();
+  });
+});
+
+describe('credits and licence', () => {
+  it('credits every asset that shipped, and says when a licence is not recorded', async () => {
+    // A gap somebody can see is worth more than a tidy file that quietly leaves things out.
+    const result = await plan();
+    const text = textOf(result, 'CREDITS.md');
+
+    expect(text).toContain('building_hut_01');
+    expect(text).toContain('tree_pine_01');
+    expect(text).not.toContain('rock_boulder_01');
+    expect(text).toContain('licence not recorded');
+    expect(text).toContain('Three.js');
+  });
+
+  it('uses the attribution the manifest carries', async () => {
+    const credited = parseAssetManifest({
+      version: 1,
+      assets: [
+        {
+          id: 'building_hut_01',
+          name: 'Hut',
+          category: 'buildings',
+          glbPath: 'models/hut.glb',
+          author: 'Someone',
+          license: 'CC-BY-4.0',
+          sourceUrl: 'https://example.invalid/hut',
+        },
+      ],
+    });
+    const result = await buildExport({
+      scene: scene({ objects: [{ id: 'obj_0001', assetId: 'building_hut_01' }] }),
+      manifest: credited,
+      options: DEFAULT_EXPORT_OPTIONS,
+      runtimeSource: '',
+      readAsset: async () => new Uint8Array(),
+    });
+
+    const text = textOf(result, 'CREDITS.md');
+    expect(text).toContain('by Someone');
+    expect(text).toContain('CC-BY-4.0');
+    expect(text).toContain('https://example.invalid/hut');
+  });
+
+  it('credits the physics engine only when it ships', async () => {
+    expect(textOf(await plan(scene(), { ...DEFAULT_EXPORT_OPTIONS, mode: 'game' }), 'CREDITS.md'))
+      .toContain('Rapier');
+    expect(textOf(await plan(scene(), { ...DEFAULT_EXPORT_OPTIONS, mode: 'static' }), 'CREDITS.md'))
+      .not.toContain('Rapier');
+  });
+
+  it('leaves the author their own licence to choose', async () => {
+    const text = textOf(await plan(), 'LICENSE.md');
+    expect(text).toContain('<your name here>');
+    expect(text).toContain('MIT');
   });
 });

@@ -56,6 +56,17 @@ export const AssetManifestEntrySchema = z.object({
   bounds: Vec3Schema.default([1, 1, 1]),
   /** Placeholder tint, and the fallback material colour when a model fails to load. */
   placeholderColor: HexColorSchema.default('#b0b0b0'),
+
+  /**
+   * Attribution, for the CREDITS file an export generates.
+   *
+   * Optional because the stand-in assets are generated in code and have nobody to credit — but the
+   * moment a real asset library exists, an export that could not say where its art came from would
+   * be shipping somebody else's work with the attribution stripped.
+   */
+  license: z.string().max(120).optional(),
+  author: z.string().max(200).optional(),
+  sourceUrl: z.string().max(500).optional(),
 });
 export type AssetManifestEntry = z.infer<typeof AssetManifestEntrySchema>;
 

@@ -26,15 +26,36 @@ export default defineConfig([
     format: ['esm'],
     dts: false,
     sourcemap: false,
-    // Named rather than `/.*/`: a catch-all also matches Rapier, and `noExternal` wins over
-    // `external`, so the physics engine ended up bundled anyway — two megabytes of WASM in a
-    // static export that never presses Play.
+    // Named rather than `/.*/`, which is the difference between a bundle and a mistake: a
+    // catch-all also matches Rapier, and `noExternal` wins over `external`.
     noExternal: ['three', 'zod', 'yuka', 'howler', '@helaengine/schema'],
     minify: true,
     platform: 'browser',
-    // Rapier is a dynamic `import()` of a WASM package, and bundling it would pull a megabyte of
-    // physics into every static export that never presses Play. Sprint 22, which exports
-    // behaviours, is where that becomes worth paying for.
+    // Left out: a static export renders the world and never presses Play, so two megabytes of
+    // physics WASM would be dead weight in every one of them. The dynamic `import()` that reaches
+    // Rapier simply never fires.
     external: ['@dimforge/rapier3d-compat'],
+  },
+  {
+    // The same engine with Rapier inlined, for exports that actually run the game. Two files rather
+    // than one file plus a chunk, because a chunk gets a content-hashed name that the exporter
+    // would then have to *discover* — and the exporter runs in a browser tab, which cannot list a
+    // directory. An explicit second entry is a string both sides already know.
+    entry: { 'runtime-full': 'src/index.ts' },
+    format: ['esm'],
+    dts: false,
+    sourcemap: false,
+    noExternal: [
+      'three',
+      'zod',
+      'yuka',
+      'howler',
+      '@helaengine/schema',
+      '@dimforge/rapier3d-compat',
+    ],
+    // Off, so the dynamically-imported physics module lands in this file instead of beside it.
+    splitting: false,
+    minify: true,
+    platform: 'browser',
   },
 ]);

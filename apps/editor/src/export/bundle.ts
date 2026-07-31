@@ -1,8 +1,13 @@
 import type { AssetManifest, AssetManifestEntry, Scene } from '@helaengine/schema';
+import { mainJs, type CodeStyle, type ExportMode } from './mainJs';
 
 export interface ExportOptions {
   /** Used for the folder name inside the zip and the zip filename. */
   projectName: string;
+  /** `static` draws the world; `game` starts physics, behaviours, menus and sound. */
+  mode: ExportMode;
+  /** Whether `main.js` also writes the level out as literal calls. Cosmetic; see `mainJs.ts`. */
+  codeStyle: CodeStyle;
   /** Ship the scene document as a readable, indented file as well as the one the runtime loads. */
   includeSource: boolean;
   /** Minify the generated `main.js`. The engine bundle is already minified either way. */
@@ -31,6 +36,8 @@ const DRACO_FILES = ['draco_decoder.js', 'draco_decoder.wasm', 'draco_wasm_wrapp
 
 export const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
   projectName: 'my-game',
+  mode: 'game',
+  codeStyle: 'document',
   includeSource: true,
   minify: true,
 };
@@ -89,68 +96,6 @@ export function collectUsedAssets(scene: Scene, manifest: AssetManifest): {
   return { used, usedIds: used.map((asset) => asset.id), missing };
 }
 
-/** The entry point an exported project runs. Written out rather than bundled, so it stays readable. */
-function mainJs(options: ExportOptions): string {
-  const source = `import {
-  GltfModelSource,
-  ManifestAssetResolver,
-  SceneLoader,
-  Viewport,
-} from './engine/runtime.js';
-
-/**
- * A HelaEngine export.
- *
- * This file is yours: it is deliberately short and unminified so you can read it, change it, or
- * throw it away and drive the engine yourself. Everything it uses is exported from
- * ./engine/runtime.js.
- */
-const [scene, manifest] = await Promise.all([
-  fetch('./scene.json').then((response) => response.json()),
-  fetch('./assets/manifest.json').then((response) => response.json()),
-]);
-
-const loader = new SceneLoader({
-  resolver: new ManifestAssetResolver(manifest),
-  modelSource: new GltfModelSource({ baseUrl: './assets/' }),
-});
-
-const viewport = new Viewport({ container: document.getElementById('viewport'), loader });
-
-// Built twice, on purpose. The first pass draws immediately from the manifest's bounds, so the
-// world is there while the models are still downloading; the second rebuilds it once they have
-// arrived. \`load()\` is synchronous and takes whatever is in the model cache at the time, so
-// preloading after the only build would fill a cache nothing ever reads — and every object would
-// stay a placeholder box.
-viewport.setScene(scene);
-viewport.frameScene();
-viewport.start();
-
-const report = await loader.preload(scene);
-if (report.failed.length > 0) console.warn('[helaengine] some assets failed', report.failed);
-viewport.setScene(scene);
-viewport.frameScene();
-`;
-
-  if (!options.minify) return source;
-
-  // A deliberately gentle "minify": comments and blank runs out, structure untouched. Running a
-  // real minifier over the one file the user is invited to read would work against the point.
-  //
-  // Block comments go first, and that ordering is the whole correctness of this function. Removing
-  // `*`-prefixed lines beforehand strips the `*/` terminators, which leaves an unclosed `/**` that
-  // then swallows everything up to the next one — the export still looked plausible and shipped a
-  // `main.js` with its import list deleted.
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .split('\n')
-    .filter((line) => !line.trimStart().startsWith('//'))
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-    .concat('\n');
-}
-
 function indexHtml(scene: Scene, options: ExportOptions): string {
   const title = escapeHtml(scene.name || options.projectName);
   const background = scene.environment.background;
@@ -197,7 +142,7 @@ Then open the address it prints.
 
 \`\`\`
 index.html          The page. Edit the title and styling freely.
-main.js             Thirty lines that load the scene and start rendering. Yours to change.
+main.js             ${options.mode === 'game' ? 'The game loop' : 'Thirty lines that load the scene and start rendering'}. Yours to change.
 scene.json          The world: terrain, objects, environment, game settings.
 engine/runtime.js   The HelaEngine runtime, with Three.js bundled in. One file, no dependencies.
 assets/             ${plan.assetCount} model${plan.assetCount === 1 ? '' : 's'} and a manifest — only what this scene uses.
@@ -205,17 +150,108 @@ ${options.includeSource ? 'scene.source.json    The same scene, indented for rea
 
 The scene places ${plan.objectCount} object${plan.objectCount === 1 ? '' : 's'}.
 
-## What this export does not include
+${
+    options.mode === 'game'
+      ? 'Press Play on the home screen. WASD moves, Shift sprints, C crouches, Space jumps, click\nfires, R reloads, Q swaps weapon, V changes camera, Escape pauses.'
+      : ''
+  }
+
+${
+    options.mode === 'game'
+      ? `## Serving it correctly
+
+Two notes about WebAssembly, because getting either wrong fails quietly.
+
+The physics engine is **inside** \`engine/runtime.js\` — the \`rapier3d-compat\` build encodes its
+WebAssembly as base64 in the JavaScript, which is most of why that file is three megabytes. There
+is no separate \`.wasm\` file for physics and nothing to configure for it.
+
+The model decoder is a different story: \`assets/draco/draco_decoder.wasm\` is a real file, and
+browsers refuse to compile one served with the wrong content type. \`npx serve\` and
+\`python3 -m http.server\` both get this right. If you deploy somewhere that does not, make sure
+\`.wasm\` is served as \`application/wasm\` — the symptom is a world where every model is a plain
+grey box.
+`
+      : `## What this export does not include
 
 This is a **static export**: it renders the world. Behaviours, physics, menus, the HUD and sound
-are not started here — that is a later export mode, not a limitation of the runtime, and the same
+are not started here — that is the other export mode, not a limitation of the runtime, and the same
 \`engine/runtime.js\` contains all of it.
-
+`
+  }
 ## Assets
 
 Everything under \`assets/\` is compressed output. \`manifest.json\` maps every \`assetId\` in
 \`scene.json\` to a file, which is why the scene never contains a path: move or rename the files and
 fix the manifest, and the scene keeps working.
+`;
+}
+
+/**
+ * Attribution for every asset that shipped.
+ *
+ * Generated from the manifest rather than written by hand, because the one thing an attribution
+ * file must never be is out of date with what is actually in the folder. Assets with no recorded
+ * licence are listed as such rather than omitted — a gap somebody can see is worth more than a
+ * tidy file that quietly leaves things out.
+ */
+function credits(options: ExportOptions, used: AssetManifestEntry[]): string {
+  const rows = used.map((asset) => {
+    const parts = [`- **${asset.name}** (\`${asset.id}\`)`];
+    if (asset.author) parts.push(`by ${asset.author}`);
+    parts.push(asset.license ? `— ${asset.license}` : '— licence not recorded');
+    if (asset.sourceUrl) parts.push(`<${asset.sourceUrl}>`);
+    return parts.join(' ');
+  });
+
+  return `# Credits
+
+## ${options.projectName}
+
+Made with [HelaEngine](https://github.com/LasaKaru/helaengine).
+
+## Engine
+
+The runtime in \`engine/\` is HelaEngine, MIT licensed, and bundles:
+
+- [Three.js](https://threejs.org) — MIT
+- [Zod](https://zod.dev) — MIT
+${options.mode === 'game' ? '- [Rapier](https://rapier.rs) — Apache-2.0\n- [Yuka](https://mugen87.github.io/yuka/) — MIT\n- [Howler.js](https://howlerjs.com) — MIT\n' : ''}
+## Assets
+
+${rows.length > 0 ? rows.join('\n') : '_No assets shipped with this export._'}
+`;
+}
+
+/** A licence file for the author's own work, with the parts only they can fill in left blank. */
+function licence(options: ExportOptions): string {
+  return `# License
+
+## Your project
+
+${options.projectName} — © ${new Date().getFullYear()} <your name here>.
+
+Choose a licence for your own work and replace this section. Nothing in HelaEngine requires you to
+pick one, and nothing here restricts what you pick.
+
+## The engine
+
+The HelaEngine runtime bundled in \`engine/\` is MIT licensed:
+
+\`\`\`
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction,
+including without limitation the rights to use, copy, modify, merge, publish, distribute,
+sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or
+substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.
+\`\`\`
+
+Third-party licences for what the runtime bundles are listed in CREDITS.md.
 `;
 }
 
@@ -259,7 +295,15 @@ export async function buildExport(input: BuildExportInput): Promise<ExportPlan> 
 
   const files: ExportFile[] = [
     { path: 'index.html', text: indexHtml(scene, options) },
-    { path: 'main.js', text: mainJs(options) },
+    {
+      path: 'main.js',
+      text: mainJs({
+        scene,
+        mode: options.mode,
+        style: options.codeStyle,
+        minify: options.minify,
+      }),
+    },
     { path: 'engine/runtime.js', text: runtimeSource },
     // The runtime parses this, so it goes out compact. The readable copy is a separate file.
     { path: 'scene.json', text: JSON.stringify(scene) },
@@ -305,6 +349,8 @@ export async function buildExport(input: BuildExportInput): Promise<ExportPlan> 
     path: 'README.md',
     text: readme(options, { assetCount: used.length, objectCount: scene.objects.length }),
   });
+  files.push({ path: 'CREDITS.md', text: credits(options, used) });
+  files.push({ path: 'LICENSE.md', text: licence(options) });
 
   const skippedAssetIds = manifest.assets
     .map((asset) => asset.id)

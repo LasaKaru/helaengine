@@ -1,3 +1,11 @@
+/**
+ * Three.js itself, re-exported.
+ *
+ * For exported projects, which have no package manager: somebody hand-editing an export needs a
+ * `Vector3` and has nowhere else to get one. In the editor and the co-op server this is the very
+ * same module instance — `three` is external in that build — so it cannot become a second copy.
+ */
+export * as THREE from 'three';
 export {
   SceneLoader,
   LoadedScene,

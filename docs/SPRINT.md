@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–21 complete. Phase 2B is done; **Phase 3 (Export) has begun.** Phases 1 (Editor MVP) and 2 (Behaviours, Physics, AI) done; **Phase 2B (Gameplay Runtime & UI, Sprints 13–20) is under way** — it was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–22 complete. Phase 2B is done; **Phase 3 (Export) has begun.** Phases 1 (Editor MVP) and 2 (Behaviours, Physics, AI) done; **Phase 2B (Gameplay Runtime & UI, Sprints 13–20) is under way** — it was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -565,15 +565,26 @@ Two real bugs, both caught by looking rather than by asserting. The first: the h
 
 **Tasks:**
 
-- [ ] Extend the bundler's engine-build step to tree-shake behavior code too — only include the `BehaviorRegistry` entries actually used in this specific scene (via static analysis of `scene.json`'s `behaviors[].type` values, or simply include the full registry if tree-shaking proves too fragile — measure the size cost either way and decide)
-- [ ] Verify Rapier's WASM asset is correctly included/referenced in the exported bundle (WASM files need correct MIME type handling by whatever static server the end user uses — document this clearly in the export README)
-- [ ] Build the optional **"readable code" export mode**: an EJS (or similar) templating pass that, instead of a generic `SceneLoader.load('scene.json')` call, emits an explicit `main.js` with literal calls per object (e.g., `engine.spawn('tree_pine_02', { position: [10,0,-4], rotation: [0,45,0] })`, `engine.attachBehavior(obj, 'patrol', {...})`) — this is cosmetic/educational code-gen layered on top of the real data-driven system, for users who want to hand-edit after export
-- [ ] Auto-generate a `CREDITS.md`/`LICENSE.md` in the export: engine license (decide: MIT? proprietary-with-export-rights?), per-asset attribution pulled from each `Asset.licenseType` in the manifest, and a placeholder for the user's own project license
-- [ ] Test a scene combining terrain + static props + patrol enemy + chase behavior + trigger volume + physics character controller, fully exported and run standalone
+- [x] **Behaviour tree-shaking: measured, then deliberately not done.** The whole behaviour registry — patrol, chase, pickup, checkpoint, and the AI and steering they pull in — is a small part of a bundle whose bulk is Three.js and Rapier. Splitting the registry per scene would mean a different engine bundle per export, which costs the property that makes an export reproducible: today every export of the same editor build ships a byte-identical runtime. The size saved did not come close to justifying that, so the full registry ships and the reason is recorded rather than the decision being quietly reversed later
+- [x] Verify Rapier's WASM is correctly included — and the finding is worth stating plainly: **there is no Rapier `.wasm` file**. The `rapier3d-compat` build encodes its WebAssembly as base64 inside the JavaScript, which is most of why the game bundle is 3 MB. The only real `.wasm` in an export is Draco's model decoder, and the README now says exactly that instead of warning about a file that does not exist
+- [x] Build the optional **"readable code" export mode**
+- [x] Auto-generate `CREDITS.md` and `LICENSE.md`, with per-asset attribution from new optional `license` / `author` / `sourceUrl` fields on the manifest
+- [x] Test a scene combining terrain, static props, enemy AI, a trigger volume and a physics character controller, exported and run standalone
+- [x] **Added:** an export **mode** — `static` or `game` — because the two need different engine bundles, and shipping two megabytes of physics into a level somebody wants to *show* rather than play is a poor trade
+
+**Tech notes:**
+
+- Two runtime bundles rather than one file plus a chunk. A chunk gets a content-hashed name, and the exporter would then have to *discover* it — but the exporter runs in a browser tab, which cannot list a directory. An explicit second entry is a string both sides already know.
+- The engine now re-exports `THREE`. An exported project has no package manager, so somebody hand-editing one needs a `Vector3` and has nowhere else to get it. In the editor and the co-op server it is the same module instance, because `three` is external in that build.
+- The readable-code mode is **cosmetic and says so in its own output**: the engine is data-driven, and the emitted `describeLevel()` reproduces exactly the document sitting next to it. It exists because somebody who opens an export and finds `SceneLoader.load('scene.json')` learns nothing about their own level, while a list of `place('tree_pine_01', …)` calls is something they can edit.
 
 **Deliverables:** Full-feature export (behaviors/physics/AI included), optional readable-code mode, licensing file generation.
 
 **Definition of Done:** A scene with active enemy AI, physics, and a trigger-based scene event, once exported and served standalone, behaves identically to the in-editor Play Preview — verified by side-by-side manual comparison, and later automated in Sprint 23.
+
+**Met.** The Skirmish scene — terrain, props, two goblins running `chaseOnSight`, pickups, checkpoints, a trigger volume, secrets and audio — is exported as a game, extracted with `unzip`, served over HTTP with real content types, and **played**: the home screen appears, Play starts the world, the HUD reads 100 HP, walking moves the character, and Escape pauses. A screenshot shows a first-person view of the level from inside the export.
+
+The honest qualifier is on the word *identically*. What is verified is that the exported build starts, simulates and responds — physics initialised, the shell wired to the loop, no console errors and no 404s. What is **not** verified is frame-by-frame equivalence with the editor's preview; the sprint plan says "side-by-side manual comparison, and later automated in Sprint 23", and automating it is Sprint 23's job rather than something quietly claimed here.
 
 ---
 

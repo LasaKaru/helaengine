@@ -89,6 +89,43 @@ export function ExportWizard({
           Downloads as <code>{slugify(options.projectName)}.zip</code>
         </p>
 
+        <div className="gizmo-modes" role="group" aria-label="Export mode">
+          {(
+            [
+              ['game', 'Playable game', 'Physics, behaviours, menus, combat and sound.'],
+              ['static', 'Static scene', 'Renders the world. Smaller, and nothing runs.'],
+            ] as const
+          ).map(([value, label, hint]) => (
+            <button
+              key={value}
+              type="button"
+              title={hint}
+              className={options.mode === value ? 'active' : ''}
+              aria-pressed={options.mode === value}
+              onClick={() => setOptions({ ...options, mode: value })}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="panel-hint">
+          {options.mode === 'game'
+            ? 'Includes the physics engine — about 3 MB before compression.'
+            : 'No physics engine: about a third the size, and Play does nothing.'}
+        </p>
+
+        <label className="param-check">
+          <input
+            type="checkbox"
+            aria-label="Readable level listing"
+            checked={options.codeStyle === 'readable'}
+            onChange={(event) =>
+              setOptions({ ...options, codeStyle: event.target.checked ? 'readable' : 'document' })
+            }
+          />
+          Also write the level out as readable code
+        </label>
+
         <label className="param-check">
           <input
             type="checkbox"

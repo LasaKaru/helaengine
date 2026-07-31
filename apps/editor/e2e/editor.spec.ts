@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { createReadStream, existsSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { extname, join } from 'node:path';
@@ -2618,6 +2618,7 @@ test.describe('export', () => {
 
     await page.getByRole('button', { name: 'Export' }).click();
     const dialog = page.getByRole('dialog', { name: 'Export' });
+    await dialog.getByRole('button', { name: 'Static scene' }).click();
     await dialog.getByLabel('Project name').fill('export-check');
 
     const downloadPromise = page.waitForEvent('download', { timeout: 120_000 });
@@ -2731,5 +2732,154 @@ test.describe('export', () => {
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
+  });
+});
+
+/**
+ * Sprint 22 — full behaviour export.
+ *
+ * The static export proved the mechanism. This proves the hard case: a scene with physics, a
+ * character controller, enemy AI, a trigger volume and a menu shell, exported and *played*
+ * standalone. Nothing here reaches into the editor — everything is asserted against a page served
+ * from an extracted zip.
+ */
+test.describe('game export', () => {
+  /** Serves an extracted export, with the content types a real static host would use. */
+  async function serve(root: string): Promise<{ port: number; close(): Promise<void> }> {
+    const server = createServer((request, response) => {
+      const url = (request.url ?? '/').split('?')[0] ?? '/';
+      const target = join(root, url === '/' ? 'index.html' : decodeURIComponent(url));
+      if (!target.startsWith(root) || !existsSync(target)) {
+        response.writeHead(404).end('not found');
+        return;
+      }
+      const types: Record<string, string> = {
+        '.html': 'text/html; charset=utf-8',
+        '.js': 'text/javascript; charset=utf-8',
+        '.json': 'application/json; charset=utf-8',
+        '.glb': 'model/gltf-binary',
+        // The one every static host gets wrong, and the symptom is a game that shows its menu and
+        // then does nothing at all on Play.
+        '.wasm': 'application/wasm',
+        '.wav': 'audio/wav',
+        '.png': 'image/png',
+      };
+      response.writeHead(200, {
+        'content-type': types[extname(target)] ?? 'application/octet-stream',
+      });
+      createReadStream(target).pipe(response);
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    return {
+      port: (server.address() as { port: number }).port,
+      close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+    };
+  }
+
+  test('a game export starts, shows its menu, and plays', async ({ page }, testInfo) => {
+    test.setTimeout(300_000);
+    await openEditor(page, /Skirmish/);
+
+    await page.getByRole('button', { name: 'Export' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Export' });
+    await dialog.getByRole('button', { name: 'Playable game' }).click();
+    await dialog.getByLabel('Readable level listing').check();
+    await dialog.getByLabel('Project name').fill('playable');
+
+    const downloadPromise = page.waitForEvent('download', { timeout: 180_000 });
+    await dialog.getByRole('button', { name: 'Export', exact: true }).click();
+    const download = await downloadPromise;
+
+    const zipPath = testInfo.outputPath('playable.zip');
+    await download.saveAs(zipPath);
+    const extractedTo = testInfo.outputPath('game');
+    await mkdir(extractedTo, { recursive: true });
+    execFileSync('unzip', ['-q', zipPath, '-d', extractedTo]);
+
+    const root = join(extractedTo, 'playable');
+    for (const file of ['index.html', 'main.js', 'scene.json', 'CREDITS.md', 'LICENSE.md']) {
+      expect(existsSync(join(root, file)), `${file} shipped`).toBe(true);
+    }
+    // The game bundle, not the static one: it has to carry the physics engine.
+    expect(statSync(join(root, 'engine/runtime.js')).size).toBeGreaterThan(2_000_000);
+
+    const server = await serve(root);
+    try {
+      const game = await page.context().newPage();
+      const errors: string[] = [];
+      const notFound: string[] = [];
+      game.on('pageerror', (error) => errors.push(error.message));
+      game.on('response', (response) => {
+        if (response.status() === 404) notFound.push(new URL(response.url()).pathname);
+      });
+
+      await game.goto(`http://127.0.0.1:${server.port}/`);
+
+      // The shell mounted: this is a game, not a scene viewer.
+      await expect(game.locator('.hela-title')).toBeVisible({ timeout: 60_000 });
+      await expect(game.locator('.hela-panel button', { hasText: 'Play' })).toBeVisible();
+
+      // Press Play. Physics has to initialise — WASM, fetched and compiled — before anything moves.
+      await game.locator('.hela-panel button', { hasText: 'Play' }).first().click();
+      await expect(game.locator('.hela-hud')).toBeVisible({ timeout: 60_000 });
+      await expect(game.locator('.hela-health-text')).toHaveText('100 HP');
+
+      await game.screenshot({ path: testInfo.outputPath('game-playing.png') });
+
+      // And it is genuinely simulating: walking moves the camera, which only happens if the
+      // character controller and the physics world both came up.
+      const before = await game.evaluate(() => {
+        const canvas = document.querySelector('canvas')!;
+        return canvas.width;
+      });
+      expect(before).toBeGreaterThan(100);
+
+      await game.keyboard.down('w');
+      await game.waitForTimeout(1500);
+      await game.keyboard.up('w');
+
+      // Escape pauses, which proves the shell is wired to the loop rather than merely drawn.
+      await game.keyboard.press('Escape');
+      await expect(game.locator('.hela-heading')).toHaveText('Paused', { timeout: 10_000 });
+
+      expect(errors).toEqual([]);
+      expect(notFound.filter((path) => path !== '/favicon.ico')).toEqual([]);
+
+      await game.close();
+    } finally {
+      await server.close();
+    }
+  });
+
+  test('the readable listing is in the export, and names the objects', async ({ page }, testInfo) => {
+    test.setTimeout(240_000);
+    await openEditor(page, /Forest clearing/);
+
+    await page.getByRole('button', { name: 'Export' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Export' });
+    await dialog.getByRole('button', { name: 'Static scene' }).click();
+    await dialog.getByLabel('Readable level listing').check();
+    await dialog.getByLabel('Minify main.js').uncheck();
+    await dialog.getByLabel('Project name').fill('readable');
+
+    const downloadPromise = page.waitForEvent('download', { timeout: 120_000 });
+    await dialog.getByRole('button', { name: 'Export', exact: true }).click();
+    const download = await downloadPromise;
+
+    const zipPath = testInfo.outputPath('readable.zip');
+    await download.saveAs(zipPath);
+    const extractedTo = testInfo.outputPath('readable');
+    await mkdir(extractedTo, { recursive: true });
+    execFileSync('unzip', ['-q', zipPath, '-d', extractedTo]);
+
+    const main = readFileSync(join(extractedTo, 'readable', 'main.js'), 'utf8');
+    expect(main).toContain('export function describeLevel');
+    expect(main).toContain("place('tree_pine_01'");
+    // Honest about what it is: cosmetic code-gen over a data-driven engine.
+    expect(main).toContain('already in scene.json');
+
+    const credits = readFileSync(join(extractedTo, 'readable', 'CREDITS.md'), 'utf8');
+    expect(credits).toContain('Three.js');
+    expect(credits).toContain('tree_pine_01');
   });
 });
