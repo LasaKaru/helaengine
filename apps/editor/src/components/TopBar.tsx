@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import type { AssetManifest } from '@helaengine/schema';
+import { ExportWizard } from './ExportWizard';
 import { useProjectStore } from '../store/projectStore';
 import { useSceneStore } from '../store/sceneStore';
 
@@ -13,7 +16,13 @@ function saveLabel(
 }
 
 /** Application chrome: project name, history, save state, and the way back to the projects list. */
-export function TopBar(): React.JSX.Element {
+/**
+ * `manifest` is optional so the bar can render before the asset library has loaded — and so its
+ * unit tests, which are about undo and saving, do not have to construct one. Export needs it, and
+ * says so rather than exporting a scene whose assets it cannot look up.
+ */
+export function TopBar({ manifest }: { manifest?: AssetManifest } = {}): React.JSX.Element {
+  const [exporting, setExporting] = useState(false);
   const name = useSceneStore((state) => state.scene.name);
   const setName = useSceneStore((state) => state.setName);
   const objectCount = useSceneStore((state) => state.scene.objects.length);
@@ -77,10 +86,18 @@ export function TopBar(): React.JSX.Element {
         >
           Save
         </button>
-        <button type="button" disabled title="Export arrives in Sprint 21">
+        <button
+          type="button"
+          onClick={() => setExporting(true)}
+          disabled={!manifest}
+          title={manifest ? 'Download a runnable copy' : 'Waiting for the asset library'}
+        >
           Export
         </button>
       </div>
+      {exporting && manifest && (
+        <ExportWizard manifest={manifest} onClose={() => setExporting(false)} />
+      )}
     </header>
   );
 }

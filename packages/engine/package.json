@@ -1,7 +1,7 @@
 {
   "name": "@helaengine/engine",
   "version": "0.1.0",
-  "description": "HelaEngine runtime — framework-free Three.js library that renders a scene document. Runs unmodified inside the editor preview and inside every exported project.",
+  "description": "HelaEngine runtime \u2014 framework-free Three.js library that renders a scene document. Runs unmodified inside the editor preview and inside every exported project.",
   "type": "module",
   "license": "MIT",
   "main": "./src/index.ts",
@@ -26,7 +26,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --sourcemap --clean --external three",
+    "build": "tsup",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },

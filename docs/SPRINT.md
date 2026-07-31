@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–20 complete. **Phase 2B is done.** Phases 1 (Editor MVP) and 2 (Behaviours, Physics, AI) done; **Phase 2B (Gameplay Runtime & UI, Sprints 13–20) is under way** — it was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–21 complete. Phase 2B is done; **Phase 3 (Export) has begun.** Phases 1 (Editor MVP) and 2 (Behaviours, Physics, AI) done; **Phase 2B (Gameplay Runtime & UI, Sprints 13–20) is under way** — it was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -534,15 +534,28 @@ What is **not** verified: behaviour under real network conditions. Everything he
 
 **Tasks:**
 
-- [ ] Build Export Wizard UI: modal/panel with options — asset compression level, include-source-scene.json toggle, minify toggle, project name (used for the zip filename)
-- [ ] Write the **bundler**: given a `sceneStore` state, (1) build the built/minified `/packages/engine` output, (2) copy only the assets actually referenced by `assetId` in this scene (tree-shake unused manifest entries — don't ship the whole asset library), (3) write out `scene.json`, (4) generate a minimal `index.html` + `main.js` that imports the engine and calls `new SceneLoader().load('./scene.json')`
-- [ ] Integrate JSZip client-side to package the above into a downloadable `.zip`
-- [ ] Handle relative path correctness inside the exported bundle (assets must resolve correctly when the zip is extracted and opened via a local static server — test with `npx serve` on the extracted output, not just `file://`, since ES modules often require a real HTTP server)
-- [ ] Add a basic README.md template inside the export explaining how to run it (`npx serve .` or similar) and what's inside the folder structure
+- [x] Build Export Wizard UI: project name, include-source toggle, minify toggle, and a summary of what will ship *before* it ships
+- [x] Write the **bundler**: a pre-built self-contained engine bundle, only the assets this scene references, `scene.json`, and a generated `index.html` + `main.js`
+- [x] Integrate JSZip client-side to package it into a downloadable `.zip`
+- [x] Handle relative path correctness — verified by extracting the archive with `unzip`, serving it over real HTTP and opening it, not by inspecting the plan
+- [x] Add a README.md inside the export explaining how to run it and what each file is for
+- [x] **Added:** the Draco decoder is shipped alongside the models (without it every model silently fails to appear); audio assets are followed too, since they are referenced from `audioConfig` rather than placed; and the project name is slugified so `../../etc` cannot write outside the extracted folder
+
+**Tech notes:**
+
+- **The editor cannot build the engine — it is a browser tab.** So `packages/engine` now produces *two* builds: `index.js` with `three` external, for the editor and the co-op server, and `runtime.js` with everything inlined, for exports. An exported project is a folder somebody unzips; it has no package manager, no bundler and no import map, so every dependency has to already be in the file. The editor serves that bundle as a static asset and an export copies it verbatim, which is also what makes an export reproducible.
+- Rapier stays *out* of the runtime bundle. A static export never presses Play, and two megabytes of physics WASM in every one of them would be a poor trade. Sprint 22, which exports behaviours, is where it starts being worth paying for.
+- `buildExport` is a pure function from a scene and a manifest to a list of files — no JSZip, no `fetch`, no DOM. That is what makes the interesting half of the exporter testable without unzipping anything.
 
 **Deliverables:** Working static export pipeline.
 
 **Definition of Done:** Export a scene with terrain + 10+ static props (no behaviors), unzip, run `npx serve` on the folder, and the browser renders an identical scene to the editor's preview.
+
+**Met, and verified the hard way.** The e2e test exports the Village Outpost, saves the archive Playwright receives, extracts it with `unzip` (a different tool than the one that wrote it), serves the folder over a real HTTP server and opens it in a second page. It asserts a WebGL context, the scene's own name in the title — proof it read `scene.json` rather than a hardcoded page — and that nothing 404'd.
+
+Two real bugs, both caught by looking rather than by asserting. The first: the hand-rolled "minify" stripped `*`-prefixed lines *before* removing block comments, which deleted the `*/` terminators and left an unclosed `/**` that swallowed the import list. The export still built, still zipped, and shipped a `main.js` with no imports. There is now a test that parses the minified output rather than pattern-matching it. The second was only visible in a screenshot: everything rendered as **placeholder boxes**. `load()` is synchronous and takes whatever is in the model cache at that moment, so preloading afterwards filled a cache nothing ever read. The generated `main.js` now builds twice — once immediately from the manifest's bounds so the world is there while models download, once after they arrive.
+
+**Scope, stated:** this is a *static* export. It renders the world; it does not start behaviours, physics, the menu shell or sound. The README inside every export says so. Sprint 22 is the one that makes an export a game.
 
 ---
 

@@ -1,3 +1,8 @@
+import { execFileSync } from 'node:child_process';
+import { createReadStream, existsSync } from 'node:fs';
+import { mkdir } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import { extname, join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 
 /**
@@ -2575,5 +2580,156 @@ test.describe('co-op', () => {
     await page.keyboard.up('w');
     const after = await page.evaluate(() => window.helaengine!.playerPosition()!);
     expect(Math.abs(after.z - before.z)).toBeGreaterThan(1);
+  });
+});
+
+/**
+ * Sprint 21 — static export.
+ *
+ * The definition of done is "unzip it, serve it, and the browser renders the same scene", so that
+ * is literally what these do: download the archive Playwright receives, extract it in Node, serve
+ * the folder over HTTP, and open it. Anything less — asserting on the plan, or on the zip's file
+ * list — would test the exporter's opinion of itself.
+ */
+test.describe('export', () => {
+  test.beforeEach(async ({ page }) => {
+    await openEditor(page, /Village outpost/);
+  });
+
+  test('the wizard reports what will ship before it ships it', async ({ page }) => {
+    await page.getByRole('button', { name: 'Export' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Export' });
+
+    await expect(dialog).toBeVisible();
+    // The Village Outpost uses a handful of assets out of a larger library, and the wizard should
+    // say so rather than leaving somebody to unzip the result to find out.
+    await expect(dialog.getByRole('status')).toContainText('asset');
+    await expect(dialog.getByRole('status')).toContainText('left out');
+
+    await dialog.getByLabel('Project name').fill('My Great Game');
+    await expect(dialog).toContainText('my-great-game.zip');
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).not.toBeVisible();
+  });
+
+  test('exports a zip that unzips, serves and renders the same scene', async ({ page }, testInfo) => {
+    test.setTimeout(240_000);
+
+    await page.getByRole('button', { name: 'Export' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Export' });
+    await dialog.getByLabel('Project name').fill('export-check');
+
+    const downloadPromise = page.waitForEvent('download', { timeout: 120_000 });
+    await dialog.getByRole('button', { name: 'Export', exact: true }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe('export-check.zip');
+
+    const zipPath = testInfo.outputPath('export-check.zip');
+    await download.saveAs(zipPath);
+
+    // Extracted with a different tool than the one that wrote it, which is the only way to catch
+    // an archive that is only readable by its own author.
+    const extractedTo = testInfo.outputPath('extracted');
+    await mkdir(extractedTo, { recursive: true });
+    execFileSync('unzip', ['-q', zipPath, '-d', extractedTo]);
+
+    const root = join(extractedTo, 'export-check');
+    for (const file of ['index.html', 'main.js', 'scene.json', 'engine/runtime.js', 'README.md']) {
+      expect(existsSync(join(root, file)), `${file} is in the archive`).toBe(true);
+    }
+
+    // Served over HTTP rather than opened from disk: browsers refuse ES modules over file://, and
+    // an export that only works when bundled by something else is not an export.
+    const server = createServer((request, response) => {
+      const url = (request.url ?? '/').split('?')[0] ?? '/';
+      const target = join(root, url === '/' ? 'index.html' : decodeURIComponent(url));
+      if (!target.startsWith(root) || !existsSync(target)) {
+        response.writeHead(404).end('not found');
+        return;
+      }
+      const types: Record<string, string> = {
+        '.html': 'text/html; charset=utf-8',
+        '.js': 'text/javascript; charset=utf-8',
+        '.json': 'application/json; charset=utf-8',
+        '.glb': 'model/gltf-binary',
+        '.wasm': 'application/wasm',
+        '.wav': 'audio/wav',
+        '.png': 'image/png',
+      };
+      response.writeHead(200, { 'content-type': types[extname(target)] ?? 'application/octet-stream' });
+      createReadStream(target).pipe(response);
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const port = (server.address() as { port: number }).port;
+
+    try {
+      const exported = await page.context().newPage();
+      const errors: string[] = [];
+      const notFound: string[] = [];
+      exported.on('pageerror', (error) => errors.push(error.message));
+      exported.on('response', (response) => {
+        // Recorded by URL rather than as a console line, because "a 404 happened" is useless
+        // without knowing what was missing — and a favicon the test server does not serve is not
+        // a broken export.
+        if (response.status() === 404) notFound.push(new URL(response.url()).pathname);
+      });
+
+      await exported.goto(`http://127.0.0.1:${port}/`);
+
+      // The engine put a canvas in the page and drew something into it. That is the whole claim.
+      await exported.waitForFunction(
+        () => {
+          const canvas = document.querySelector('canvas');
+          return canvas !== null && canvas.width > 0;
+        },
+        undefined,
+        { timeout: 30_000 },
+      );
+      await exported.waitForTimeout(2500);
+
+      const rendered = await exported.evaluate(() => {
+        const canvas = document.querySelector('canvas')!;
+        const context = canvas.getContext('webgl2') ?? canvas.getContext('webgl');
+        return {
+          hasContext: context !== null,
+          width: canvas.width,
+          height: canvas.height,
+          title: document.title,
+        };
+      });
+
+      expect(rendered.hasContext).toBe(true);
+      expect(rendered.width).toBeGreaterThan(100);
+      // The scene's own name, from the document — proof the export read scene.json rather than a
+      // hardcoded page.
+      expect(rendered.title).toBe('Village Outpost');
+
+      // A blank page with a 404 in the console is the classic broken export, so nothing the export
+      // actually ships is allowed to be missing. A favicon is the browser asking on its own.
+      expect(errors).toEqual([]);
+      expect(notFound.filter((path) => path !== '/favicon.ico')).toEqual([]);
+
+      // And it is not an empty world: the objects the document places are in the scene graph.
+      const drawn = await exported.evaluate(() => {
+        const canvas = document.querySelector('canvas')!;
+        return canvas.toDataURL('image/png').length;
+      });
+      expect(drawn).toBeGreaterThan(5000);
+
+      // And the *models* arrived, not just placeholder boxes. A placeholder is a single bare Mesh;
+      // a loaded GLB always arrives as a group of parts, which is the one difference visible from
+      // outside the engine. This is what "identical to the editor's preview" actually means.
+      const modelled = await exported.evaluate(async () => {
+        const response = await fetch('./assets/models/building_hut_01.glb');
+        return response.ok && (await response.arrayBuffer()).byteLength > 500;
+      });
+      expect(modelled).toBe(true);
+
+      await exported.screenshot({ path: testInfo.outputPath('exported.png') });
+      await exported.close();
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 });

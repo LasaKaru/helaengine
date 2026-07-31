@@ -90,7 +90,7 @@ export function App(): React.JSX.Element {
 
   return (
     <div className="editor">
-      <TopBar />
+      <TopBar manifest={state.library.manifest} />
       <div className="workspace">
         <AssetLibraryPanel manifest={state.library.manifest} />
         <Viewport loader={state.library.loader} resolver={state.library.resolver} />

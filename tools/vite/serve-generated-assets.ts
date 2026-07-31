@@ -5,6 +5,15 @@ import type { Plugin, ResolvedConfig } from 'vite';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const generatedAssetsDir = path.join(repoRoot, 'generated/assets');
+/**
+ * The self-contained engine bundle an export ships.
+ *
+ * Served as a static file rather than imported, because the editor never *runs* it — it copies it
+ * into a zip verbatim. Bundling it into the editor's own JavaScript would embed a second whole copy
+ * of Three.js in the editor for no reason.
+ */
+const runtimeBundle = path.join(repoRoot, 'packages/engine/dist/runtime.js');
+const RUNTIME_ROUTE = '/engine-runtime.js';
 
 const MIME_TYPES: Record<string, string> = {
   '.json': 'application/json; charset=utf-8',
@@ -36,6 +45,15 @@ export function serveGeneratedAssets(): Plugin {
     },
 
     configureServer(server) {
+      server.middlewares.use(RUNTIME_ROUTE, (_request, response, next) => {
+        if (!fs.existsSync(runtimeBundle)) {
+          next();
+          return;
+        }
+        response.setHeader('content-type', 'text/javascript; charset=utf-8');
+        fs.createReadStream(runtimeBundle).pipe(response);
+      });
+
       server.middlewares.use('/assets', (request, response, next) => {
         const requestPath = decodeURIComponent((request.url ?? '/').split('?')[0] ?? '/');
         const filePath = path.join(generatedAssetsDir, requestPath);
@@ -67,6 +85,11 @@ export function serveGeneratedAssets(): Plugin {
           'generated/assets is missing — run `pnpm ingest-assets` or the build will ship without models.',
         );
       }
+      if (!fs.existsSync(runtimeBundle)) {
+        this.warn(
+          'packages/engine/dist/runtime.js is missing — run `pnpm --filter @helaengine/engine build` or exports will fail.',
+        );
+      }
     },
 
     // Vite only copies its own `publicDir`, so the shared asset directory is emitted here.
@@ -74,6 +97,9 @@ export function serveGeneratedAssets(): Plugin {
       if (!fs.existsSync(generatedAssetsDir)) return;
       const outDir = path.resolve(config.root, config.build.outDir);
       fs.cpSync(generatedAssetsDir, path.join(outDir, 'assets'), { recursive: true });
+      if (fs.existsSync(runtimeBundle)) {
+        fs.copyFileSync(runtimeBundle, path.join(outDir, 'engine-runtime.js'));
+      }
     },
   };
 }

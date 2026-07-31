@@ -7,14 +7,15 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 20 — **Phase 2B complete**. A working editor, behaviours, physics, enemies, trigger
+**Status:** Sprint 21 — Phase 2B complete, export under way. A working editor, behaviours, physics, enemies, trigger
 volumes, a measured performance baseline, first/third/top-down cameras with one input layer covering
 keyboard, touch and gamepad, a schema-driven menu/HUD shell, and now combat: a weapon catalogue in
 the document, hitscan firing, ammo and reloading, pickups, player damage and respawn — plus secrets
 that hide areas, grant weapons or teleport the player, and checkpoints whose progress survives
 closing the tab, and sound — state-driven music with a crossfade, effects bound to engine events,
 a volume mixer, and a co-op multiplayer slice with a server-authoritative Colyseus service. The
-**Skirmish** template is a playable level built from all of it. The export system is next.
+**Skirmish** template is a playable level built from all of it, and **Export** produces a folder you
+can unzip and serve.
 
 ---
 
@@ -374,6 +375,26 @@ ever makes.
 ```bash
 pnpm --filter @helaengine/realtime start   # ws://localhost:2567
 ```
+
+## Export
+
+**Export** in the top bar writes a zip you can unzip, serve and open. Inside: `index.html`, a
+thirty-line `main.js` that is yours to change, `scene.json`, the assets this scene actually uses —
+not the whole library — and `engine/runtime.js`, the engine with Three.js bundled in as one file
+with no dependencies.
+
+That last file is why `packages/engine` has two builds. The editor and the co-op server import
+`index.js` with `three` left external, so there is one copy of Three in any app that also uses it
+directly. An export gets `runtime.js` with everything inlined, because a folder somebody unzips has
+no package manager, no bundler and no import map — every dependency has to already be in the file.
+
+Paths inside an export are relative throughout, which is checked by extracting the archive, serving
+it over HTTP and opening it rather than by reading the code. Browsers refuse ES modules over
+`file://`, so the README inside each export says to run `npx serve .` and why.
+
+Today this is a **static** export: it renders the world. Behaviours, physics, menus and sound are
+not started — the same `runtime.js` contains all of it, and Sprint 22 is what turns the export from
+a scene into a game.
 
 ## Where this is going
 
