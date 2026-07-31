@@ -107,20 +107,32 @@ export function AssetLibraryPanel({ manifest }: { manifest: AssetManifest }): Re
 
   const [gridRef, gridSize] = useElementSize<HTMLDivElement>();
 
+  /**
+   * Everything that can be dragged into the world.
+   *
+   * Audio shares the manifest — there should be one answer to "what assets does this project
+   * have" — but a sound is not something you place, so it is filtered out here rather than
+   * appearing as a card that does nothing when dropped. The Audio panel is where it belongs.
+   */
+  const placeable = useMemo(
+    () => manifest.assets.filter((asset) => asset.category !== 'audio'),
+    [manifest],
+  );
+
   const categories = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const asset of manifest.assets) {
+    for (const asset of placeable) {
       counts.set(asset.category, (counts.get(asset.category) ?? 0) + 1);
     }
     return [...counts].sort(([a], [b]) => a.localeCompare(b));
-  }, [manifest]);
+  }, [placeable]);
 
   const visible = useMemo(
     () =>
-      manifest.assets.filter(
+      placeable.filter(
         (asset) => (category === null || asset.category === category) && matches(asset, search),
       ),
-    [manifest, category, search],
+    [placeable, category, search],
   );
 
   const width = gridSize?.width ?? 0;
@@ -149,7 +161,7 @@ export function AssetLibraryPanel({ manifest }: { manifest: AssetManifest }): Re
             className={category === null ? 'active' : ''}
             onClick={() => setCategory(null)}
           >
-            All <span className="count">{manifest.assets.length}</span>
+            All <span className="count">{placeable.length}</span>
           </button>
           {categories.map(([name, count]) => (
             <button
@@ -185,7 +197,7 @@ export function AssetLibraryPanel({ manifest }: { manifest: AssetManifest }): Re
         </div>
 
         <p className="asset-footer">
-          {visible.length} of {manifest.assets.length} · drag onto the terrain to place
+          {visible.length} of {placeable.length} · drag onto the terrain to place
         </p>
       </section>
 

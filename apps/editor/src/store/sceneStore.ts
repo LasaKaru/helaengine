@@ -15,6 +15,7 @@ import {
   type Transform,
   type Trigger,
   type HudElement,
+  type AudioConfig,
   type Inventory,
   type Unlockable,
   type Weapon,
@@ -85,6 +86,7 @@ export interface SceneState {
   addUnlockable(): string;
   removeUnlockable(unlockableId: string): void;
   setUnlockable(unlockableId: string, patch: Partial<Unlockable>): void;
+  setAudioConfig(config: Partial<Omit<AudioConfig, 'music'>> & { music?: Partial<AudioConfig['music']> }): void;
   setGameConfig(config: Partial<GameConfig>): void;
   setUiConfig(config: UiConfigPatch): void;
   setMenuButtons(menu: 'mainMenu' | 'pauseMenu', buttons: UiButton[]): void;
@@ -467,6 +469,14 @@ export const useSceneStore = create<SceneState>()(
           commit('unlockable/set', (draft) => {
             const found = draft.unlockables.find((entry) => entry.id === unlockableId);
             if (found) Object.assign(found, patch);
+          }),
+
+        setAudioConfig: (config) =>
+          commit('scene/setAudioConfig', (draft) => {
+            const { music, ...rest } = config;
+            Object.assign(draft.audioConfig, rest);
+            // Music is merged rather than replaced, so setting one track does not clear the others.
+            if (music) Object.assign(draft.audioConfig.music, music);
           }),
 
         setPlayer: (player) =>

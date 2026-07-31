@@ -8,6 +8,7 @@ export * from './physics.js';
 export * from './inventory.js';
 export * from './unlockable.js';
 export * from './save.js';
+export * from './audio.js';
 export * from './trigger.js';
 export * from './object.js';
 export * from './scene.js';

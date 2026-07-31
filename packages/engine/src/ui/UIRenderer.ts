@@ -1,4 +1,4 @@
-import type { UiAction, UiButton, UiConfig } from '@helaengine/schema';
+import type { MixerSettings, UiAction, UiButton, UiConfig } from '@helaengine/schema';
 import { themeVariables } from './theme.js';
 
 /** Which surface is showing. `playing` means the shell is out of the way. */
@@ -26,8 +26,10 @@ export interface UIRendererOptions {
    * that it means "start stepping physics again". Neither needs to know the other's half.
    */
   onAction?: (action: UiAction) => void;
-  /** Volume settings surfaced by the settings screen. Wired to real audio in Sprint 19. */
+  /** Called as a mixer slider moves, so the host can apply it while the player is still dragging. */
   onVolumeChange?: (channel: 'master' | 'music' | 'sfx', value: number) => void;
+  /** Where the sliders start. The host owns the values; the shell only draws them. */
+  mixer?: MixerSettings;
   /** Called whenever the visible screen changes, however it changed. */
   onScreenChange?: (screen: UiScreen) => void;
 }
@@ -64,6 +66,7 @@ export class UIRenderer {
 
   #config: UiConfig;
   #screen: UiScreen = 'home';
+  #mixer: MixerSettings = { master: 1, music: 1, sfx: 1 };
   #hud: HudState = { health: 100, maxHealth: 100, ammo: null, score: 0, timer: 0 };
   #mounted = false;
   #video: HTMLVideoElement | null = null;
@@ -75,6 +78,7 @@ export class UIRenderer {
     this.#onAction = options.onAction ?? (() => {});
     this.#onVolumeChange = options.onVolumeChange ?? (() => {});
     this.#onScreenChange = options.onScreenChange ?? (() => {});
+    if (options.mixer) this.#mixer = options.mixer;
 
     this.#root = document.createElement('div');
     this.#root.className = 'hela-ui';
@@ -83,6 +87,17 @@ export class UIRenderer {
 
   get screen(): UiScreen {
     return this.#screen;
+  }
+
+  /** What the mixer sliders currently read. */
+  get mixer(): Readonly<MixerSettings> {
+    return this.#mixer;
+  }
+
+  /** Sets the sliders from outside — restoring saved settings, or a host-side reset. */
+  setMixer(mixer: MixerSettings): void {
+    this.#mixer = mixer;
+    if (this.#screen === 'settings') this.#render();
   }
 
   get root(): HTMLElement {
@@ -302,16 +317,23 @@ export class UIRenderer {
       slider.type = 'range';
       slider.min = '0';
       slider.max = '100';
-      slider.value = '80';
+      slider.value = String(Math.round(this.#mixer[channel] * 100));
       slider.setAttribute('aria-label', `${channel} volume`);
-      slider.addEventListener('input', () =>
-        this.#onVolumeChange(channel, Number(slider.value) / 100),
-      );
+
+      // The readout is the difference between a slider you can use and one you have to guess at,
+      // especially with the sound muted or the machine silent.
+      const readout = element('span', 'hela-readout', `${slider.value}%`);
+      slider.addEventListener('input', () => {
+        const value = Number(slider.value) / 100;
+        this.#mixer = { ...this.#mixer, [channel]: value };
+        readout.textContent = `${slider.value}%`;
+        this.#onVolumeChange(channel, value);
+      });
+
       row.appendChild(slider);
+      row.appendChild(readout);
       panel.appendChild(row);
     }
-
-    panel.appendChild(element('p', 'hela-subtitle', 'Audio arrives in Sprint 19.'));
     panel.appendChild(button('Back', 'hela-button', () => this.dispatch('closeSettings')));
 
     screen.appendChild(panel);
@@ -466,6 +488,7 @@ function ensureStyles(): void {
 .hela-button:hover, .hela-button:focus-visible { background: var(--hela-primary); color: var(--hela-on-primary); }
 .hela-primary { background: var(--hela-primary); color: var(--hela-on-primary); font-weight: 600; }
 .hela-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; }
+.hela-readout { min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; opacity: 0.8; }
 .hela-intro { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; }
 .hela-skip { position: absolute; right: 24px; bottom: 24px; padding: 8px 16px; color: var(--hela-text);
   font: inherit; background: rgba(0,0,0,0.5); border: 1px solid var(--hela-panel-border);

@@ -7,13 +7,14 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 18 — Phase 2B under way. A working editor, behaviours, physics, enemies, trigger
+**Status:** Sprint 19 — Phase 2B under way. A working editor, behaviours, physics, enemies, trigger
 volumes, a measured performance baseline, first/third/top-down cameras with one input layer covering
 keyboard, touch and gamepad, a schema-driven menu/HUD shell, and now combat: a weapon catalogue in
 the document, hitscan firing, ammo and reloading, pickups, player damage and respawn — plus secrets
 that hide areas, grant weapons or teleport the player, and checkpoints whose progress survives
-closing the tab. The **Skirmish** template is a playable level built from all of it. Audio is next;
-there is no backend yet, deliberately.
+closing the tab, and sound — state-driven music with a crossfade, effects bound to engine events,
+and a volume mixer. The **Skirmish** template is a playable level built from all of it. A co-op
+multiplayer slice is next; there is no backend yet, deliberately.
 
 ---
 
@@ -70,7 +71,7 @@ pnpm typecheck
 pnpm test
 pnpm build
 pnpm e2e              # editor end-to-end suite (Playwright)
-pnpm generate-assets  # regenerate the stand-in raw .glb sources
+pnpm generate-assets  # regenerate the stand-in raw .glb sources and .wav clips
 ```
 
 Requires Node 20+ and pnpm 10+. Thumbnail rendering needs a Chromium that Playwright can find; set
@@ -132,9 +133,10 @@ enforces what it can (budgets, pivot drift, absurd scale) and warns about the re
 looks wrong, fix the source file — never special-case it in engine code, because every exported
 project inherits engine code.
 
-The ten starter assets are **stand-ins generated in code** (`pnpm generate-assets`), not modelled
-art. They exist so the pipeline has real GLBs to chew on; Sprint 37 replaces them with commissioned
-assets, and nothing downstream has to change when it does.
+The ten starter models and ten starter audio clips are **stand-ins generated in code**
+(`pnpm generate-assets`), not modelled art or sound design. They exist so the pipeline has real GLBs
+and real waveforms to chew on; Sprint 37 replaces them with commissioned assets, and nothing
+downstream has to change when it does, because everything refers to them by `assetId`.
 
 Texture compression (KTX2/Basis) is wired but inert: it needs `toktx` from KHRONOS KTX-Software on
 PATH, and the current assets are untextured. Ingest says so rather than skipping silently.
@@ -318,6 +320,28 @@ ceilings so a hand-edited save cannot mint ammo.
 
 The editor's **Progress** panel reports what is saved and throws it away, because testing a level
 that keeps resuming from halfway through it is worse than a level with no checkpoints at all.
+
+## Sound
+
+Music has three states — menu, exploring, and a fight — and crossfades between them. A scene that
+only supplies one track simply never crossfades; one that has no combat track falls silent for a
+fight rather than carrying exploration music through it. Leaving combat waits out a **hold**,
+because without one the track flickers every time an enemy blinks.
+
+Sound effects are bound to **event names**, not to a fixed list of occasions. Behaviours already
+raise `pickup`, `checkpoint` and `enemyDied`; a scene binds a name to a clip and that is the entire
+integration — no gameplay code anywhere knows that any of it makes a noise. A binding can be
+positional, in which case the sound plays at the object whose id the event carried.
+
+`pnpm ingest-assets` now has an audio step: it decodes WAV, measures RMS and peak in dBFS, and
+levels each clip towards a target with the gain capped so a spiky sample is quieted rather than
+clipped. It does **not** transcode — that needs ffmpeg, which is not part of this toolchain — so
+what it publishes is levelled WAV, and it says so rather than implying a web-optimised codec.
+
+The settings menu has master, music and effects sliders. Those are the *player's*, stored on their
+machine and not in `scene.json`: how loud somebody likes their music is a property of that person,
+and putting it in the document would carry one player's preference to everyone the project reaches.
+The author's own defaults live in the scene, and the two multiply.
 
 ## Where this is going
 

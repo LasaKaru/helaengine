@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import {
+  AudioSystem,
   InputManager,
+  MixerStore,
   PhysicsWorld,
   createCameraRig,
   createPlayerAvatar,
@@ -26,6 +28,7 @@ import { useEditorStore } from '../store/editorStore';
 import { useSceneStore } from '../store/sceneStore';
 import {
   recordSimulationTiming,
+  setAudioSystem,
   resetSimulationTiming,
   setGameRuntime,
   setLookHandler,
@@ -75,6 +78,7 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
   const avatar = useRef<PlayerAvatar | null>(null);
   const ui = useRef<UIRenderer | null>(null);
   const saves = useRef<SaveStore | null>(null);
+  const audio = useRef<AudioSystem | null>(null);
   const look = useRef({ yaw: 0, pitch: 0 });
   const lookDelta = useRef({ x: 0, y: 0 });
   const health = useRef<number | null>(null);
@@ -85,6 +89,7 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
   // The one piece of the document this component subscribes to. Everything else it reads once, at
   // the moment play starts — but the shell is authored while it is on screen, so it has to follow.
   const uiConfig = useSceneStore((state) => state.scene.uiConfig);
+  const audioConfig = useSceneStore((state) => state.scene.audioConfig);
 
   useEffect(() => {
     if (!walking || !loadedScene) return;
@@ -139,6 +144,28 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
         // Saving on the checkpoint rather than on a timer: a checkpoint *is* the author saying
         // "this moment is worth keeping", and a periodic autosave would second-guess them.
         game.behaviors.on('checkpointReached', () => store.write(game.captureSave()));
+
+        // Audio binds to the bus the rest of gameplay already talks through, so nothing in the
+        // engine had to grow a "play a sound here" call.
+        const mixerStore = new MixerStore();
+        const sound = new AudioSystem({
+          config: scene.audioConfig,
+          bus: game.behaviors,
+          resolve: (assetId) => {
+            const entry = resolver.get(assetId);
+            return entry?.audioPath ? `${ASSET_BASE_URL}${entry.audioPath}` : null;
+          },
+          locate: (objectId) =>
+            loadedScene.objects.get(objectId)?.getWorldPosition(new THREE.Vector3()) ?? null,
+          listener: () => ({
+            position: camera.getWorldPosition(new THREE.Vector3()),
+            forward: camera.getWorldDirection(new THREE.Vector3()),
+          }),
+        });
+        sound.setMixer(mixerStore.read());
+        sound.start();
+        audio.current = sound;
+        setAudioSystem(sound);
         if (game.behaviors.problems.length > 0) {
           console.warn('[helaengine] behaviour problems:', game.behaviors.problems);
         }
@@ -167,6 +194,13 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
         const shell = new UIRenderer({
           container: domElement.parentElement ?? domElement,
           config: scene.uiConfig,
+          mixer: new MixerStore().read(),
+          onVolumeChange: (channel, value) => {
+            const store2 = new MixerStore();
+            const next = { ...store2.read(), [channel]: value };
+            store2.write(next);
+            audio.current?.setMixer(next);
+          },
           resolveAsset: (assetId) => {
             // Uploaded UI assets first: a home screen background is something the author added,
             // not something the ingest pipeline produced.
@@ -194,6 +228,9 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
             if (action === 'restartCheckpoint') runtime.current?.respawnPlayer();
             if (action === 'startGame' || action === 'resume' || action === 'restartCheckpoint') {
               input.current?.requestPointerLock();
+              // Browsers refuse to start an audio context outside a user gesture. A button press
+              // is the gesture; without this the first game is silent and nothing says why.
+              AudioSystem.resume();
             }
           },
         });
@@ -233,6 +270,9 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
       avatar.current?.dispose();
       avatar.current = null;
       setCameraMode(null);
+      audio.current?.stop();
+      audio.current = null;
+      setAudioSystem(null);
       runtime.current?.stop();
       runtime.current = null;
       saves.current = null;
@@ -264,6 +304,12 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
   useEffect(() => {
     ui.current?.setConfig(uiConfig);
   }, [uiConfig]);
+
+  // The audio config is authored while the preview is running too — swapping a track or binding a
+  // new sound should be audible without leaving Walk.
+  useEffect(() => {
+    audio.current?.setConfig(audioConfig);
+  }, [audioConfig]);
 
   // One input layer for every source. The engine owns it, because an exported game running on a
   // phone needs the same virtual joystick and has no React to build it with.
@@ -307,6 +353,16 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
     const shell = ui.current;
 
     manager.captureOnClick = !shell || shell.screen === 'playing';
+
+    if (shell && shell.screen !== 'playing') {
+      // Menu music, and the effects go quiet: a pause screen with combat still crashing away
+      // behind it is the least paused a game can feel.
+      audio.current?.setSuspended(true);
+      audio.current?.update(delta, 'menu');
+    } else {
+      audio.current?.setSuspended(false);
+      audio.current?.update(delta);
+    }
 
     // A menu is not a pause button that happens to be visible — the world genuinely stops.
     if (shell && shell.screen !== 'playing') {

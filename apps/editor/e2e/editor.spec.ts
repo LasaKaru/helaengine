@@ -2217,3 +2217,164 @@ test.describe('checkpoints', () => {
     ).toBeNull();
   });
 });
+
+/**
+ * Sprint 19 — audio.
+ *
+ * A caveat worth stating in the file rather than only in the sprint notes: headless Chromium has no
+ * output device, so nothing here asserts that a sound was *heard*. What it asserts is that the
+ * right track was chosen, the music state machine moved with the game, the mixer took and kept a
+ * value, and the audio assets are actually served — which is the whole of the wiring.
+ */
+test.describe('audio', () => {
+  test.beforeEach(async ({ page }) => {
+    await openEditor(page, /Skirmish/);
+  });
+
+  async function enterWalk(page: Page, spawn: [number, number, number]): Promise<void> {
+    await page.evaluate((at) => window.helaengine!.store.getState().setPlayer({ spawn: at }), spawn);
+    await page.waitForTimeout(300);
+    await page.getByRole('button', { name: 'Walk' }).click();
+    await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
+      timeout: 20_000,
+    });
+    await startPlaying(page);
+  }
+
+  test('the ingested audio is actually served', async ({ page, request }) => {
+    const url = await page.evaluate(() => {
+      const asset = window
+        .helaengine!.store.getState()
+        .scene.audioConfig.music.exploreTrackAssetId;
+      return asset;
+    });
+    expect(url).toBe('audio_music_explore');
+
+    // The manifest path, fetched for real. A binding pointing at a 404 is the failure mode that
+    // silently produces no sound at all.
+    const response = await request.get('/assets/audio/audio_music_explore.wav');
+    expect(response.status()).toBe(200);
+    // The body rather than the header: the dev server streams these, so `content-length` is absent.
+    const body = await response.body();
+    expect(body.length).toBeGreaterThan(100_000);
+    // A real RIFF/WAVE, not an HTML error page served with a 200.
+    expect(body.subarray(0, 4).toString('ascii')).toBe('RIFF');
+    expect(body.subarray(8, 12).toString('ascii')).toBe('WAVE');
+  });
+
+  test('the Audio panel edits music and sound bindings', async ({ page }) => {
+    const panel = page.getByRole('region', { name: 'Audio' });
+    await expect(panel.getByLabel('Menu track')).toHaveValue('audio_music_menu');
+
+    await panel.getByLabel('Combat track').selectOption('');
+    await panel.getByRole('button', { name: 'Add sound' }).click();
+
+    const audio = await page.evaluate(
+      () => window.helaengine!.store.getState().scene.audioConfig,
+    );
+    expect(audio.music.combatTrackAssetId).toBeNull();
+    // Nine bindings: the template's eight plus the one just added.
+    expect(audio.sfx).toHaveLength(9);
+  });
+
+  test('the sound picker only offers ingested audio, and the asset library offers none', async ({
+    page,
+  }) => {
+    const options = await page
+      .getByRole('region', { name: 'Audio' })
+      .getByLabel('Menu track')
+      .locator('option')
+      .evaluateAll((nodes) => nodes.map((node) => (node as HTMLOptionElement).value));
+
+    expect(options.filter((value) => value !== '').every((value) => value.startsWith('audio_'))).toBe(
+      true,
+    );
+
+    // A sound is not something you place, so it must not appear as a draggable card.
+    await expect(page.getByRole('button', { name: /^Audio \d+$/ })).toHaveCount(0);
+  });
+
+  test('music follows the game: menu, then exploring, then combat', async ({ page }) => {
+    await page.getByRole('button', { name: 'Walk' }).click();
+    await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
+      timeout: 20_000,
+    });
+
+    // The home screen is a menu, and the menu track is what should be up.
+    await page.waitForTimeout(600);
+    expect(await page.evaluate(() => window.helaengine!.audioState()!.musicState)).toBe('menu');
+
+    await startPlaying(page);
+    await page.waitForTimeout(600);
+    expect(await page.evaluate(() => window.helaengine!.audioState()!.musicState)).toBe('explore');
+
+    // A fight. `enemyAlerted` is what the AI raises when it spots the player, so raising it is the
+    // same message the goblin would send.
+    await page.evaluate(() => window.helaengine!.emit('enemyAlerted', { objectId: 'obj_0004' }));
+    await page.waitForTimeout(400);
+    const fighting = await page.evaluate(() => window.helaengine!.audioState()!);
+    expect(fighting.inCombat).toBe(true);
+    expect(fighting.musicState).toBe('combat');
+  });
+
+  test('pausing switches to menu music without ending the fight', async ({ page }) => {
+    await enterWalk(page, [0, 0, 4]);
+    await page.evaluate(() => window.helaengine!.emit('enemyAlerted', {}));
+    await page.waitForTimeout(300);
+    expect(await page.evaluate(() => window.helaengine!.audioState()!.musicState)).toBe('combat');
+
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+    const paused = await page.evaluate(() => window.helaengine!.audioState()!);
+    expect(paused.musicState).toBe('menu');
+    // A menu pauses a fight, it does not end one.
+    expect(paused.inCombat).toBe(true);
+  });
+
+  test('the settings mixer takes a value and keeps it across a reload', async ({ page }) => {
+    await enterWalk(page, [0, 0, 4]);
+
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    await page.locator('.hela-panel button', { hasText: 'Settings' }).click();
+
+    const slider = page.locator('.hela-panel input[aria-label="music volume"]');
+    await slider.fill('25');
+    await slider.dispatchEvent('input');
+    await expect(page.locator('.hela-panel .hela-readout').nth(1)).toHaveText('25%');
+
+    expect(await page.evaluate(() => window.helaengine!.audioState()!.mixer.music)).toBeCloseTo(
+      0.25,
+      2,
+    );
+
+    // The player's own settings are stored on their machine, not in the scene — so they survive a
+    // reload without the document being touched.
+    await page.reload();
+    await page.waitForFunction(() => window.helaengine !== undefined);
+    expect(
+      await page.evaluate(() => JSON.parse(localStorage.getItem('helaengine:mixer') ?? '{}')),
+    ).toMatchObject({ music: 0.25 });
+  });
+
+  test('a mixer setting is not written into the scene document', async ({ page }) => {
+    // How loud somebody likes their music is a property of that person, not of the level.
+    const before = await page.evaluate(
+      () => window.helaengine!.store.getState().scene.audioConfig.musicVolume,
+    );
+
+    await enterWalk(page, [0, 0, 4]);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    await page.locator('.hela-panel button', { hasText: 'Settings' }).click();
+    const slider = page.locator('.hela-panel input[aria-label="music volume"]');
+    await slider.fill('10');
+    await slider.dispatchEvent('input');
+
+    expect(
+      await page.evaluate(
+        () => window.helaengine!.store.getState().scene.audioConfig.musicVolume,
+      ),
+    ).toBe(before);
+  });
+});

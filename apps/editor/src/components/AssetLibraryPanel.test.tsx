@@ -79,4 +79,25 @@ describe('AssetLibraryPanel', () => {
 
     expect(screen.getByText(/1 of 4/)).toBeInTheDocument();
   });
+  it('leaves audio out of the library entirely, counts included', () => {
+    // Audio shares the manifest — one answer to "what assets does this project have" — but a sound
+    // is not something you drag onto the terrain, and a count that includes it is a count nobody
+    // can reconcile with what they see.
+    render(
+      <AssetLibraryPanel
+        manifest={parseAssetManifest({
+          version: 1,
+          assets: [
+            { id: 'prop_crate_01', name: 'Crate', category: 'props' },
+            { id: 'audio_music_menu', name: 'Menu music', category: 'audio' },
+            { id: 'audio_sfx_pickup', name: 'Pickup', category: 'audio' },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.queryByText('Menu music')).toBeNull();
+    expect(screen.getByRole('button', { name: /^All/ })).toHaveTextContent('1');
+    expect(screen.getByText(/drag onto the terrain/)).toHaveTextContent('1 of 1');
+  });
 });

@@ -2,6 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { checkPolyBudget, polyBudgets } from './budgets.js';
 import { readAssetMetadata } from './metadata.js';
 import { metadataFile } from './paths.js';
+import {
+  decodeWav,
+  durationSeconds,
+  encodeWav,
+  isAudioFile,
+  levelLoudness,
+  measureLoudness,
+  PEAK_CEILING_DB,
+  TARGET_RMS_DB,
+  type DecodedAudio,
+} from './audio.js';
 
 describe('poly budgets', () => {
   it('passes an asset inside its category budget', () => {
@@ -63,5 +74,116 @@ describe('asset metadata', () => {
     ]) {
       expect(metadata.get(assetId).declared, `${assetId} should be declared`).toBe(true);
     }
+  });
+});
+
+describe('audio ingest', () => {
+  /** A pure tone, at a known amplitude, so every measurement below has an expected answer. */
+  function tone(amplitude: number, seconds = 0.1, sampleRate = 44_100): DecodedAudio {
+    const count = Math.floor(seconds * sampleRate);
+    const samples = new Float32Array(count);
+    for (let index = 0; index < count; index += 1) {
+      samples[index] = Math.sin((2 * Math.PI * 440 * index) / sampleRate) * amplitude;
+    }
+    return { sampleRate, channels: 1, samples };
+  }
+
+  it('round-trips a WAV through encode and decode', () => {
+    const original = tone(0.5, 0.05);
+    const decoded = decodeWav(encodeWav(original));
+
+    expect(decoded.sampleRate).toBe(44_100);
+    expect(decoded.channels).toBe(1);
+    expect(decoded.samples.length).toBe(original.samples.length);
+    // 16-bit quantisation, so exact equality is the wrong assertion.
+    for (let index = 0; index < original.samples.length; index += 100) {
+      expect(decoded.samples[index]).toBeCloseTo(original.samples[index]!, 3);
+    }
+  });
+
+  it('rejects something that is not a WAV rather than producing noise', () => {
+    expect(() => decodeWav(new Uint8Array([1, 2, 3, 4]))).toThrow(/not a readable WAV/);
+    expect(() => decodeWav(new TextEncoder().encode('RIFF....NOTAWAVE'))).toThrow(/WAVE/);
+  });
+
+  it('walks chunks rather than assuming the data starts at byte 44', () => {
+    // Real encoders interleave LIST and fact chunks; a decoder that assumed a fixed offset works
+    // on exactly the files it was written against and nothing else.
+    const plain = encodeWav(tone(0.5, 0.01));
+    const extra = new TextEncoder().encode('LIST');
+    const padded = new Uint8Array(plain.length + 12);
+    padded.set(plain.subarray(0, 36), 0);
+    padded.set(extra, 36);
+    new DataView(padded.buffer).setUint32(40, 4, true);
+    padded.set(new TextEncoder().encode('INFO'), 44);
+    padded.set(plain.subarray(36), 48);
+    // The RIFF size field has to grow with the file.
+    new DataView(padded.buffer).setUint32(4, padded.length - 8, true);
+
+    expect(decodeWav(padded).samples.length).toBe(decodeWav(plain).samples.length);
+  });
+
+  it('measures RMS and peak in dBFS', () => {
+    const { rmsDb, peakDb } = measureLoudness(tone(1).samples);
+
+    // A full-scale sine is -3.01 dBFS RMS and 0 dBFS peak. Those are the textbook numbers, which
+    // is exactly why they make a good assertion.
+    expect(rmsDb).toBeCloseTo(-3.01, 1);
+    expect(peakDb).toBeCloseTo(0, 1);
+  });
+
+  it('levels a quiet clip up towards the target', () => {
+    const quiet = tone(0.02);
+    const { audio, gainDb } = levelLoudness(quiet);
+
+    expect(gainDb).toBeGreaterThan(0);
+    expect(measureLoudness(audio.samples).rmsDb).toBeCloseTo(TARGET_RMS_DB, 1);
+  });
+
+  it('levels a loud clip down', () => {
+    const { audio, gainDb } = levelLoudness(tone(1));
+
+    expect(gainDb).toBeLessThan(0);
+    expect(measureLoudness(audio.samples).rmsDb).toBeCloseTo(TARGET_RMS_DB, 1);
+  });
+
+  it('stops short of the target rather than clipping a peaky clip', () => {
+    // A clip whose RMS is far below its peak — one spike in silence. Levelling it to the target by
+    // RMS alone would push the spike past full scale, which is audible distortion.
+    const samples = new Float32Array(44_100);
+    samples[0] = 0.95;
+    const { audio } = levelLoudness({ sampleRate: 44_100, channels: 1, samples });
+
+    const after = measureLoudness(audio.samples);
+    expect(after.peakDb).toBeLessThanOrEqual(PEAK_CEILING_DB + 0.01);
+    expect(after.rmsDb).toBeLessThan(TARGET_RMS_DB);
+  });
+
+  it('leaves silence alone rather than dividing by zero', () => {
+    const silence = { sampleRate: 44_100, channels: 1, samples: new Float32Array(1000) };
+    const { gainDb, audio } = levelLoudness(silence);
+
+    expect(gainDb).toBe(0);
+    expect(audio.samples.every((sample) => sample === 0)).toBe(true);
+  });
+
+  it('clamps on encode, so an over-unity sample is quiet rather than a click', () => {
+    // Without the clamp, a sample above 1 wraps to a large negative integer — the loudest possible
+    // click rather than the loudest possible sound.
+    const hot = { sampleRate: 44_100, channels: 1, samples: new Float32Array([2, -2, 0]) };
+    const decoded = decodeWav(encodeWav(hot));
+
+    expect(decoded.samples[0]).toBeCloseTo(1, 2);
+    expect(decoded.samples[1]).toBeCloseTo(-1, 2);
+  });
+
+  it('reports duration from the sample count', () => {
+    expect(durationSeconds(tone(0.5, 2.5))).toBeCloseTo(2.5, 3);
+  });
+
+  it('recognises the formats the step handles', () => {
+    expect(isAudioFile('music.wav')).toBe(true);
+    expect(isAudioFile('SHOUT.OGG')).toBe(true);
+    expect(isAudioFile('model.glb')).toBe(false);
   });
 });

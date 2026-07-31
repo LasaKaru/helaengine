@@ -41,6 +41,11 @@ export {
 export type { CheckpointParams } from './behaviors/CheckpointBehavior.js';
 export { registerBuiltinBehaviors } from './behaviors/builtins.js';
 export { SaveStore, saveKey } from './save/SaveStore.js';
+export { AudioSystem } from './audio/AudioSystem.js';
+export type { AudioSystemOptions, SfxVoice } from './audio/AudioSystem.js';
+export { MixerStore, MIXER_KEY } from './audio/MixerStore.js';
+export { MusicPlayer } from './audio/MusicPlayer.js';
+export type { MusicPlayerOptions, MusicTrack } from './audio/MusicPlayer.js';
 export type { SaveStorage, SaveStoreOptions } from './save/SaveStore.js';
 export { Inventory } from './combat/Inventory.js';
 export type { CarriedWeapon } from './combat/Inventory.js';

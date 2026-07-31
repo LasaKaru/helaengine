@@ -1,5 +1,11 @@
 import { TerrainField } from '@helaengine/engine';
-import { CURRENT_SCENE_VERSION, SceneSchema, type Scene, type Vec3 } from '@helaengine/schema';
+import {
+  CURRENT_SCENE_VERSION,
+  SceneSchema,
+  type AudioConfigInput,
+  type Scene,
+  type Vec3,
+} from '@helaengine/schema';
 
 export interface SceneTemplate {
   id: string;
@@ -47,6 +53,7 @@ function buildScene(
   terrain: Partial<Scene['terrain']> = {},
   inventory: Partial<Scene['inventory']> = {},
   unlockables: Scene['unlockables'] = [],
+  audioConfig: AudioConfigInput = {},
 ): Scene {
   counter = 0;
   return SceneSchema.parse({
@@ -56,6 +63,7 @@ function buildScene(
     terrain,
     inventory,
     unlockables,
+    audioConfig,
     objects: placements.map((placement) => ({
       id: objectId(),
       assetId: placement.assetId,
@@ -384,6 +392,29 @@ export const TEMPLATES: SceneTemplate[] = [
             once: true,
           },
         ],
+        {
+          music: {
+            menuTrackAssetId: 'audio_music_menu',
+            exploreTrackAssetId: 'audio_music_explore',
+            combatTrackAssetId: 'audio_music_combat',
+            crossfadeSeconds: 1.5,
+            combatHoldSeconds: 6,
+          },
+          // Bound to event names the rest of the engine already raises — no gameplay code knows
+          // that any of this makes a noise.
+          sfx: [
+            { event: 'pickup', assetId: 'audio_sfx_pickup' },
+            { event: 'checkpoint', assetId: 'audio_sfx_checkpoint' },
+            { event: 'playerDamaged', assetId: 'audio_sfx_damage' },
+            { event: 'playerDied', assetId: 'audio_sfx_death' },
+            { event: 'weaponFired', assetId: 'audio_sfx_shoot', volume: 0.7 },
+            { event: 'weaponReloaded', assetId: 'audio_sfx_reload' },
+            { event: 'secretUnlocked', assetId: 'audio_sfx_secret' },
+            // In the world rather than in both ears: a goblin dying behind you should sound like
+            // it happened behind you.
+            { event: 'enemyDied', assetId: 'audio_sfx_death', positional: true, volume: 0.8 },
+          ],
+        },
       );
     },
   },

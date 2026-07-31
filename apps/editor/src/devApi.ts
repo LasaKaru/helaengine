@@ -1,5 +1,5 @@
 import { Vector3, type Camera, type WebGLRenderer } from 'three';
-import type { GameRuntime, LoadedScene, PlayerController } from '@helaengine/engine';
+import type { AudioSystem, GameRuntime, LoadedScene, PlayerController } from '@helaengine/engine';
 import { SceneObjectSchema, type Vec3 } from '@helaengine/schema';
 import type { AssetLibrary } from './engine/assetLibrary';
 import { useEditorStore } from './store/editorStore';
@@ -77,6 +77,18 @@ export interface DevApi {
     reserve: number;
     carried: string[];
     shotsFired: number;
+  } | null;
+  /**
+   * What the audio system is doing, or null when nothing is playing.
+   *
+   * Headless Chromium has no output device, so no test can assert that a sound was *heard*. What it
+   * can assert is that the right track was selected, the state machine moved, and the mixer took
+   * the value — which is the whole of the wiring and the only part a regression would break.
+   */
+  audioState(): {
+    musicState: string | null;
+    inCombat: boolean;
+    mixer: { master: number; music: number; sfx: number };
   } | null;
   /** Object id of the checkpoint the player currently holds, or null. */
   currentCheckpoint(): string | null;
@@ -165,6 +177,13 @@ let currentGame: GameRuntime | null = null;
 /** Records the running game runtime, so tests can read AI state and raise events. */
 export function setGameRuntime(runtime: GameRuntime | null): void {
   currentGame = runtime;
+}
+
+let currentAudio: AudioSystem | null = null;
+
+/** Records the running audio system, so tests can read what it decided to play. */
+export function setAudioSystem(audio: AudioSystem | null): void {
+  currentAudio = audio;
 }
 
 let lookHandler: ((yaw: number, pitch?: number) => void) | null = null;
@@ -349,6 +368,15 @@ export function exposeDevApi(library: AssetLibrary): void {
       currentGame.damagePlayer(amount);
       return true;
     },
+
+    audioState: () =>
+      currentAudio
+        ? {
+            musicState: currentAudio.music.state,
+            inCombat: currentAudio.inCombat,
+            mixer: { ...currentAudio.mixer },
+          }
+        : null,
 
     currentCheckpoint: () => currentGame?.checkpointId ?? null,
 

@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Ingest pipeline: raw GLB sources in, compressed GLBs + thumbnails + manifest out.",
   "scripts": {
-    "generate-raw": "tsx src/generate-raw-assets.ts",
+    "generate-raw": "tsx src/generate-raw-assets.ts && tsx src/generate-raw-audio.ts",
     "ingest": "tsx src/ingest-assets.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"

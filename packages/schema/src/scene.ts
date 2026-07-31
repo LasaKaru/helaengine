@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AudioConfigSchema } from './audio.js';
 import { EnvironmentSchema } from './environment.js';
 import { SceneObjectSchema } from './object.js';
 import { GameConfigSchema } from './game.js';
@@ -26,6 +27,7 @@ export const SceneSchema = z
     player: PlayerSchema,
     inventory: InventorySchema,
     unlockables: UnlockablesSchema,
+    audioConfig: AudioConfigSchema,
     gameConfig: GameConfigSchema,
     uiConfig: UiConfigSchema,
   })

@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–18 complete. Phases 1 (Editor MVP) and 2 (Behaviours, Physics, AI) done; **Phase 2B (Gameplay Runtime & UI, Sprints 13–20) is under way** — it was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–19 complete. Phases 1 (Editor MVP) and 2 (Behaviours, Physics, AI) done; **Phase 2B (Gameplay Runtime & UI, Sprints 13–20) is under way** — it was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -472,12 +472,24 @@ Two things found by playing it. A checkpoint marker made from a fence **blocks t
 
 **Tasks:**
 
-- [ ] Howler.js for music (state-driven crossfade between menu, exploration and combat tracks); Three.js positional audio for in-world sources
-- [ ] Bind SFX to engine events: damage, pickup, checkpoint, footsteps, weapon fire
-- [ ] Extend the ingest pipeline with an audio step: format normalisation to a web-friendly codec, loudness levelling
-- [ ] Settings-menu volume mixer (master/music/SFX) plus editor-side defaults
+- [x] Howler.js for music, with a state-driven crossfade between menu, exploration and combat tracks; positional one-shots placed at the object that raised the event
+- [x] Bind SFX to engine events: damage, pickup, checkpoint, weapon fire, reload, death, secrets — as a **list of bindings** rather than a fixed `onDamage`/`onPickup` map, because the event bus is already what everything talks through
+- [x] Extend the ingest pipeline with an audio step: format normalisation and loudness levelling
+- [x] Settings-menu volume mixer (master/music/SFX) plus editor-side defaults
+- [x] **Added:** a combat *hold* so the track does not flicker every time an enemy blinks; per-binding rate limiting; a stand-in audio generator (`pnpm generate-assets` now writes ten synthesised WAVs); and audio excluded from the placement library, because a sound is not something you drag onto the terrain
+
+**Tech notes:**
+
+- **No gameplay code knows that any of this makes a noise.** Behaviours already raise `pickup`, `checkpoint` and `enemyDied`; a scene binds a name to a clip and that is the whole integration. It is also why an author can put a sound on an event the engine has never heard of, from a pickup's `sfxEvent` or a trigger's `emit`.
+- The music player takes its track factory as an option, so the crossfade is unit-tested without a sound card — which matters, because neither CI nor headless Chromium has one.
+- Two audio graphs are in play and it is worth being honest: Howler owns one `AudioContext`, and positional sources would own another. The same master gain is applied to both. One shared context would be tidier and is not worth reimplementing Howler to get.
+- The player's mixer settings live in `localStorage`, deliberately **not** in `scene.json`: how loud somebody likes their music is a property of that person, and writing it into the document would carry one player's preference to everyone the project is exported to. Validated on read like every other stored blob — a tampered value would otherwise produce a volume of 40.
 
 **Definition of Done:** A scene has distinct menu and gameplay music with a clean crossfade, correct SFX on damage/pickup/checkpoint, and a working in-game mixer that persists for the session.
+
+**Met, with one limitation that has to be stated plainly: nothing here has been _heard_.** Headless Chromium has no output device and this container has no sound card, so every audio claim in this sprint is a claim about wiring, not about acoustics. What *is* verified, in a real browser: the music state machine moves menu → explore → combat as the game does, pausing switches to menu music without ending the fight, the mixer takes a value and keeps it across a reload without touching the document, and the ingested WAVs are served as real RIFF/WAVE files rather than 404s. The crossfade itself — old track falling while the new one rises, over the configured duration — is asserted against a recording test double, which pins the sequence and the timings but not the sound.
+
+Two further gaps, both real. **There is no transcoding**: ffmpeg is not installed, so the pipeline normalises WAV to one sample format and levels its loudness (measured in dBFS, peak-limited so a spiky clip is quieted rather than clipped) but cannot produce Ogg or AAC. The music beds are therefore ~700 KB each, which is fine for a stand-in and wrong for a shipped game; Sprint 23's export hardening is where that has to be fixed. And **footsteps are not implemented** — the plan lists them, but there is no `footstep` event to bind to and inventing one would mean a per-frame distance accumulator in the character controller, which belongs with movement polish rather than with audio.
 
 ---
 

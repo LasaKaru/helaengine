@@ -14,6 +14,9 @@ export const polyBudgets: Record<AssetCategory, number> = {
   // Logic assets are trigger volumes: the engine draws them as an outline and the pipeline never
   // ingests one, so any triangle count at all means somebody has miscategorised a model.
   logic: 0,
+  // Nor does an audio asset have geometry. Same reasoning: a triangle here means a miscategorised
+  // file, and the pipeline should say so rather than ingest a model as a sound.
+  audio: 0,
 };
 
 export const HARD_LIMIT_MULTIPLIER = 2;

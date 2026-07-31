@@ -11,6 +11,9 @@ export const AssetCategorySchema = z.enum([
   // Not a visual asset at all: trigger volumes and other world logic, which the editor lists
   // alongside props because "place it in the world" is the same gesture.
   'logic',
+  // Nor is this: music and sound effects, referenced by id from `audioConfig` rather than placed.
+  // Sharing the manifest keeps one answer to "what assets does this project have".
+  'audio',
 ]);
 export type AssetCategory = z.infer<typeof AssetCategorySchema>;
 
@@ -37,6 +40,12 @@ export const AssetManifestEntrySchema = z.object({
   /** Manifest-relative path to the compressed GLB. Absent while an asset is still a placeholder. */
   glbPath: z.string().min(1).optional(),
   thumbnailPath: z.string().min(1).optional(),
+  /** Manifest-relative path to the normalised audio file. Only for `category: 'audio'`. */
+  audioPath: z.string().min(1).optional(),
+  /** Length in seconds, measured at ingest. Lets the editor show it without decoding the file. */
+  durationSeconds: z.number().positive().max(3600).optional(),
+  /** Whether the ingest step judged this a music bed rather than a one-shot. */
+  loop: z.boolean().optional(),
 
   defaultScale: Vec3Schema.default([1, 1, 1]),
   colliderType: ColliderTypeSchema.default('box'),
