@@ -1,11 +1,24 @@
 import type * as THREE from 'three';
-import type { BehaviorEntry, ObjectPhysics, PickupKind, Vec3 } from '@helaengine/schema';
+import type {
+  BehaviorEntry,
+  CheckpointReset,
+  ObjectPhysics,
+  PickupKind,
+  Vec3,
+} from '@helaengine/schema';
 
 /** What a pickup is offering. `weaponId` is empty for health, and for ammo means "the held gun". */
 export interface PickupRequest {
   kind: PickupKind;
   weaponId: string;
   amount: number;
+}
+
+/** A checkpoint announcing itself. `reset` travels with it, so a save records the rules it used. */
+export interface CheckpointRequest {
+  objectId: string;
+  position: Vec3;
+  reset: CheckpointReset;
 }
 
 export interface SpawnRequest {
@@ -46,6 +59,14 @@ export interface WorldHandle {
 
   /** Moves the player. Used by respawns and by a secret that drops you somewhere else. */
   teleportPlayer(position: THREE.Vector3): void;
+
+  /**
+   * Makes somewhere the place the player comes back to.
+   *
+   * Returns whether this was news. Re-entering the checkpoint already held answers false, which is
+   * what stops a repeatable checkpoint from writing a save on every frame the player stands in it.
+   */
+  setCheckpoint(request: CheckpointRequest): boolean;
 
   /**
    * Hides or shows an object, collider included.
@@ -96,6 +117,7 @@ export const INERT_WORLD: WorldHandle = {
   damagePlayer: () => {},
   collect: () => false,
   teleportPlayer: () => {},
+  setCheckpoint: () => false,
   setObjectHidden: () => false,
   lineOfSight: () => true,
   groundHeight: () => 0,

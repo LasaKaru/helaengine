@@ -78,6 +78,10 @@ export interface DevApi {
     carried: string[];
     shotsFired: number;
   } | null;
+  /** Object id of the checkpoint the player currently holds, or null. */
+  currentCheckpoint(): string | null;
+  /** Seconds of play the runtime has counted, or null. */
+  playSeconds(): number | null;
   /** Secrets found so far, or null when nothing is playing. */
   unlockedSecrets(): string[] | null;
   /** Whether a node is currently visible — how a revealed area is asserted on. */
@@ -345,6 +349,10 @@ export function exposeDevApi(library: AssetLibrary): void {
       currentGame.damagePlayer(amount);
       return true;
     },
+
+    currentCheckpoint: () => currentGame?.checkpointId ?? null,
+
+    playSeconds: () => currentGame?.elapsedSeconds ?? null,
 
     unlockedSecrets: () => currentGame?.unlocks.unlockedIds ?? null,
 

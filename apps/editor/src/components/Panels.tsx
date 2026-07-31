@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type {
   AssetManifest,
   BodyType,
@@ -8,6 +8,7 @@ import type {
   Transform,
   Vec3,
 } from '@helaengine/schema';
+import { SaveStore } from '@helaengine/engine';
 import { useEditorStore } from '../store/editorStore';
 import { useSceneStore } from '../store/sceneStore';
 import { BehaviorPanel } from './BehaviorPanel';
@@ -281,6 +282,56 @@ function PlayerPanel(): React.JSX.Element {
   );
 }
 
+/**
+ * Saved progress for this scene, and a way to throw it away.
+ *
+ * The moment anything persists, a designer needs this: testing a level that keeps resuming from a
+ * checkpoint halfway through it is worse than a level with no checkpoints at all, and hunting
+ * through devtools for a `localStorage` key is not an answer.
+ */
+function ProgressPanel(): React.JSX.Element {
+  const sceneId = useSceneStore((state) => state.scene.sceneId);
+  const walking = useEditorStore((state) => state.walking);
+  // A counter rather than a piece of state holding the save itself: the read is synchronous, so
+  // deriving it is both simpler and free of the "set state in an effect" hazard.
+  const [cleared, setCleared] = useState(0);
+
+  // Re-read when play stops as well as when the scene changes: that is when a run has just written
+  // one, and a stale "no saved progress" would be the most confusing possible readout.
+  const saved = useMemo(() => {
+    // `walking` and `cleared` are read here purely so they are honest dependencies: both are
+    // moments after which the answer may have changed, and neither affects what is read.
+    void walking;
+    void cleared;
+    return new SaveStore({ sceneId }).read();
+  }, [sceneId, walking, cleared]);
+
+  return (
+    <section className="panel" aria-label="Progress">
+      <h2>Progress</h2>
+
+      {saved === null ? (
+        <p className="panel-hint">No saved progress. Reaching a checkpoint in Walk creates some.</p>
+      ) : (
+        <p className="panel-hint" role="status">
+          Saved at {saved.checkpointId ?? 'the spawn point'}, {Math.round(saved.health)} health.
+        </p>
+      )}
+
+      <button
+        type="button"
+        disabled={saved === null}
+        onClick={() => {
+          new SaveStore({ sceneId }).clear();
+          setCleared((count) => count + 1);
+        }}
+      >
+        Clear saved progress
+      </button>
+    </section>
+  );
+}
+
 /** Inspector for the current selection, above the scene list. */
 export function InspectorPanel({ manifest }: { manifest: AssetManifest }): React.JSX.Element {
   const selectedIds = useSceneStore((state) => state.selectedIds);
@@ -383,6 +434,7 @@ export function InspectorPanel({ manifest }: { manifest: AssetManifest }): React
 
       <GameUiPanel />
       <PlayerPanel />
+      <ProgressPanel />
     </aside>
   );
 }

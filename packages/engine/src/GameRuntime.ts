@@ -11,7 +11,8 @@ import { Inventory } from './combat/Inventory.js';
 import { UnlockRuntime } from './unlock/UnlockRuntime.js';
 import { WeaponSystem, type ShotHit, type WeaponInput } from './combat/WeaponSystem.js';
 import type { PickupRequest, SpawnRequest, WorldHandle } from './world.js';
-import type { UnlockKey } from '@helaengine/schema';
+import type { CheckpointReset, SaveState, UnlockKey } from '@helaengine/schema';
+import type { CheckpointRequest } from './world.js';
 
 export interface GameRuntimeOptions {
   loader: SceneLoader;
@@ -66,8 +67,14 @@ export class GameRuntime implements WorldHandle {
   readonly #removed = new Map<string, SceneObject>();
   /** The document's own objects, by id — the set that must survive a preview unchanged. */
   readonly #documentObjects: Map<string, SceneObject>;
+  /** Which scene a save belongs to. Refusing another scene's save is the only use. */
+  readonly #sceneId: string;
 
   readonly #spawnPoint: THREE.Vector3;
+  /** The last checkpoint reached, or null for "the spawn point is still the answer". */
+  #checkpoint: { objectId: string; position: THREE.Vector3; reset: CheckpointReset } | null = null;
+  /** Seconds of play, carried into a save so a timer survives a reload. */
+  #elapsed = 0;
 
   #player: PlayerController | null;
   #health: number;
@@ -87,6 +94,7 @@ export class GameRuntime implements WorldHandle {
     this.#playerSettings = options.scene.player;
     this.#health = options.scene.player.health;
     this.#documentObjects = new Map(options.scene.objects.map((object) => [object.id, object]));
+    this.#sceneId = options.scene.sceneId;
     this.#spawnPoint = (options.spawnPoint ?? new THREE.Vector3(...options.scene.player.spawn)).clone();
     this.inventory = new Inventory(options.scene.inventory);
     this.#warn = options.warn ?? ((message) => console.warn(`[helaengine] ${message}`));
@@ -124,6 +132,15 @@ export class GameRuntime implements WorldHandle {
     return this.#health > 0;
   }
 
+  /** Object id of the checkpoint currently held, or null. */
+  get checkpointId(): string | null {
+    return this.#checkpoint?.objectId ?? null;
+  }
+
+  get elapsedSeconds(): number {
+    return this.#elapsed;
+  }
+
   /** Ids of objects spawned since start — none of which are in the document. */
   get spawnedIds(): readonly string[] {
     return this.#spawned;
@@ -149,6 +166,7 @@ export class GameRuntime implements WorldHandle {
   update(deltaSeconds: number, weapons?: WeaponInput, sequenceKeys?: readonly UnlockKey[]): void {
     if (!this.#started) return;
 
+    this.#elapsed += deltaSeconds;
     this.#damageCooldown = Math.max(0, this.#damageCooldown - deltaSeconds);
     this.#tickRespawn(deltaSeconds);
 
@@ -168,11 +186,90 @@ export class GameRuntime implements WorldHandle {
    * the shape of this. What matters now is that dying is recoverable rather than terminal.
    */
   respawnPlayer(): void {
-    this.#health = this.#playerSettings.health;
+    const checkpoint = this.#checkpoint;
+    const maximum = this.#playerSettings.health;
+
+    if (checkpoint) {
+      // The rules the checkpoint was *reached* under, not the rules the document says now. A save
+      // records what happened.
+      switch (checkpoint.reset.health) {
+        case 'full':
+          this.#health = maximum;
+          break;
+        case 'partial':
+          this.#health = Math.max(1, Math.round(maximum * checkpoint.reset.healthFraction));
+          break;
+        case 'none':
+          // Coming back on zero health would be an instant second death, so the floor is one.
+          this.#health = Math.max(1, this.#health);
+          break;
+      }
+      if (checkpoint.reset.ammo === 'full') this.inventory.refillAll();
+    } else {
+      this.#health = maximum;
+    }
+
     this.#respawnIn = null;
     this.#damageCooldown = this.#playerSettings.damageCooldown;
-    this.#player?.teleport(this.#spawnPoint);
-    this.behaviors.emit('playerRespawned', { position: this.#spawnPoint.toArray() });
+
+    const where = checkpoint?.position ?? this.#spawnPoint;
+    this.#player?.teleport(where);
+    this.behaviors.emit('playerRespawned', {
+      position: where.toArray(),
+      checkpointId: checkpoint?.objectId ?? null,
+    });
+  }
+
+  /**
+   * Everything worth carrying across a reload.
+   *
+   * State, never structure: a save says how much health and which weapons, never which objects a
+   * scene contains — so no save, however edited, can change what the game *is*.
+   */
+  captureSave(): SaveState {
+    const where = this.#checkpoint?.position ?? this.#spawnPoint;
+    return {
+      version: 1,
+      sceneId: this.#sceneId,
+      savedAt: Date.now(),
+      checkpointId: this.#checkpoint?.objectId ?? null,
+      checkpointPosition: [where.x, where.y, where.z],
+      health: this.#health,
+      weapons: this.inventory.snapshot(),
+      currentWeaponId: this.inventory.current?.weapon.id ?? null,
+      unlockedIds: this.unlocks.unlockedIds,
+      elapsedSeconds: this.#elapsed,
+    };
+  }
+
+  /**
+   * Puts a saved run back.
+   *
+   * Returns false for a save from another scene rather than applying it — respawning somebody at a
+   * checkpoint from a different level is worse than starting them over. The checkpoint's *rules*
+   * are not saved: a resumed run that then dies falls back to a full restore, which is the generous
+   * reading and avoids inventing rules the document may no longer contain.
+   */
+  restoreSave(state: SaveState): boolean {
+    if (state.sceneId !== this.#sceneId) return false;
+
+    this.#health = Math.min(state.health, this.#playerSettings.health);
+    this.#elapsed = state.elapsedSeconds;
+    this.#respawnIn = null;
+    this.inventory.restore(state.weapons, state.currentWeaponId);
+    this.unlocks.restore(state.unlockedIds);
+
+    if (state.checkpointId) {
+      this.#checkpoint = {
+        objectId: state.checkpointId,
+        position: new THREE.Vector3(...state.checkpointPosition),
+        reset: { health: 'full', healthFraction: 0.5, ammo: 'none' },
+      };
+      this.#player?.teleport(this.#checkpoint.position);
+    }
+
+    this.behaviors.emit('progressRestored', { checkpointId: state.checkpointId });
+    return true;
   }
 
   #tickRespawn(deltaSeconds: number): void {
@@ -203,6 +300,8 @@ export class GameRuntime implements WorldHandle {
     this.#health = this.#playerSettings.health;
     this.#respawnIn = null;
     this.#damageCooldown = 0;
+    this.#checkpoint = null;
+    this.#elapsed = 0;
   }
 
   // ---- WorldHandle ----------------------------------------------------------------------
@@ -252,6 +351,23 @@ export class GameRuntime implements WorldHandle {
 
   teleportPlayer(position: THREE.Vector3): void {
     this.#player?.teleport(position);
+  }
+
+  setCheckpoint(request: CheckpointRequest): boolean {
+    // Already holding this one is not news, and saying so is what stops a repeatable checkpoint
+    // writing a save on every frame the player stands in it.
+    if (this.#checkpoint?.objectId === request.objectId) return false;
+
+    this.#checkpoint = {
+      objectId: request.objectId,
+      position: new THREE.Vector3(...request.position),
+      reset: request.reset,
+    };
+    this.behaviors.emit('checkpointReached', {
+      checkpointId: request.objectId,
+      position: request.position,
+    });
+    return true;
   }
 
   setObjectHidden(objectId: string, hidden: boolean): boolean {

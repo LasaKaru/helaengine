@@ -7,12 +7,13 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 17 — Phase 2B under way. A working editor, behaviours, physics, enemies, trigger
+**Status:** Sprint 18 — Phase 2B under way. A working editor, behaviours, physics, enemies, trigger
 volumes, a measured performance baseline, first/third/top-down cameras with one input layer covering
 keyboard, touch and gamepad, a schema-driven menu/HUD shell, and now combat: a weapon catalogue in
 the document, hitscan firing, ammo and reloading, pickups, player damage and respawn — plus secrets
-that hide areas, grant weapons or teleport the player. The **Skirmish** template is a playable level
-built from all of it. Checkpoints and audio are next; there is no backend yet, deliberately.
+that hide areas, grant weapons or teleport the player, and checkpoints whose progress survives
+closing the tab. The **Skirmish** template is a playable level built from all of it. Audio is next;
+there is no backend yet, deliberately.
 
 ---
 
@@ -298,6 +299,25 @@ takes the collider with it, so a secret area is not an invisible wall.
 
 The **Secrets** panel builds both its pickers from the schema, so it can offer exactly what the
 runtime can do and nothing else.
+
+## Checkpoints and saved progress
+
+A checkpoint is a `checkpoint` behaviour with a radius — the same shape as a pickup, because they
+are the same gesture. Reaching one makes it the place death sends you, and each one says what coming
+back restores: full, partial or no health, and whether the ammo comes back with it. Per checkpoint
+rather than per game, because the two ends of a level want different answers.
+
+Reaching a checkpoint writes a save, keyed by scene id. Saving on the checkpoint rather than on a
+timer is the point: a checkpoint *is* the author saying this moment is worth keeping.
+
+A save holds **state, never structure** — health, weapons, which checkpoint, which secrets. Nothing
+in one names an object, an asset or a behaviour, so no save can change what a scene contains. And it
+is validated on the way *in*: `localStorage` is a text field the player can edit, so a save that
+fails to parse is discarded and the run starts fresh, and counts are clamped to each weapon's own
+ceilings so a hand-edited save cannot mint ammo.
+
+The editor's **Progress** panel reports what is saved and throws it away, because testing a level
+that keeps resuming from halfway through it is worse than a level with no checkpoints at all.
 
 ## Where this is going
 

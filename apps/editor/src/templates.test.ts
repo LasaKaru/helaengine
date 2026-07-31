@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SceneSchema } from '@helaengine/schema';
+import { CheckpointParamsSchema } from '@helaengine/engine';
 import { TEMPLATES, buildStressScene, templateById } from './templates';
 
 describe('templates', () => {
@@ -121,5 +122,23 @@ describe('skirmish secrets', () => {
     const alcove = scene.objects.find((object) => object.metadata.label === 'Alcove');
 
     expect(alcove?.trigger).not.toBeNull();
+  });
+});
+
+describe('skirmish checkpoints', () => {
+  it('places two, the deeper one more generous than the first', () => {
+    const scene = templateById('skirmish')!.build();
+    const checkpoints = scene.objects
+      .map((object) => object.behaviors.find((behavior) => behavior.type === 'checkpoint'))
+      .filter((behavior) => behavior !== undefined);
+
+    expect(checkpoints).toHaveLength(2);
+    // Parsed through the behaviour's own schema, because that is where the defaults land — a
+    // document stores the params as written, and the runtime fills the rest in on creation.
+    const resets = checkpoints.map(
+      (behavior) => CheckpointParamsSchema.parse(behavior!.params).reset.ammo,
+    );
+    // A scarcity stretch that never refills is a checkpoint you dread rather than one you want.
+    expect(resets).toEqual(['none', 'full']);
   });
 });

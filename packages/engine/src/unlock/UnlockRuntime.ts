@@ -64,6 +64,30 @@ export class UnlockRuntime {
     return this.#entries.filter((entry) => entry.unlocked).map((entry) => entry.unlockable.id);
   }
 
+  /**
+   * Marks secrets as already found, from a save.
+   *
+   * The actions are *not* re-run: a teleport on load would drop the player somewhere they did not
+   * ask to be, and a weapon grant is already in the restored inventory. Only `revealArea` has a
+   * lasting world effect, and that is applied directly so a revealed area stays revealed.
+   */
+  restore(unlockedIds: readonly string[]): void {
+    const found = new Set(unlockedIds);
+
+    for (const entry of this.#entries) {
+      if (!found.has(entry.unlockable.id)) continue;
+      entry.unlocked = true;
+
+      for (const action of entry.unlockable.actions) {
+        if (action.type !== 'revealArea') continue;
+        for (const objectId of action.objectIds) {
+          this.#world.setObjectHidden(objectId, false);
+          this.#hidden.delete(objectId);
+        }
+      }
+    }
+  }
+
   isUnlocked(id: string): boolean {
     return this.#entries.some((entry) => entry.unlockable.id === id && entry.unlocked);
   }

@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–17 complete. Phases 1 (Editor MVP) and 2 (Behaviours, Physics, AI) done; **Phase 2B (Gameplay Runtime & UI, Sprints 13–20) is under way** — it was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–18 complete. Phases 1 (Editor MVP) and 2 (Behaviours, Physics, AI) done; **Phase 2B (Gameplay Runtime & UI, Sprints 13–20) is under way** — it was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -444,12 +444,25 @@ One thing recorded rather than fixed: a stray key **does** break a sequence in p
 
 **Tasks:**
 
-- [ ] Checkpoint objects, placeable and triggerable, updating `currentCheckpointId`
-- [ ] Respawn at the current checkpoint on death, with per-checkpoint reset rules (full or partial health/ammo)
-- [ ] Persistence: `localStorage` in a standalone export; server-side later for hosted play with an account
-- [ ] Editor placement and per-checkpoint config panel
+- [x] Checkpoint objects, placeable and triggerable — a `checkpoint` behaviour, shaped exactly like `pickup`, because they are the same gesture: walk into a thing, something happens
+- [x] Respawn at the current checkpoint on death, with per-checkpoint reset rules (full, partial or no health; ammo refilled or not)
+- [x] Persistence: `SaveStore` over `localStorage`, with the storage injectable so hosted play (Sprint 27) swaps it without touching a caller
+- [x] Editor placement and per-checkpoint config — the behaviour's form is generated from its schema like every other behaviour's, plus a **Progress** panel that reports the save and can throw it away
+- [x] **Added:** `SaveState` as a schema, validated on read; `Inventory.snapshot/restore/refillAll`; `UnlockRuntime.restore`; and two checkpoints in the Skirmish template, the deeper one more generous than the first
+
+**Tech notes:**
+
+- **A save is validated on the way in.** `localStorage` is a text field the player can edit, so an exported game reading one back is reading untrusted input in exactly the sense the rest of this codebase means. A save that does not parse is discarded and the run starts fresh — worse than resuming, far better than a crash on load. Counts are clamped to the weapon's own ceilings on restore, so a hand-edited save cannot mint ammo or health.
+- **A save holds state, never structure.** Health, weapons, checkpoint, secrets found. Nothing in it names an object, an asset or a behaviour, so no save — however edited — can change what a scene *contains*.
+- The reset rules travel with the checkpoint request rather than being looked up at respawn time, so a checkpoint reached before its rules were edited keeps the rules it was reached under. A save records what happened, not what the document says now.
+- Restoring a save does **not** re-run the unlock actions: a teleport on load would drop the player somewhere they did not ask to be, and a granted weapon is already in the restored inventory. Only `revealArea` has a lasting world effect, and that is applied directly.
+- Saving happens on the checkpoint rather than on a timer. A checkpoint *is* the author saying "this moment is worth keeping"; a periodic autosave would second-guess them.
 
 **Definition of Done:** The player reaches a checkpoint, dies, respawns there with correctly reset stats; closing and reopening an exported build resumes from the last checkpoint.
+
+**Met for the first half and for everything the second half can currently be**, and the distinction is worth being precise about. Reaching a checkpoint, dying and coming back with the right stats is played end to end in a browser, including a checkpoint that refills ammo and one that does not. Progress surviving a **full page reload** is also played end to end — but through the editor's Play Preview, because there is no exporter until Sprint 21. That is the same `SaveStore`, the same `captureSave`/`restoreSave` and the same `localStorage` key an export will use, so Sprint 21 inherits an exercised save system rather than a blind one; what it does not yet prove is the export wrapper around it.
+
+Two things found by playing it. A checkpoint marker made from a fence **blocks the player** — a checkpoint you bounce off is a wall with a saving throw attached, so the template's markers now carry `collider: 'none'`. And the Progress panel's "Clear saved progress" button broke two long-standing tests, because Playwright's `name` option is a substring match and "Clear saved progress" matches "Save"; the locators are anchored with `exact: true` now.
 
 ---
 

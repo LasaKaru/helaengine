@@ -8,6 +8,7 @@ import {
   createPlayerAvatar,
   nextCameraMode,
   registerBuiltinBehaviors,
+  SaveStore,
   startScene,
   UIRenderer,
   type AssetResolver,
@@ -73,6 +74,7 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
   const rig = useRef<CameraRig | null>(null);
   const avatar = useRef<PlayerAvatar | null>(null);
   const ui = useRef<UIRenderer | null>(null);
+  const saves = useRef<SaveStore | null>(null);
   const look = useRef({ yaw: 0, pitch: 0 });
   const lookDelta = useRef({ x: 0, y: 0 });
   const health = useRef<number | null>(null);
@@ -126,6 +128,17 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
         });
         runtime.current = game;
         setGameRuntime(game);
+
+        // Progress persists per scene. This is the same path an exported build takes (Sprint 21) —
+        // writing it now means the export inherits an exercised save system rather than a blind one.
+        const store = new SaveStore({ sceneId: scene.sceneId });
+        saves.current = store;
+        const saved = store.read();
+        if (saved) game.restoreSave(saved);
+
+        // Saving on the checkpoint rather than on a timer: a checkpoint *is* the author saying
+        // "this moment is worth keeping", and a periodic autosave would second-guess them.
+        game.behaviors.on('checkpointReached', () => store.write(game.captureSave()));
         if (game.behaviors.problems.length > 0) {
           console.warn('[helaengine] behaviour problems:', game.behaviors.problems);
         }
@@ -188,7 +201,7 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
         ui.current = shell;
         setUiScreen(shell.screen);
         setPauseHandler(() => shell.togglePause());
-        elapsed.current = 0;
+        elapsed.current = game.elapsedSeconds;
 
         // A body to look at. First person hides it, because the camera is inside it.
         const body = createPlayerAvatar(scene.player);
@@ -222,6 +235,7 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
       setCameraMode(null);
       runtime.current?.stop();
       runtime.current = null;
+      saves.current = null;
       setGameRuntime(null);
       for (const node of loadedScene.objects.values()) {
         if (node.userData['isTrigger']) node.visible = true;
@@ -361,7 +375,7 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
       health.current = current;
       useEditorStore.getState().setPlayerHealth(current);
     }
-    elapsed.current += delta;
+    elapsed.current = runtime.current?.elapsedSeconds ?? elapsed.current + delta;
     if (current !== null) {
       shell?.setHud({
         health: current,

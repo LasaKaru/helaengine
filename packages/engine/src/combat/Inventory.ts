@@ -1,4 +1,4 @@
-import type { Inventory as InventoryConfig, Weapon } from '@helaengine/schema';
+import type { Inventory as InventoryConfig, SavedWeapon, Weapon } from '@helaengine/schema';
 
 /** What the player is carrying of one weapon: the weapon itself, plus its two ammo pools. */
 export interface CarriedWeapon {
@@ -174,6 +174,48 @@ export class Inventory {
     current.clip += moved;
     current.reserve -= moved;
     return moved;
+  }
+
+  /** What is carried, as plain data a save can hold. */
+  snapshot(): SavedWeapon[] {
+    return this.#carried.map((entry) => ({
+      weaponId: entry.weapon.id,
+      clip: entry.clip,
+      reserve: entry.reserve,
+    }));
+  }
+
+  /**
+   * Replaces what is carried from a snapshot.
+   *
+   * Entries naming a weapon the catalogue no longer has are skipped rather than rejected: the save
+   * may predate an edit that deleted the weapon, and losing one gun beats losing the whole run.
+   * Counts are clamped to the weapon's own ceilings, so a hand-edited save cannot mint ammo.
+   */
+  restore(saved: readonly SavedWeapon[], currentWeaponId: string | null): void {
+    this.#carried.length = 0;
+
+    for (const entry of saved) {
+      const weapon = this.#catalogue.get(entry.weaponId);
+      if (!weapon || this.#carried.length >= this.#maxCarried) continue;
+
+      this.#carried.push({
+        weapon,
+        clip: Math.min(entry.clip, weapon.clipSize),
+        reserve: Math.min(entry.reserve, weapon.reserveAmmo),
+      });
+    }
+
+    this.#index = 0;
+    if (currentWeaponId) this.select(currentWeaponId);
+  }
+
+  /** Tops every carried weapon back up — what a checkpoint with `ammo: 'full'` does. */
+  refillAll(): void {
+    for (const entry of this.#carried) {
+      entry.clip = entry.weapon.clipSize;
+      entry.reserve = entry.weapon.reserveAmmo;
+    }
   }
 
   /** Whether a reload would do anything — what a "press R" prompt and the auto-reload both ask. */

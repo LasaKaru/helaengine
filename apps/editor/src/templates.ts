@@ -22,6 +22,8 @@ interface Placement {
   label?: string;
   behaviors?: Array<{ type: string; params: Record<string, unknown> }>;
   body?: 'static' | 'dynamic' | 'kinematic';
+  /** Overrides the asset's collider. `none` is what a marker you walk *through* needs. */
+  collider?: 'none';
   trigger?: Record<string, unknown>;
 }
 
@@ -64,7 +66,14 @@ function buildScene(
       },
       ...(placement.behaviors ? { behaviors: placement.behaviors } : {}),
       ...(placement.trigger ? { trigger: placement.trigger } : {}),
-      ...(placement.body ? { physics: { body: placement.body } } : {}),
+      ...(placement.body || placement.collider
+        ? {
+            physics: {
+              ...(placement.body ? { body: placement.body } : {}),
+              ...(placement.collider ? { collider: placement.collider } : {}),
+            },
+          }
+        : {}),
       ...(placement.label ? { metadata: { label: placement.label } } : {}),
     })),
   });
@@ -260,8 +269,8 @@ export const TEMPLATES: SceneTemplate[] = [
             },
           ],
         },
-        // Two secrets' worth of scenery. Placed before the generated treeline so their ids stay
-        // obj_0006 and obj_0007 no matter what the tree loop does.
+        // Two secrets' worth of scenery and two checkpoints. Placed before the generated treeline
+        // so their ids stay obj_0006..obj_0009 no matter what the tree loop does.
         {
           assetId: 'building_hut_01',
           position: [-16, 0, -26],
@@ -274,6 +283,26 @@ export const TEMPLATES: SceneTemplate[] = [
           scale: 4,
           label: 'Alcove',
           trigger: { shape: 'box', detects: 'player', once: false },
+        },
+        {
+          assetId: 'prop_fence_01',
+          position: [0, 0, -2],
+          label: 'Checkpoint one',
+          // No collider: a checkpoint is a place, and one you bounce off is a wall with a saving
+          // throw attached. Found by walking into it.
+          collider: 'none',
+          behaviors: [{ type: 'checkpoint', params: { radius: 3, reset: { health: 'full' } } }],
+        },
+        {
+          assetId: 'prop_fence_01',
+          position: [0, 0, -16],
+          label: 'Checkpoint two',
+          collider: 'none',
+          // Deeper into the fight, so it hands the ammo back as well — a scarcity stretch that
+          // never refills is a checkpoint you dread rather than one you want.
+          behaviors: [
+            { type: 'checkpoint', params: { radius: 3, reset: { health: 'full', ammo: 'full' } } },
+          ],
         },
       ];
 

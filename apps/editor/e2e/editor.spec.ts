@@ -633,7 +633,7 @@ test.describe('projects and local save', () => {
       window.helaengine!.store.getState().setName('Persisted Scene');
       window.helaengine!.addObject('building_hut_01', [2, 0, 3]);
     });
-    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('status', { name: 'Save state' })).toHaveText('Saved');
 
     await page.reload();
@@ -686,7 +686,7 @@ test.describe('projects and local save', () => {
     await expect(page.getByRole('banner')).toBeVisible();
     await page.waitForTimeout(1500);
 
-    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('status', { name: 'Save state' })).toHaveText('Saved');
 
     await page.getByRole('button', { name: 'Projects' }).click();
@@ -2087,5 +2087,133 @@ test.describe('secrets', () => {
 
     expect(await page.evaluate(() => window.helaengine!.unlockedSecrets())).toEqual([]);
     expect(await page.evaluate(() => window.helaengine!.playerInventory()!.carried)).toEqual([]);
+  });
+});
+
+/**
+ * Sprint 18 — checkpoints and saved progress.
+ *
+ * The Skirmish template has two checkpoints on the way into the fight. These play them, and check
+ * that progress survives a reload — which is the half of the sprint that has no visible UI at all.
+ */
+test.describe('checkpoints', () => {
+  test.beforeEach(async ({ page }) => {
+    await openEditor(page, /Skirmish/);
+  });
+
+  async function enterWalk(page: Page, spawn: [number, number, number]): Promise<void> {
+    await page.evaluate((at) => window.helaengine!.store.getState().setPlayer({ spawn: at }), spawn);
+    await page.waitForTimeout(300);
+    await page.getByRole('button', { name: 'Walk' }).click();
+    await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
+      timeout: 20_000,
+    });
+    await startPlaying(page);
+  }
+
+  /** Walks forward until the runtime reports a checkpoint, and returns which one. */
+  async function walkToCheckpoint(page: Page): Promise<string | null> {
+    await page.evaluate(() => window.helaengine!.setPlayerYaw(0));
+    await page.keyboard.down('w');
+    await page
+      .waitForFunction(() => window.helaengine!.currentCheckpoint() !== null, undefined, {
+        timeout: 15_000,
+      })
+      .catch(() => undefined);
+    await page.keyboard.up('w');
+    return page.evaluate(() => window.helaengine!.currentCheckpoint());
+  }
+
+  test('reaching one makes it the place death sends you', async ({ page }) => {
+    // Checkpoint one sits at [0, 0, -2]. Spawn behind it and walk in.
+    await enterWalk(page, [0, 0, 4]);
+    expect(await page.evaluate(() => window.helaengine!.currentCheckpoint())).toBeNull();
+
+    const reached = await walkToCheckpoint(page);
+    expect(reached).not.toBeNull();
+
+    // Walk well past it, then die.
+    await page.keyboard.down('w');
+    await page.waitForTimeout(1500);
+    await page.keyboard.up('w');
+    const before = await page.evaluate(() => window.helaengine!.playerPosition()!);
+
+    await page.evaluate(() => window.helaengine!.damagePlayer(1000));
+    await page.waitForFunction(() => window.helaengine!.playerHealth() === 100, undefined, {
+      timeout: 10_000,
+    });
+
+    const after = await page.evaluate(() => window.helaengine!.playerPosition()!);
+    // Back at the checkpoint, which is behind where they died — not at the original spawn.
+    expect(after.z).toBeGreaterThan(before.z);
+    expect(Math.abs(after.z + 2)).toBeLessThan(4);
+  });
+
+  test('the Progress panel reports a save and can throw it away', async ({ page }) => {
+    const panel = page.getByRole('region', { name: 'Progress' });
+    await expect(panel).toContainText('No saved progress');
+
+    await enterWalk(page, [0, 0, 4]);
+    await walkToCheckpoint(page);
+    await exitWalk(page);
+
+    await expect(panel.getByRole('status')).toContainText('health');
+    await panel.getByRole('button', { name: 'Clear saved progress' }).click();
+    await expect(panel).toContainText('No saved progress');
+  });
+
+  test('progress survives a full page reload', async ({ page }) => {
+    // The definition of done, minus the export wrapper: closing and reopening resumes from the
+    // last checkpoint. The exporter in Sprint 21 runs this exact path.
+    await enterWalk(page, [0, 0, 4]);
+    const reached = await walkToCheckpoint(page);
+    expect(reached).not.toBeNull();
+
+    await page.evaluate(() => window.helaengine!.damagePlayer(35));
+    const health = await page.evaluate(() => window.helaengine!.playerHealth());
+    expect(health).toBe(65);
+
+    // Save the scene so reopening it is the same scene — a save is keyed by sceneId.
+    await exitWalk(page);
+    await page.keyboard.press('Control+s');
+    await expect(page.getByRole('status', { name: 'Save state' })).toHaveText('Saved');
+
+    await page.reload();
+    await page.waitForFunction(() => window.helaengine !== undefined);
+    await page
+      .getByRole('button', { name: /Skirmish/ })
+      .first()
+      .click();
+    await expect(page.getByRole('banner')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Walk' }).click();
+    await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
+      timeout: 20_000,
+    });
+    await startPlaying(page);
+
+    // The checkpoint came back. Health is whatever the save held — the run resumed, it did not
+    // restart.
+    expect(await page.evaluate(() => window.helaengine!.currentCheckpoint())).toBe(reached);
+    expect(await page.evaluate(() => window.helaengine!.playerHealth())).toBe(100);
+  });
+
+  test('a corrupt save is discarded rather than crashing the game', async ({ page }) => {
+    // localStorage is a text field the player can edit. This is the untrusted-input case.
+    const sceneId = await page.evaluate(
+      () => window.helaengine!.store.getState().scene.sceneId,
+    );
+    await page.evaluate(
+      (id) => localStorage.setItem(`helaengine:save:${id}`, '{"health": "lots"'),
+      sceneId,
+    );
+
+    await enterWalk(page, [0, 0, 4]);
+    expect(await page.evaluate(() => window.helaengine!.playerHealth())).toBe(100);
+    expect(await page.evaluate(() => window.helaengine!.currentCheckpoint())).toBeNull();
+    // And the bad blob is gone, so the next load is not the same failure again.
+    expect(
+      await page.evaluate((id) => localStorage.getItem(`helaengine:save:${id}`), sceneId),
+    ).toBeNull();
   });
 });
