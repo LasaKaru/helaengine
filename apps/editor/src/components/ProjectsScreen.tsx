@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useProjectStore } from '../store/projectStore';
 import { TEMPLATES } from '@helaengine/templates';
+import { AccountBar } from './AccountBar';
 
 function formatWhen(timestamp: number): string {
   const minutes = Math.round((Date.now() - timestamp) / 60_000);
@@ -38,6 +39,7 @@ export function ProjectsScreen(): React.JSX.Element {
 
   return (
     <div className="projects-screen">
+      <AccountBar />
       <header className="projects-header">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true" />

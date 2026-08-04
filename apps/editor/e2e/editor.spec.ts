@@ -3071,3 +3071,86 @@ test.describe('shareable hosted play', () => {
     await theirBrowser.close();
   });
 });
+
+/**
+ * Sprint 29 — cloud save, driven through the editor.
+ *
+ * The gap this closes was named rather than hidden: the adapter and the API were each tested, and
+ * nobody had watched a browser sign in, save, and come back to the same state. Sprint 26 taught
+ * that lesson twice in one afternoon — the logic was right and the seams were wrong, both times.
+ */
+test.describe('cloud save', () => {
+  /** A different address per run, so a re-run is not a duplicate signup. */
+  function newEmail(): string {
+    return `e2e-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}@example.com`;
+  }
+
+  async function signUp(page: Page, email: string): Promise<void> {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Create an account' }).click();
+    await page.getByLabel('Display name').fill('E2E Person');
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password').fill('a-long-enough-password');
+    await page.getByRole('button', { name: 'Create account' }).click();
+    await expect(page.getByText('Signed in as')).toBeVisible({ timeout: 30_000 });
+  }
+
+  test('a project saved in one browser opens in another, with its history', async ({ page }) => {
+    test.setTimeout(240_000);
+    const email = newEmail();
+
+    await signUp(page, email);
+
+    // Built and saved in the first browser.
+    await page.getByRole('button', { name: /Forest clearing/ }).click();
+    await expect(page.getByRole('banner')).toBeVisible();
+    await page.waitForFunction(() => window.helaengine !== undefined);
+
+    await page.evaluate(() => window.helaengine!.addObject('rock_boulder_01', [4, 0, 4]));
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('status', { name: 'Save state' })).toContainText(/Saved/i, {
+      timeout: 30_000,
+    });
+
+    const objectCount = await page.evaluate(
+      () => window.helaengine!.store.getState().scene.objects.length,
+    );
+
+    // A second browser: a fresh context, so none of the first one's IndexedDB or localStorage is
+    // available. Only the account is shared.
+    const second = await page.context().browser()!.newContext();
+    const theirPage = await second.newPage();
+    await theirPage.goto('/');
+    await theirPage.getByLabel('Email').fill(email);
+    await theirPage.getByLabel('Password').fill('a-long-enough-password');
+    await theirPage.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await expect(theirPage.getByText('Signed in as')).toBeVisible({ timeout: 30_000 });
+
+    // The project is there, and it is the same one.
+    await theirPage
+      .getByRole('button', { name: /Forest Clearing/ })
+      .first()
+      .click();
+    await expect(theirPage.getByRole('banner')).toBeVisible({ timeout: 30_000 });
+    await theirPage.waitForFunction(() => window.helaengine !== undefined);
+
+    await expect
+      .poll(async () =>
+        theirPage.evaluate(() => window.helaengine!.store.getState().scene.objects.length),
+      )
+      .toBe(objectCount);
+
+    // And the history is real: two saves, because creating the project was the first one.
+    await theirPage.getByRole('button', { name: 'History' }).click();
+    const history = theirPage.getByRole('dialog', { name: 'Version history' });
+    await expect(history).toContainText('v2', { timeout: 30_000 });
+    await expect(history).toContainText('E2E Person');
+
+    // Restoring appends rather than rewinds — the point the panel makes in words, asserted.
+    await history.getByRole('button', { name: 'Restore version 1' }).click();
+    await expect(history).toContainText('v3', { timeout: 30_000 });
+    await expect(history).toContainText('v1');
+
+    await second.close();
+  });
+});

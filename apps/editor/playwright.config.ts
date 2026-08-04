@@ -104,6 +104,23 @@ export default defineConfig({
       url: 'http://127.0.0.1:5174',
       reuseExistingServer: !process.env['CI'],
       timeout: 120_000,
+      // Points the editor at the platform API, which turns the account bar on. Without it the
+      // editor runs exactly as it always has, on IndexedDB — which is what most of this suite
+      // exercises and should keep exercising.
+      env: { VITE_API_ORIGIN: 'http://127.0.0.1:3100' },
+    },
+    {
+      // The platform API (Sprint 28-29). Cloud save is only testable if something is on the other
+      // end of it, and a mock would be testing the mock.
+      command: 'pnpm --filter @helaengine/api start',
+      url: 'http://127.0.0.1:3100/health',
+      reuseExistingServer: !process.env['CI'],
+      timeout: 120_000,
+      env: {
+        API_PORT: '3100',
+        DATABASE_URL:
+          process.env['TEST_DATABASE_URL'] ?? 'postgres://hela@127.0.0.1:5433/helaengine_e2e',
+      },
     },
     {
       // The co-op server (Sprint 20). Started for the whole run rather than per test, because it

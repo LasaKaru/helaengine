@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–29 complete, with one gap named in Sprint 29: the editor's cloud path is unit-tested but has not been driven end to end against a running API. Phase 3 (Export) is done — build a world visually, get real runnable code, verified in three browsers by a suite that exports it, serves it and compares the pixels — and **Phase 3B (Pre-Delivery Validation & Hosted Play, Sprints 24–27) has begun**: every build is now played by a robot before anybody can have it, which found a starter template whose player spawned inside a building on the very first run. Phases 1 (Editor MVP), 2 (Behaviours, Physics, AI) and 2B (Gameplay Runtime & UI) done — 2B was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–29 complete. Phase 4 (Backend Platform) is under way: accounts, organisations and role-gated access in Sprint 28, cloud save with append-only version history in Sprint 29. Phase 3 (Export) is done — build a world visually, get real runnable code, verified in three browsers by a suite that exports it, serves it and compares the pixels — and **Phase 3B (Pre-Delivery Validation & Hosted Play, Sprints 24–27) has begun**: every build is now played by a robot before anybody can have it, which found a starter template whose player spawned inside a building on the very first run. Phases 1 (Editor MVP), 2 (Behaviours, Physics, AI) and 2B (Gameplay Runtime & UI) done — 2B was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -855,7 +855,7 @@ CI runs it against `postgres:16` as a service container rather than a mock, for 
 - [x] Zod-validate incoming `sceneJson` server-side before persisting, with the shared `@helaengine/schema` package — the same validation the editor runs locally
 - [x] Build editor-side migration: a `CloudProjects` adapter and a `backend` facade that dispatches to it or to IndexedDB; the project store now calls the facade and is otherwise unchanged
 - [x] Implement optimistic concurrency: a save carries the version it was based on; the server refuses one based on a version somebody has already moved past, with a 409 carrying the current number
-- [x] Projects Dashboard UI — **Sprint 8's screen, now backed by either store.** Its list, create, delete and duplicate all work against the cloud without the screen knowing; what is _not_ added is an organisation switcher, so a signed-in user works in their personal workspace
+- [x] Projects Dashboard UI — **Sprint 8's screen, now backed by either store, with an account bar in front of it.** Its list, create, delete and duplicate all work against the cloud without the screen knowing; what is _not_ added is an organisation switcher, so a signed-in user works in their personal workspace
 - [x] Build Version History panel: the last N versions with timestamp and author, and a restore that appends rather than rewinds
 
 **Tech notes:**
@@ -877,7 +877,9 @@ The editor now goes through a `backend` facade with the same six functions it al
 
 The version cursor lives in the facade rather than in the scene store, because it is a fact about _storage_ — the same scene saved to a different backend has a different version, and to no backend at all has none. It advances on load and on a successful save, and deliberately **does not move on a conflict**: a client that advanced on a refusal would then send a base the server has never seen. There is a test for exactly that.
 
-**The gap, stated rather than buried:** none of the editor-side wiring has been driven end to end against a running API. The pieces are unit-tested — the adapter against every answer the API can give, the facade against dispatch and version bookkeeping — and the API is integration-tested against real Postgres, but nobody has watched a browser sign in, save, and reload into the same state. Sprint 26 taught this exact lesson twice in one afternoon: the logic was right and the seams were wrong, both times. Until that test exists, "Browser A saves, Browser B sees it" is a well-founded expectation rather than an observation.
+**And driven end to end**, which is the part that turns an expectation into an observation. An e2e test signs up through the account bar, opens a template, adds an object, saves, and then opens a **second browser context** — no shared IndexedDB, no shared localStorage, only the account — signs in, opens the same project, and finds the same objects. It then opens the history panel, sees `v2` with the author's name, restores `v1`, and watches `v3` appear while `v1` stays where it was. That last assertion is the one worth having: it is the difference between a history and an undo button.
+
+Sprint 26 taught this lesson twice in one afternoon — the logic was right and the seams were wrong, both times — so the sprint is not called done on unit tests alone. This one passed first try, which is the pleasant version of the same discipline.
 
 ---
 

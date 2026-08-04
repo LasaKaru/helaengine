@@ -7,10 +7,11 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 28 — the platform has accounts. Exports are playable games, checked in three
-browsers, played before anyone can have them, automatically repaired where a fix exists, refused
-with a reason where one does not, shareable as a link rather than a zip, and now owned by a user in
-an organisation with role-gated access. A working editor, behaviours, physics, enemies, trigger
+**Status:** Sprint 29 — the platform has accounts and cloud save. Exports are playable games,
+checked in three browsers, played before anyone can have them, automatically repaired where a fix
+exists, refused with a reason where one does not, and shareable as a link rather than a zip; a
+project now belongs to a user in an organisation with role-gated access, and is saved to a server
+with a version for every save. A working editor, behaviours, physics, enemies, trigger
 volumes, a measured performance baseline, first/third/top-down cameras with one input layer covering
 keyboard, touch and gamepad, a schema-driven menu/HUD shell, and now combat: a weapon catalogue in
 the document, hitscan firing, ammo and reloading, pickups, player damage and respawn — plus secrets
@@ -54,8 +55,12 @@ lowers, smooths and flattens the ground; painting blends four terrain layers. A 
 undo step. Height and paint data are stored in the scene document as base64 — about 33 KB at the
 default 64×64 resolution — so a scene opens and exports without a second fetch.
 
-Projects live in IndexedDB. The app opens on a projects screen with three starter templates; work
-saves on Ctrl+S, on leaving the editor, and automatically 20 seconds after you stop editing. Every
+Projects live in IndexedDB until you sign in, and in your account afterwards — the projects screen
+grows an account bar when `VITE_API_ORIGIN` points at a running `@helaengine/api`. Signed in, every
+save appends a version you can see and return to under **History**; restoring adds a new version
+holding the old content rather than deleting what came after. The app opens on a projects screen
+with three starter templates; work saves on Ctrl+S, on leaving the editor, and automatically 20
+seconds after you stop editing. Every
 project is validated against the schema on the way back in, so a document written by an older build
 fails loudly at the boundary rather than halfway through a render.
 
