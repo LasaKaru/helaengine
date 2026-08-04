@@ -7,9 +7,9 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 26 — exports are playable games, checked in three browsers, played before anyone
-can download them, automatically repaired where a fix exists, and refused with a reason where one
-does not. A working editor, behaviours, physics, enemies, trigger
+**Status:** Sprint 27 — exports are playable games, checked in three browsers, played before anyone
+can have them, automatically repaired where a fix exists, refused with a reason where one does not,
+and shareable as a link rather than a zip. A working editor, behaviours, physics, enemies, trigger
 volumes, a measured performance baseline, first/third/top-down cameras with one input layer covering
 keyboard, touch and gamepad, a schema-driven menu/HUD shell, and now combat: a weapon catalogue in
 the document, hitscan firing, ammo and reloading, pickups, player damage and respawn — plus secrets
@@ -91,6 +91,7 @@ packages/engine        Vanilla Three.js runtime. No React, no store, no DOM assu
 packages/export        Scene + manifest in, runnable folder out. Pure functions, so it runs in Node too.
 packages/repair        Turns a failed play-test into a narrow, schema-validated patch. Proposes; never executes.
 packages/templates     The five starter worlds. Shared so the editor offers what the gate tests.
+apps/share             Hosts validated builds behind a link. Refuses anything that did not pass.
 tools/asset-pipeline   Ingest: raw GLBs in, compressed GLBs + thumbnails + manifest out.
 tools/smoke            Plays a build before a human can. Deterministic checks, exit code as verdict.
 raw-assets/            Hand-authored .glb sources. The artefacts under version control.
@@ -563,6 +564,44 @@ Not everything is repairable, and the loop says so rather than guessing. `page-l
 `scene-loaded`, `physics-initialises` and `memory-stable` are broken _builds_ — no document patch
 reaches them, and a loop that answered a corrupted engine bundle by moving spawn points would be
 destroying work to fix a fault it cannot touch. Handed one, it stops with nothing changed.
+
+## Sharing a link
+
+`apps/share` hosts a validated build so you can send someone a URL instead of a zip. It is a
+separate deployable, like the co-op server, and it is small on purpose.
+
+```bash
+pnpm --filter @helaengine/share start        # http://localhost:4000
+SHARE_ORG_TOKEN=... SHARE_ROOT=/var/hela ... # optional
+```
+
+In the editor, **Check and share a link** runs the same gate as a download and then uploads the
+same `ExportPlan` the zip would have been built from — as JSON rather than compressed. That is what
+`buildExport` being a pure function buys: "download it" and "host it" are two endings to one plan,
+not two pipelines to keep in step.
+
+**The service re-checks the smoke report and refuses to host a build that did not pass.** The editor
+already refused to download one, but the editor is a browser tab, and a rule enforced only on the
+client is not enforced. It reads the report's _checks_ rather than its `passed` flag, so a client
+that claims a pass it did not earn is caught by the rule rather than by the claim. Sharing is the
+more consequential of the two: a bad download is one person's afternoon, a bad link is everyone they
+sent it to.
+
+Three visibility levels, because "share" means three different things and conflating them is how
+something private ends up indexed:
+
+|                        |                                                                                                                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **unlisted** (default) | Reachable only by its id — 96 random bits, sized as a secret rather than a slug. Absent from every listing, and served `no-store` so no proxy keeps a copy nobody can withdraw. |
+| **public**             | Listed at `GET /api/builds`.                                                                                                                                                    |
+| **org**                | Needs the token the service was started with. A placeholder for real accounts, named as one in the code.                                                                        |
+
+An org build answers **404 to a missing token and 404 to a wrong one** — distinguishing them would
+turn the metadata endpoint into an oracle for which builds are real — and the token comparison is
+constant-time over hashes so it does not leak the answer through timing either.
+
+Plays are counted when the _page_ is served, not when an asset is: otherwise "plays" is really
+"requests", and a build with more models looks more popular.
 
 ## Where this is going
 

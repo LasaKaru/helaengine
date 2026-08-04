@@ -113,5 +113,18 @@ export default defineConfig({
       reuseExistingServer: !process.env['CI'],
       timeout: 120_000,
     },
+    {
+      // The share service (Sprint 27). "Here's a link" is only testable if something is on the
+      // other end of the link, and a temp directory per run keeps one test's builds out of the next
+      // one's public listing.
+      command: 'pnpm --filter @helaengine/share start',
+      url: 'http://127.0.0.1:4000/health',
+      reuseExistingServer: !process.env['CI'],
+      timeout: 120_000,
+      env: {
+        SHARE_ROOT: process.env['SHARE_ROOT'] ?? '.hela-shared-e2e',
+        SHARE_ORG_TOKEN: 'e2e-team-token',
+      },
+    },
   ],
 });

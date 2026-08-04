@@ -119,8 +119,9 @@ export default tseslint.config(
     },
   },
   {
-    // Pipeline scripts are CLIs — their console output is the user interface.
-    files: ['tools/**/*.ts'],
+    // Pipeline scripts are CLIs and services log to stdout — in both cases the console output is
+    // the interface an operator reads, not a debugging leftover.
+    files: ['tools/**/*.ts', 'apps/share/src/index.ts', 'apps/realtime/src/index.ts'],
     rules: {
       'no-console': 'off',
     },

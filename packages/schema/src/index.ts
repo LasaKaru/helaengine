@@ -16,3 +16,4 @@ export * from './migrations.js';
 export * from './asset.js';
 export * from './smoke.js';
 export * from './repair.js';
+export * from './share.js';

@@ -39,6 +39,6 @@ server.define('coop', CoopRoom);
 
 await server.listen(port);
 // A server that starts silently is a server nobody can tell has started. The lint rule is right
-// about application code and wrong about an entry point whose whole job is to say it is up.
-// eslint-disable-next-line no-console
+// about application code and wrong about an entry point whose whole job is to say it is up — which
+// is now expressed in eslint.config.js rather than as a suppression here.
 console.log(`[helaengine] co-op server listening on ws://localhost:${port}`);

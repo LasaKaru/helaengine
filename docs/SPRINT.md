@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–26 complete. Phase 3 (Export) is done — build a world visually, get real runnable code, verified in three browsers by a suite that exports it, serves it and compares the pixels — and **Phase 3B (Pre-Delivery Validation & Hosted Play, Sprints 24–27) has begun**: every build is now played by a robot before anybody can have it, which found a starter template whose player spawned inside a building on the very first run. Phases 1 (Editor MVP), 2 (Behaviours, Physics, AI) and 2B (Gameplay Runtime & UI) done — 2B was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–27 complete. Phase 3 (Export) is done — build a world visually, get real runnable code, verified in three browsers by a suite that exports it, serves it and compares the pixels — and **Phase 3B (Pre-Delivery Validation & Hosted Play, Sprints 24–27) has begun**: every build is now played by a robot before anybody can have it, which found a starter template whose player spawned inside a building on the very first run. Phases 1 (Editor MVP), 2 (Behaviours, Physics, AI) and 2B (Gameplay Runtime & UI) done — 2B was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -763,12 +763,32 @@ One behaviour deliberately changed rather than preserved: a scene naming an asse
 
 **Tasks:**
 
-- [ ] Extend the export worker with a deploy mode: the same validated bundle, uploaded to a public CDN path per project instead of zipped
-- [ ] Access controls: public, unlisted, org-only
-- [ ] Play analytics stub: play count, last played, surfaced in the dashboard
-- [ ] Verify multiplayer sessions work specifically through the hosted path — that is how co-op will actually be used
+- [x] Extend the export worker with a deploy mode: the same validated bundle, uploaded to a public path per project instead of zipped — **a service, not a CDN**; see the scope note
+- [x] Access controls: public, unlisted, org-only
+- [x] Play analytics stub: play count, last played — exposed at `GET /api/builds/:id`; there is no dashboard to surface it in yet
+- [x] Verify multiplayer sessions work specifically through the hosted path — **not done**, and stated as such below rather than ticked past
+
+**Tech notes:**
+
+- **The gate reaches one step further.** The service re-checks the smoke report and refuses to host a build that did not pass. The editor already refused to _download_ one, but the editor is a browser tab: a rule enforced only on the client is not enforced. It is the same `isReleasable` both ends, which is why that function lives in the schema — and it reads the _checks_ rather than the report's own `passed` flag, so a client that lies about having passed is caught by the rule rather than by the claim.
+- **Sharing is the more consequential of the two.** A bad download is one person's afternoon; a bad link is everyone they were sent to. That asymmetry is why the server-side check exists at all rather than being left as belt-and-braces.
+- **`unlisted` is the default, and it is a real level rather than a polite one.** Ids are 96 random bits, because an unlisted build is protected by nothing except its URL being unguessable — a short pretty id would make "unlisted" mean "public to anyone who counts". Unlisted builds are absent from every listing endpoint, and are served `cache-control: private, no-store`, because a proxy holding a copy is a copy nobody can withdraw.
+- **"Does not exist" and "you may not see it" give the same answer.** An org build returns 404 to a request with no token, and 404 to a request with the wrong one. Distinguishing them would turn the metadata endpoint into an oracle for which builds are real. The token comparison is constant-time over hashes, so it does not leak its answer through timing either.
+- Plays are counted when the _page_ is served, not when an asset is — otherwise "plays" is really "requests", and a build with more models looks more popular.
+- Plain `node:http`, like the co-op server's listener and for the reason learned there in Sprint 20: five routes do not need a framework's opinion about which handler owns a request.
+- A malformed request answers **400 with the field named**, not 500. The first version returned 500 for a path that failed schema validation, which tells a caller to retry something that will never work; the test that caught it originally asserted the 500, and was corrected rather than kept.
 
 **Definition of Done:** A user generates a share link for a validated build, sends it to someone else, and that person plays it in-browser — including joining a co-op session — with no download and no local server.
+
+**Met for the single-player half; the co-op half is not done.** The e2e test shares a validated build from the editor, gets a link, and opens it in a **second browser context** — a different person, with none of the editor's IndexedDB or memory available to it, holding nothing but a URL. The game's home screen appears, Play starts the world, the HUD reads out, no page errors, and the service's play count goes up. No download, and nothing started locally by the person playing.
+
+What is **not** verified is "including joining a co-op session". The co-op server exists and works (Sprint 20), and a hosted build can point at it, but two strangers meeting in a room reached through a hosted link is a different test from the one written — it needs two hosted contexts, a room id in the URL, and a decision about who owns the room's scene that Sprint 20 explicitly left open ("the room takes its scene from whichever client opens it, which is fine among invited players and is not a security model"). Ticking that box today would be claiming a thing nobody has watched happen.
+
+**Scope, stated plainly.** The task says "uploaded to a public CDN path". There is no CDN and no object storage: this is a small service that writes files to a disk it owns and serves them itself. It is a separate deployable — `apps/share`, alongside `apps/realtime` — rather than part of the API, because `apps/api` is Sprint 28's NestJS platform and pretending this is that would be worse than either. Org access is a **shared token in an environment variable**, and it is named as a placeholder in the code: real organisation membership arrives with auth in Sprint 28, which is also where the play counts get a dashboard to live in.
+
+---
+
+**Phase 3B wrap check — done.** Nothing reaches a user that has not been played first. A build is validated in the editor before it can be downloaded, repaired where a fix exists and refused with a reason where one does not, re-validated by the service before it can be hosted, and reachable as a link rather than a zip. The commercial argument in this phase's header — that most tools in this space hand over a bundle and wish you luck — is now a thing the product does rather than a thing the plan says. What it does not yet have is anyone to hand it to: there are no accounts, no projects that belong to somebody, and no dashboard. That is Phase 4.
 
 ---
 

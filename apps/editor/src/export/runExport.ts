@@ -44,19 +44,34 @@ async function fetchBytes(url: string): Promise<Uint8Array> {
  * function over a scene and a manifest and is therefore testable without a browser. This is the
  * part that can only run in one.
  */
-export async function runExport(
+/**
+ * Builds the export without doing anything with it.
+ *
+ * Split out because a plan is now the input to two different endings — a zip somebody downloads and
+ * an upload somebody links to — and building it twice would mean fetching every asset twice to
+ * produce two things that must be identical.
+ */
+export async function planExport(
   scene: Scene,
   manifest: AssetManifest,
   options: ExportOptions,
-): Promise<RunExportResult> {
+): Promise<ExportPlan> {
   const runtimeSource = await fetchText(RUNTIME_URLS[options.mode]);
-  const plan = await buildExport({
+  return buildExport({
     scene,
     manifest,
     options,
     runtimeSource,
     readAsset: (path) => fetchBytes(`${ASSET_BASE_URL}${path}`),
   });
+}
+
+export async function runExport(
+  scene: Scene,
+  manifest: AssetManifest,
+  options: ExportOptions,
+): Promise<RunExportResult> {
+  const plan = await planExport(scene, manifest, options);
 
   const folder = slugify(options.projectName);
   const blob = await zipExport(plan, folder);

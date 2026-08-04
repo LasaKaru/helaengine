@@ -3016,3 +3016,58 @@ test.describe('release gate', () => {
     await expect(dialog).not.toContainText('Downloaded');
   });
 });
+
+/**
+ * Sprint 27 — "here's a link" instead of "here's a zip".
+ *
+ * The definition of done is a sentence about two people: one shares, the other plays, and nothing
+ * is downloaded and no local server is started by the second one. So the test uses two browser
+ * contexts — the second with no access to the first's storage — and the second one only ever sees
+ * a URL.
+ */
+test.describe('shareable hosted play', () => {
+  test('a validated build becomes a link somebody else can play', async ({ page }, testInfo) => {
+    test.setTimeout(300_000);
+    await openEditor(page, /Forest clearing/);
+
+    await page.getByRole('button', { name: 'Export' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Export' });
+    await dialog.getByLabel('Project name').fill('shared-world');
+    await dialog.getByRole('button', { name: 'Check and share a link' }).click();
+
+    // Same gate as a download. Sharing an unvalidated build is the worse of the two mistakes: a bad
+    // download is one person's afternoon, a bad link is everyone they sent it to.
+    await expect(dialog).toContainText('Playing your game', { timeout: 60_000 });
+    await expect(dialog).toContainText('Your game is live', { timeout: 240_000 });
+
+    const link = await dialog.getByRole('link').first().getAttribute('href');
+    expect(link).toMatch(/\/play\/[0-9a-f]{24}\/$/);
+
+    // A different person: a fresh context, so none of the editor's IndexedDB, service workers or
+    // memory is available to it. All it has is the URL.
+    const theirBrowser = await page.context().browser()!.newContext();
+    const theirPage = await theirBrowser.newPage();
+    const errors: string[] = [];
+    theirPage.on('pageerror', (error) => errors.push(error.message));
+
+    await theirPage.goto(link!);
+    await expect(theirPage.locator('.hela-title')).toBeVisible({ timeout: 90_000 });
+    await theirPage.locator('.hela-panel button', { hasText: 'Play' }).first().click();
+    await expect(theirPage.locator('.hela-hud')).toBeVisible({ timeout: 90_000 });
+
+    await theirPage.screenshot({ path: testInfo.outputPath('hosted-play.png') });
+    expect(errors).toEqual([]);
+
+    // And the service counted the play, which is the whole of the analytics stub.
+    const id = /\/play\/([0-9a-f]{24})\//.exec(link!)![1];
+    const stats = await theirPage.evaluate(async (buildId) => {
+      const response = await fetch(`http://127.0.0.1:4000/api/builds/${buildId}`);
+      return (await response.json()) as { build: { plays: number; lastPlayedAt: string | null } };
+    }, id);
+
+    expect(stats.build.plays).toBeGreaterThanOrEqual(1);
+    expect(stats.build.lastPlayedAt).not.toBeNull();
+
+    await theirBrowser.close();
+  });
+});

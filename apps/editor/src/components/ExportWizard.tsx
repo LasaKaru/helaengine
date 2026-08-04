@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { AssetManifest } from '@helaengine/schema';
+import type { AssetManifest, Visibility } from '@helaengine/schema';
 import { useSceneStore } from '../store/sceneStore';
 import {
   collectUsedAssets,
@@ -9,7 +9,8 @@ import {
   SIZE_WARN_BYTES,
   type ExportOptions,
 } from '@helaengine/export';
-import { runExport } from '../export/runExport';
+import { planExport, runExport } from '../export/runExport';
+import { publishBuild, ShareFailed } from '../export/publish';
 import { explainBlock, runGate, type GateResult, type GateStage } from '../validation/gate';
 
 /**
@@ -91,6 +92,8 @@ export function ExportWizard({
   const [error, setError] = useState<string>('');
   const [stage, setStage] = useState<GateStage>({ kind: 'done' });
   const [gate, setGate] = useState<GateResult | null>(null);
+  const [shared, setShared] = useState<{ url: string; visibility: Visibility } | null>(null);
+  const [visibility, setVisibility] = useState<Visibility>('unlisted');
 
   const summary = useMemo(() => collectUsedAssets(scene, manifest), [scene, manifest]);
 
@@ -128,10 +131,11 @@ export function ExportWizard({
    * product exists not to make. A repair, if one was needed, is applied to the real document and
    * disclosed before the file is written.
    */
-  const start = async (): Promise<void> => {
+  const start = async (deliver: 'download' | 'share'): Promise<void> => {
     setPhase('checking');
     setError('');
     setGate(null);
+    setShared(null);
 
     try {
       const outcome = await runGate({
@@ -153,15 +157,39 @@ export function ExportWizard({
       }
 
       setPhase('working');
-      const written = await runExport(outcome.scene, manifest, options);
-      setResult({
-        filename: written.filename,
-        bytes: written.bytes,
-        warnings: written.plan.warnings,
-      });
+
+      if (deliver === 'share') {
+        // The same plan the zip would have been built from, sent as JSON instead of compressed.
+        const plan = await planExport(outcome.scene, manifest, options);
+        const published = await publishBuild({
+          plan,
+          sceneName: options.projectName,
+          report: outcome.report,
+          visibility,
+        });
+        setShared({ url: published.url, visibility });
+        setResult({
+          filename: published.build.id,
+          bytes: published.build.sizeBytes,
+          warnings: plan.warnings,
+        });
+      } else {
+        const written = await runExport(outcome.scene, manifest, options);
+        setResult({
+          filename: written.filename,
+          bytes: written.bytes,
+          warnings: written.plan.warnings,
+        });
+      }
       setPhase('done');
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
+      const message =
+        caught instanceof ShareFailed
+          ? caught.message
+          : caught instanceof Error
+            ? caught.message
+            : String(caught);
+      setError(message);
       setPhase('error');
     }
   };
@@ -239,6 +267,28 @@ export function ExportWizard({
           />
           Include a readable copy of scene.json
         </label>
+
+        <div className="gizmo-modes" role="group" aria-label="Who can play it">
+          {(
+            [
+              ['unlisted', 'Anyone with the link', 'Not listed anywhere. The link is the key.'],
+              ['public', 'Listed publicly', 'Appears in the public list of shared games.'],
+              ['org', 'My team only', 'Needs the team token the share service was started with.'],
+            ] as const
+          ).map(([value, label, hint]) => (
+            <button
+              key={value}
+              type="button"
+              title={hint}
+              className={visibility === value ? 'active' : ''}
+              aria-pressed={visibility === value}
+              onClick={() => setVisibility(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="panel-hint">Applies to the share link. A download is yours either way.</p>
 
         <label className="param-check">
           <input
@@ -334,7 +384,27 @@ export function ExportWizard({
           </p>
         )}
 
-        {phase === 'done' && result && (
+        {phase === 'done' && shared && (
+          <div className="export-summary" role="status">
+            <p>
+              <strong>Your game is live.</strong>
+            </p>
+            <p>
+              <a href={shared.url} target="_blank" rel="noreferrer">
+                {shared.url}
+              </a>
+            </p>
+            <p className="panel-hint">
+              {shared.visibility === 'unlisted'
+                ? 'Anyone with this link can play it. It is not listed anywhere, so the link is the only way in — treat it like a password.'
+                : shared.visibility === 'public'
+                  ? 'Listed publicly. Anyone can find and play it.'
+                  : 'Only people with your team token can open it.'}
+            </p>
+          </div>
+        )}
+
+        {phase === 'done' && result && !shared && (
           <div className="export-summary" role="status">
             <p>
               Downloaded <strong>{result.filename}</strong> ({formatBytes(result.bytes)}).
@@ -361,8 +431,15 @@ export function ExportWizard({
           </button>
           <button
             type="button"
+            onClick={() => void start('share')}
+            disabled={phase === 'working' || phase === 'checking'}
+          >
+            {phase === 'working' ? 'Sharing…' : 'Check and share a link'}
+          </button>
+          <button
+            type="button"
             className="primary"
-            onClick={() => void start()}
+            onClick={() => void start('download')}
             disabled={phase === 'working' || phase === 'checking'}
           >
             {BUTTON_TEXT[phase]}

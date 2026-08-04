@@ -17,3 +17,6 @@ playwright-report/
 
 # Written by `pnpm bench`.
 tools/benchmark/stress.png
+
+# Builds published to the local share service.
+.hela-shared*/
