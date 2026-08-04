@@ -3,7 +3,9 @@ import { SaveStateSchema, type SaveState } from '@helaengine/schema';
 import { SaveStore, saveKey, type SaveStorage } from './SaveStore.js';
 
 /** An in-memory `localStorage`, which is all the store needs and all a test should give it. */
-function memoryStorage(seed: Record<string, string> = {}): SaveStorage & { map: Map<string, string> } {
+function memoryStorage(
+  seed: Record<string, string> = {},
+): SaveStorage & { map: Map<string, string> } {
   const map = new Map(Object.entries(seed));
   return {
     map,

@@ -53,9 +53,7 @@ interface Harness {
 function harness(
   options: { inventory?: InventoryConfig; hit?: Omit<ShotHit, 'point'> | null } = {},
 ): Harness {
-  const inventory = new Inventory(
-    options.inventory ?? config({ startingWeaponIds: [PISTOL.id] }),
-  );
+  const inventory = new Inventory(options.inventory ?? config({ startingWeaponIds: [PISTOL.id] }));
   const events: Array<{ event: string; payload: unknown }> = [];
   const hit = options.hit === undefined ? { objectId: 'obj_0001', distance: 5 } : options.hit;
 
@@ -130,9 +128,7 @@ describe('Inventory', () => {
   });
 
   it('swaps rather than refusing once the carry limit is reached', () => {
-    const inventory = new Inventory(
-      config({ maxCarried: 1, startingWeaponIds: [KNIFE.id] }),
-    );
+    const inventory = new Inventory(config({ maxCarried: 1, startingWeaponIds: [KNIFE.id] }));
 
     expect(inventory.give(PISTOL.id)).toBe(true);
     expect(inventory.carried.map((entry) => entry.weapon.id)).toEqual([PISTOL.id]);
@@ -289,9 +285,12 @@ const manifest = parseAssetManifest({
 });
 
 /** A world that records what was offered and answers however the test wants. */
-function pickupWorld(
-  answer: (request: PickupRequest) => boolean,
-): { world: WorldHandle; offers: PickupRequest[]; destroyed: string[]; player: THREE.Vector3 } {
+function pickupWorld(answer: (request: PickupRequest) => boolean): {
+  world: WorldHandle;
+  offers: PickupRequest[];
+  destroyed: string[];
+  player: THREE.Vector3;
+} {
   const offers: PickupRequest[] = [];
   const destroyed: string[] = [];
   const player = new THREE.Vector3(10, 0, 0);

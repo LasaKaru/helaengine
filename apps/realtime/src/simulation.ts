@@ -57,8 +57,7 @@ function sanitise(raw: unknown): PlayerInput {
     jump: input?.jump === true,
     sprint: input?.sprint === true,
     crouch: input?.crouch === true,
-    yaw:
-      typeof input?.yaw === 'number' && Number.isFinite(input.yaw) ? input.yaw : 0,
+    yaw: typeof input?.yaw === 'number' && Number.isFinite(input.yaw) ? input.yaw : 0,
     seq:
       typeof input?.seq === 'number' && Number.isFinite(input.seq)
         ? Math.max(0, Math.floor(input.seq))

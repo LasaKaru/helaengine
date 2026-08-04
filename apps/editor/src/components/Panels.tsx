@@ -222,9 +222,10 @@ function GamePanel(): React.JSX.Element {
                 enabled: event.target.checked,
                 // Turning it on with mode `none` would be a switch that does nothing, so enabling
                 // picks the one mode the runtime actually implements.
-                mode: event.target.checked && config.multiplayer.mode === 'none'
-                  ? 'coop'
-                  : config.multiplayer.mode,
+                mode:
+                  event.target.checked && config.multiplayer.mode === 'none'
+                    ? 'coop'
+                    : config.multiplayer.mode,
               },
             })
           }

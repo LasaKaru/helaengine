@@ -450,14 +450,18 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
     camera.getWorldDirection(shotDirection);
 
     // Gameplay advances after physics, so enemies read positions the solver has already settled.
-    runtime.current?.update(delta, {
-      fire: manager.isDown('fire'),
-      firePressed: manager.wasPressed('fire'),
-      reload: manager.wasPressed('reload'),
-      nextWeapon: manager.wasPressed('nextWeapon'),
-      origin: shotOrigin,
-      direction: shotDirection,
-    }, manager.sequenceKeys);
+    runtime.current?.update(
+      delta,
+      {
+        fire: manager.isDown('fire'),
+        firePressed: manager.wasPressed('fire'),
+        reload: manager.wasPressed('reload'),
+        nextWeapon: manager.wasPressed('nextWeapon'),
+        origin: shotOrigin,
+        direction: shotDirection,
+      },
+      manager.sequenceKeys,
+    );
     recordSimulationTiming(afterPhysics - beforePhysics, performance.now() - afterPhysics);
 
     // Health is pushed into the store only when it changes: mirroring it every frame would mean a

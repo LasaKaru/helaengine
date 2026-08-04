@@ -12,7 +12,12 @@ import { checkpointDefinition } from './CheckpointBehavior.js';
  * exactly the types they mean to exercise.
  */
 export function registerBuiltinBehaviors(registry: BehaviorRegistry = behaviorRegistry): void {
-  for (const definition of [patrolDefinition, chaseOnSightDefinition, pickupDefinition, checkpointDefinition]) {
+  for (const definition of [
+    patrolDefinition,
+    chaseOnSightDefinition,
+    pickupDefinition,
+    checkpointDefinition,
+  ]) {
     if (!registry.has(definition.type)) registry.register(definition);
   }
 }

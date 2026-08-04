@@ -86,7 +86,9 @@ export interface SceneState {
   addUnlockable(): string;
   removeUnlockable(unlockableId: string): void;
   setUnlockable(unlockableId: string, patch: Partial<Unlockable>): void;
-  setAudioConfig(config: Partial<Omit<AudioConfig, 'music'>> & { music?: Partial<AudioConfig['music']> }): void;
+  setAudioConfig(
+    config: Partial<Omit<AudioConfig, 'music'>> & { music?: Partial<AudioConfig['music']> },
+  ): void;
   setGameConfig(config: Partial<GameConfig>): void;
   setUiConfig(config: UiConfigPatch): void;
   setMenuButtons(menu: 'mainMenu' | 'pauseMenu', buttons: UiButton[]): void;
@@ -451,7 +453,18 @@ export const useSceneStore = create<SceneState>()(
                 // panel that opens on an invalid document is worse than one that opens on a joke.
                 unlockMethod: {
                   type: 'inputSequence',
-                  sequence: ['Up', 'Up', 'Down', 'Down', 'Left', 'Right', 'Left', 'Right', 'B', 'A'],
+                  sequence: [
+                    'Up',
+                    'Up',
+                    'Down',
+                    'Down',
+                    'Left',
+                    'Right',
+                    'Left',
+                    'Right',
+                    'B',
+                    'A',
+                  ],
                 },
                 actions: [{ type: 'emit', event: 'secretFound' }],
               }),

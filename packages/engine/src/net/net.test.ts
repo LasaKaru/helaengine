@@ -31,7 +31,10 @@ const INPUT: CoopInput = {
 /** A transport that records rather than connects. */
 function fakeTransport(
   options: { fail?: string } = {},
-): CoopTransport & { sent: Array<{ type: string; payload: unknown }>; push(players: RemotePlayerSnapshot[]): void } {
+): CoopTransport & {
+  sent: Array<{ type: string; payload: unknown }>;
+  push(players: RemotePlayerSnapshot[]): void;
+} {
   const sent: Array<{ type: string; payload: unknown }> = [];
   let onPlayers: ((players: RemotePlayerSnapshot[]) => void) | null = null;
 

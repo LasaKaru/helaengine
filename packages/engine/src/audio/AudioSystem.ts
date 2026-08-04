@@ -252,13 +252,6 @@ export class AudioSystem {
       orientation?(x: number, y: number, z: number, ux: number, uy: number, uz: number): void;
     };
     howler.pos?.(listener.position.x, listener.position.y, listener.position.z);
-    howler.orientation?.(
-      listener.forward.x,
-      listener.forward.y,
-      listener.forward.z,
-      0,
-      1,
-      0,
-    );
+    howler.orientation?.(listener.forward.x, listener.forward.y, listener.forward.z, 0, 1, 0);
   }
 }

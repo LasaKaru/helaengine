@@ -11,17 +11,7 @@ import { EventNameSchema } from './trigger.js';
  * arrived as `KeyB` or as standard-mapping button 1. It also keeps the editor's picker a list of
  * ten readable things instead of a free-text field where a typo produces a secret nobody can enter.
  */
-export const UnlockKeySchema = z.enum([
-  'Up',
-  'Down',
-  'Left',
-  'Right',
-  'A',
-  'B',
-  'X',
-  'Y',
-  'Start',
-]);
+export const UnlockKeySchema = z.enum(['Up', 'Down', 'Left', 'Right', 'A', 'B', 'X', 'Y', 'Start']);
 export type UnlockKey = z.infer<typeof UnlockKeySchema>;
 
 /**

@@ -176,8 +176,7 @@ describe('AudioSystem', () => {
       config: AudioConfigSchema.parse(config),
       bus,
       resolve: (assetId) => (assetId.startsWith('audio_') ? `/assets/${assetId}.wav` : null),
-      locate: (objectId) =>
-        objectId === 'obj_0001' ? ({ x: 3, y: 0, z: -4 } as never) : null,
+      locate: (objectId) => (objectId === 'obj_0001' ? ({ x: 3, y: 0, z: -4 } as never) : null),
       createMusic: (url) => fakeTrack(musicLog, url.split('/').pop()!.replace('.wav', '')),
       createSfx: (url) => {
         const entry: { url: string; at: [number, number, number] | null } = { url, at: null };

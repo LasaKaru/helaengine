@@ -83,7 +83,18 @@ function press(runtime: UnlockRuntime, keys: UnlockKey[], gap = 0.1): void {
   for (const key of keys) runtime.update(gap, [key]);
 }
 
-const KONAMI: UnlockKey[] = ['Up', 'Up', 'Down', 'Down', 'Left', 'Right', 'Left', 'Right', 'B', 'A'];
+const KONAMI: UnlockKey[] = [
+  'Up',
+  'Up',
+  'Down',
+  'Down',
+  'Left',
+  'Right',
+  'Left',
+  'Right',
+  'B',
+  'A',
+];
 
 describe('UnlockRuntime', () => {
   it('fires an input sequence and announces it', () => {

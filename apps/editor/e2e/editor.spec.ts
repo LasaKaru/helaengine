@@ -1726,7 +1726,10 @@ test.describe('combat', () => {
   });
 
   async function enterWalk(page: Page, spawn: [number, number, number]): Promise<void> {
-    await page.evaluate((at) => window.helaengine!.store.getState().setPlayer({ spawn: at }), spawn);
+    await page.evaluate(
+      (at) => window.helaengine!.store.getState().setPlayer({ spawn: at }),
+      spawn,
+    );
     await page.waitForTimeout(300);
     await page.getByRole('button', { name: 'Walk' }).click();
     await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
@@ -1827,10 +1830,7 @@ test.describe('combat', () => {
         // capsule is 1.70m tall, so a level shot grazes the tapering top of the capsule and misses.
         const dy = target.y + 0.9 - (player.y + 1.65);
         // `yaw` is the camera's Y euler, where 0 faces -Z — so heading is (-sin, 0, -cos).
-        window.helaengine!.setPlayerLook(
-          Math.atan2(-dx, -dz),
-          Math.atan2(dy, Math.hypot(dx, dz)),
-        );
+        window.helaengine!.setPlayerLook(Math.atan2(-dx, -dz), Math.atan2(dy, Math.hypot(dx, dz)));
         return true;
       }, goblinId);
       if (!aimed) break; // already dead and despawned
@@ -1930,9 +1930,7 @@ test.describe('combat', () => {
 
   test('dying respawns the player rather than ending the preview', async ({ page }) => {
     await enterWalk(page, [0, 0, -2]);
-    await page.evaluate(() =>
-      window.helaengine!.store.getState().setPlayer({ respawnSeconds: 1 }),
-    );
+    await page.evaluate(() => window.helaengine!.store.getState().setPlayer({ respawnSeconds: 1 }));
 
     // Walk somewhere before dying, so "back at the spawn point" is a claim that can fail.
     await page.evaluate(() => window.helaengine!.setPlayerYaw(Math.PI));
@@ -1970,7 +1968,10 @@ test.describe('secrets', () => {
   });
 
   async function enterWalk(page: Page, spawn: [number, number, number]): Promise<void> {
-    await page.evaluate((at) => window.helaengine!.store.getState().setPlayer({ spawn: at }), spawn);
+    await page.evaluate(
+      (at) => window.helaengine!.store.getState().setPlayer({ spawn: at }),
+      spawn,
+    );
     await page.waitForTimeout(300);
     await page.getByRole('button', { name: 'Walk' }).click();
     await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
@@ -2075,7 +2076,9 @@ test.describe('secrets', () => {
     for (const key of KONAMI) await page.keyboard.press(key);
     await page.waitForTimeout(400);
 
-    expect(await page.evaluate(() => window.helaengine!.unlockedSecrets())).toContain('secret_0001');
+    expect(await page.evaluate(() => window.helaengine!.unlockedSecrets())).toContain(
+      'secret_0001',
+    );
     const inventory = await page.evaluate(() => window.helaengine!.playerInventory()!);
     expect(inventory.carried).toEqual(['weapon_0002']);
     // It arrived through the same door a pickup uses, so it came with its ammo.
@@ -2107,7 +2110,10 @@ test.describe('checkpoints', () => {
   });
 
   async function enterWalk(page: Page, spawn: [number, number, number]): Promise<void> {
-    await page.evaluate((at) => window.helaengine!.store.getState().setPlayer({ spawn: at }), spawn);
+    await page.evaluate(
+      (at) => window.helaengine!.store.getState().setPlayer({ spawn: at }),
+      spawn,
+    );
     await page.waitForTimeout(300);
     await page.getByRole('button', { name: 'Walk' }).click();
     await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
@@ -2205,9 +2211,7 @@ test.describe('checkpoints', () => {
 
   test('a corrupt save is discarded rather than crashing the game', async ({ page }) => {
     // localStorage is a text field the player can edit. This is the untrusted-input case.
-    const sceneId = await page.evaluate(
-      () => window.helaengine!.store.getState().scene.sceneId,
-    );
+    const sceneId = await page.evaluate(() => window.helaengine!.store.getState().scene.sceneId);
     await page.evaluate(
       (id) => localStorage.setItem(`helaengine:save:${id}`, '{"health": "lots"'),
       sceneId,
@@ -2237,7 +2241,10 @@ test.describe('audio', () => {
   });
 
   async function enterWalk(page: Page, spawn: [number, number, number]): Promise<void> {
-    await page.evaluate((at) => window.helaengine!.store.getState().setPlayer({ spawn: at }), spawn);
+    await page.evaluate(
+      (at) => window.helaengine!.store.getState().setPlayer({ spawn: at }),
+      spawn,
+    );
     await page.waitForTimeout(300);
     await page.getByRole('button', { name: 'Walk' }).click();
     await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
@@ -2248,9 +2255,7 @@ test.describe('audio', () => {
 
   test('the ingested audio is actually served', async ({ page, request }) => {
     const url = await page.evaluate(() => {
-      const asset = window
-        .helaengine!.store.getState()
-        .scene.audioConfig.music.exploreTrackAssetId;
+      const asset = window.helaengine!.store.getState().scene.audioConfig.music.exploreTrackAssetId;
       return asset;
     });
     expect(url).toBe('audio_music_explore');
@@ -2274,9 +2279,7 @@ test.describe('audio', () => {
     await panel.getByLabel('Combat track').selectOption('');
     await panel.getByRole('button', { name: 'Add sound' }).click();
 
-    const audio = await page.evaluate(
-      () => window.helaengine!.store.getState().scene.audioConfig,
-    );
+    const audio = await page.evaluate(() => window.helaengine!.store.getState().scene.audioConfig);
     expect(audio.music.combatTrackAssetId).toBeNull();
     // Nine bindings: the template's eight plus the one just added.
     expect(audio.sfx).toHaveLength(9);
@@ -2291,9 +2294,9 @@ test.describe('audio', () => {
       .locator('option')
       .evaluateAll((nodes) => nodes.map((node) => (node as HTMLOptionElement).value));
 
-    expect(options.filter((value) => value !== '').every((value) => value.startsWith('audio_'))).toBe(
-      true,
-    );
+    expect(
+      options.filter((value) => value !== '').every((value) => value.startsWith('audio_')),
+    ).toBe(true);
 
     // A sound is not something you place, so it must not appear as a draggable card.
     await expect(page.getByRole('button', { name: /^Audio \d+$/ })).toHaveCount(0);
@@ -2377,9 +2380,7 @@ test.describe('audio', () => {
     await slider.dispatchEvent('input');
 
     expect(
-      await page.evaluate(
-        () => window.helaengine!.store.getState().scene.audioConfig.musicVolume,
-      ),
+      await page.evaluate(() => window.helaengine!.store.getState().scene.audioConfig.musicVolume),
     ).toBe(before);
   });
 });
@@ -2430,9 +2431,13 @@ test.describe('co-op', () => {
       timeout: 20_000,
     });
     await startPlaying(page);
-    await page.waitForFunction(() => window.helaengine!.coopState()?.status === 'connected', undefined, {
-      timeout: 20_000,
-    });
+    await page.waitForFunction(
+      () => window.helaengine!.coopState()?.status === 'connected',
+      undefined,
+      {
+        timeout: 20_000,
+      },
+    );
   }
 
   test('the Game panel turns co-op on and records the server', async ({ page }) => {
@@ -2569,9 +2574,13 @@ test.describe('co-op', () => {
     });
     await startPlaying(page);
 
-    await page.waitForFunction(() => window.helaengine!.coopState()?.status === 'failed', undefined, {
-      timeout: 20_000,
-    });
+    await page.waitForFunction(
+      () => window.helaengine!.coopState()?.status === 'failed',
+      undefined,
+      {
+        timeout: 20_000,
+      },
+    );
     // Still playable: the player is in the world and can walk.
     const before = await page.evaluate(() => window.helaengine!.playerPosition()!);
     await page.evaluate(() => window.helaengine!.setPlayerYaw(0));
@@ -2613,7 +2622,9 @@ test.describe('export', () => {
     await expect(dialog).not.toBeVisible();
   });
 
-  test('exports a zip that unzips, serves and renders the same scene', async ({ page }, testInfo) => {
+  test('exports a zip that unzips, serves and renders the same scene', async ({
+    page,
+  }, testInfo) => {
     test.setTimeout(240_000);
 
     await page.getByRole('button', { name: 'Export' }).click();
@@ -2658,7 +2669,9 @@ test.describe('export', () => {
         '.wav': 'audio/wav',
         '.png': 'image/png',
       };
-      response.writeHead(200, { 'content-type': types[extname(target)] ?? 'application/octet-stream' });
+      response.writeHead(200, {
+        'content-type': types[extname(target)] ?? 'application/octet-stream',
+      });
       createReadStream(target).pipe(response);
     });
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -2851,7 +2864,9 @@ test.describe('game export', () => {
     }
   });
 
-  test('the readable listing is in the export, and names the objects', async ({ page }, testInfo) => {
+  test('the readable listing is in the export, and names the objects', async ({
+    page,
+  }, testInfo) => {
     test.setTimeout(240_000);
     await openEditor(page, /Forest clearing/);
 

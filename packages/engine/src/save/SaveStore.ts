@@ -62,7 +62,8 @@ export class SaveStore {
   constructor(options: SaveStoreOptions) {
     this.#sceneId = options.sceneId;
     this.#key = saveKey(options.sceneId);
-    this.#storage = options.storage === undefined ? defaultStorage() : (options.storage ?? NULL_STORAGE);
+    this.#storage =
+      options.storage === undefined ? defaultStorage() : (options.storage ?? NULL_STORAGE);
     this.#warn = options.warn ?? ((message) => console.warn(`[helaengine] ${message}`));
   }
 

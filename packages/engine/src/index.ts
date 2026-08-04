@@ -50,12 +50,7 @@ export type { CheckpointParams } from './behaviors/CheckpointBehavior.js';
 export { registerBuiltinBehaviors } from './behaviors/builtins.js';
 export { SaveStore, saveKey } from './save/SaveStore.js';
 export { CoopClient } from './net/CoopClient.js';
-export type {
-  CoopClientOptions,
-  CoopTransport,
-  CoopInput,
-  CoopStatus,
-} from './net/CoopClient.js';
+export type { CoopClientOptions, CoopTransport, CoopInput, CoopStatus } from './net/CoopClient.js';
 export { RemotePlayers, interpolateAngle } from './net/RemotePlayers.js';
 export type { RemotePlayerSnapshot } from './net/RemotePlayers.js';
 export { AudioSystem } from './audio/AudioSystem.js';
@@ -109,12 +104,7 @@ export type { GameRuntimeOptions } from './GameRuntime.js';
 export { TriggerRuntime } from './TriggerRuntime.js';
 export type { TriggerRuntimeOptions, EventBus } from './TriggerRuntime.js';
 export { INERT_WORLD } from './world.js';
-export type {
-  WorldHandle,
-  SpawnRequest,
-  PickupRequest,
-  CheckpointRequest,
-} from './world.js';
+export type { WorldHandle, SpawnRequest, PickupRequest, CheckpointRequest } from './world.js';
 export { StateMachine } from './ai/StateMachine.js';
 export type { State } from './ai/StateMachine.js';
 export { SteeringAgent } from './ai/SteeringAgent.js';

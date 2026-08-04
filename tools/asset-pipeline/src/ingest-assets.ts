@@ -242,9 +242,7 @@ async function ingestAudio(
 
   // A clip long enough to be a bed is looped; a short one is a one-shot. A guess, but a good one,
   // and the metadata file can override it the day it is wrong.
-  const looping = metadata.declared
-    ? assetId.includes('music')
-    : (duration ?? 0) > 3;
+  const looping = metadata.declared ? assetId.includes('music') : (duration ?? 0) > 3;
 
   const entry: AssetManifestEntry = {
     id: assetId,

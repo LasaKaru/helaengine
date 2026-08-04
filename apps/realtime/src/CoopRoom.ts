@@ -3,7 +3,12 @@
 // only works under one.
 import colyseus, { type Client } from 'colyseus';
 const { Room } = colyseus;
-import { AssetManifestSchema, safeParseScene, type AssetManifest, type Scene } from '@helaengine/schema';
+import {
+  AssetManifestSchema,
+  safeParseScene,
+  type AssetManifest,
+  type Scene,
+} from '@helaengine/schema';
 import { CoopSimulation } from './simulation.js';
 import { PlayerState, RoomState } from './state.js';
 

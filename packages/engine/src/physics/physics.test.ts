@@ -258,11 +258,7 @@ describe('castObject', () => {
     // stepped once — an hour of Sprint 10 went into learning that.
     world.step(1 / 60);
 
-    const hit = world.castObject(
-      new THREE.Vector3(0, 1, 0),
-      new THREE.Vector3(0, 0, -1),
-      50,
-    );
+    const hit = world.castObject(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, -1), 50);
     expect(hit?.objectId).toBe('obj_target');
     expect(hit?.distance).toBeCloseTo(9, 1);
     expect(hit?.point.z).toBeCloseTo(-9, 1);
@@ -274,11 +270,7 @@ describe('castObject', () => {
     world.addTerrain(new TerrainField({ segments: 8, size: [32, 32], maxHeight: 10 }));
     world.step(1 / 60);
 
-    const hit = world.castObject(
-      new THREE.Vector3(0, 20, 0),
-      new THREE.Vector3(0, -1, 0),
-      50,
-    );
+    const hit = world.castObject(new THREE.Vector3(0, 20, 0), new THREE.Vector3(0, -1, 0), 50);
     expect(hit).not.toBeNull();
     expect(hit?.objectId).toBeNull();
     world.dispose();

@@ -261,7 +261,12 @@ function ActionEditor({
           ))}
         </select>
         <div className="ui-button-actions">
-          <button type="button" aria-label={`Remove ${name}`} disabled={!removable} onClick={onRemove}>
+          <button
+            type="button"
+            aria-label={`Remove ${name}`}
+            disabled={!removable}
+            onClick={onRemove}
+          >
             ×
           </button>
         </div>
@@ -346,8 +351,7 @@ function SecretCard({
   const setUnlockable = useSceneStore((state) => state.setUnlockable);
   const removeUnlockable = useSceneStore((state) => state.removeUnlockable);
 
-  const setActions = (actions: UnlockAction[]): void =>
-    setUnlockable(unlockable.id, { actions });
+  const setActions = (actions: UnlockAction[]): void => setUnlockable(unlockable.id, { actions });
 
   return (
     <div className="trigger-list">

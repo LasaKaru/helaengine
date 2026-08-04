@@ -15,11 +15,7 @@ const scene = parseScene({
 });
 
 /** Waits for a condition the server has to reach on its own clock. */
-async function until(
-  predicate: () => boolean,
-  message: string,
-  timeoutMs = 8000,
-): Promise<void> {
+async function until(predicate: () => boolean, message: string, timeoutMs = 8000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (!predicate()) {
     if (Date.now() > deadline) throw new Error(`timed out waiting for ${message}`);
@@ -44,9 +40,11 @@ describe('CoopRoom over a real socket', () => {
     // Port 0 asks the OS for a free one, so a test run never collides with a dev server.
     await server.listen(0);
     port = (server as unknown as { transport: { server: http.Server } }).transport.server.address()
-      ? ((
-          server as unknown as { transport: { server: http.Server } }
-        ).transport.server.address() as { port: number }).port
+      ? (
+          (
+            server as unknown as { transport: { server: http.Server } }
+          ).transport.server.address() as { port: number }
+        ).port
       : 0;
   });
 
@@ -93,7 +91,7 @@ describe('CoopRoom over a real socket', () => {
 
     await until(
       () => (bob.state.players.get(aliceId)?.z ?? 0) < startZ - 2,
-      "Bob seeing Alice move",
+      'Bob seeing Alice move',
     );
     clearInterval(ticker);
 
@@ -134,7 +132,7 @@ describe('CoopRoom over a real socket', () => {
     });
 
     alice.send('destroy', { objectId: 'obj_0004' });
-    await until(() => announced === 'obj_0004', "Bob hearing about the destruction");
+    await until(() => announced === 'obj_0004', 'Bob hearing about the destruction');
     await until(
       () => bob.state.destroyedObjectIds.includes('obj_0004'),
       'the shared destroyed list',

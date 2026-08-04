@@ -95,7 +95,9 @@ export class GameRuntime implements WorldHandle {
     this.#health = options.scene.player.health;
     this.#documentObjects = new Map(options.scene.objects.map((object) => [object.id, object]));
     this.#sceneId = options.scene.sceneId;
-    this.#spawnPoint = (options.spawnPoint ?? new THREE.Vector3(...options.scene.player.spawn)).clone();
+    this.#spawnPoint = (
+      options.spawnPoint ?? new THREE.Vector3(...options.scene.player.spawn)
+    ).clone();
     this.inventory = new Inventory(options.scene.inventory);
     this.#warn = options.warn ?? ((message) => console.warn(`[helaengine] ${message}`));
 

@@ -31,7 +31,7 @@ function noise(seed: number): () => number {
   let state = seed;
   return () => {
     state = (state * 1664525 + 1013904223) % 4294967296;
-    return (state / 2147483648) - 1;
+    return state / 2147483648 - 1;
   };
 }
 
@@ -86,7 +86,10 @@ const CLIPS: Clip[] = [
         [
           ...chord([146.83, 196, 246.94], bed(1.5)),
           // A slow pulse over the top, so the bed is not a drone.
-          { wave: (t) => Math.sin(2 * Math.PI * 392 * t) * (0.5 + 0.5 * Math.sin(t * 1.1)), envelope: bed(1.5) },
+          {
+            wave: (t) => Math.sin(2 * Math.PI * 392 * t) * (0.5 + 0.5 * Math.sin(t * 1.1)),
+            envelope: bed(1.5),
+          },
         ],
         0.45,
       ),
@@ -99,7 +102,10 @@ const CLIPS: Clip[] = [
         8,
         [
           ...chord([110, 130.81, 164.81], bed(0.6)),
-          { wave: (t) => Math.sin(2 * Math.PI * 220 * t) * Math.sign(Math.sin(t * 12)), envelope: bed(0.6) },
+          {
+            wave: (t) => Math.sin(2 * Math.PI * 220 * t) * Math.sign(Math.sin(t * 12)),
+            envelope: bed(0.6),
+          },
         ],
         0.55,
       ),
@@ -156,14 +162,17 @@ const CLIPS: Clip[] = [
         [523.25, 659.25, 783.99, 1046.5].map((frequency, step) => ({
           wave: sine(frequency),
           // An arpeggio: each note owns a quarter of the clip.
-          envelope: (t) => (t >= step * 0.2 && t < step * 0.2 + 0.25 ? decay(2)(t - step * 0.2, 0.3) : 0),
+          envelope: (t) =>
+            t >= step * 0.2 && t < step * 0.2 + 0.25 ? decay(2)(t - step * 0.2, 0.3) : 0,
         })),
       ),
   },
   {
     id: 'audio_sfx_death',
     build: () =>
-      render(1.1, [{ wave: (t) => Math.sin(2 * Math.PI * (220 - t * 120) * t), envelope: decay(2) }]),
+      render(1.1, [
+        { wave: (t) => Math.sin(2 * Math.PI * (220 - t * 120) * t), envelope: decay(2) },
+      ]),
   },
 ];
 
