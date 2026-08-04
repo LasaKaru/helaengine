@@ -14,6 +14,7 @@ on:
       - 'packages/engine/**'
       - 'packages/export/**'
       - 'packages/schema/**'
+      - 'packages/repair/**'
       - 'packages/templates/**'
       - 'tools/smoke/**'
       - 'tools/asset-pipeline/**'
@@ -58,5 +59,8 @@ jobs:
       - name: Build packages
         run: pnpm build
 
+      # Both suites: the gate itself, and the repair loop that runs when the gate blocks a build.
+      # The repair suite rebuilds and replays an export for every attempt, which is slow and is
+      # exactly what makes it worth running here rather than trusting.
       - name: Smoke test every template and every deliberate breakage
         run: pnpm --filter @helaengine/smoke smoke:test

@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–24 complete. Phase 3 (Export) is done — build a world visually, get real runnable code, verified in three browsers by a suite that exports it, serves it and compares the pixels — and **Phase 3B (Pre-Delivery Validation & Hosted Play, Sprints 24–27) has begun**: every build is now played by a robot before anybody can have it, which found a starter template whose player spawned inside a building on the very first run. Phases 1 (Editor MVP), 2 (Behaviours, Physics, AI) and 2B (Gameplay Runtime & UI) done — 2B was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–25 complete. Phase 3 (Export) is done — build a world visually, get real runnable code, verified in three browsers by a suite that exports it, serves it and compares the pixels — and **Phase 3B (Pre-Delivery Validation & Hosted Play, Sprints 24–27) has begun**: every build is now played by a robot before anybody can have it, which found a starter template whose player spawned inside a building on the very first run. Phases 1 (Editor MVP), 2 (Behaviours, Physics, AI) and 2B (Gameplay Runtime & UI) done — 2B was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -680,16 +680,39 @@ The likely cause is test isolation rather than product behaviour: these tests re
 
 **Tasks:**
 
-- [ ] Error-context extraction: given a failure, isolate the _relevant slice_ of `scene.json` — spawn position and terrain collider for a fall-through, not the whole object list
-- [ ] Request a targeted patch through the shared `ModelRouter` (same routing layer as AI-PROTOTYPE-PLAN.md), in structured form
-- [ ] Zod-validate every proposed patch before applying it; bounded retry loop, max 3 attempts, re-running the Sprint 24 harness after each
-- [ ] Auto-repair audit log: what changed, why, on which attempt
+- [x] Error-context extraction: given a failure, isolate the _relevant slice_ of `scene.json` — spawn position and terrain collider for a fall-through, not the whole object list
+- [x] Request a targeted patch through the shared `ModelRouter` (same routing layer as AI-PROTOTYPE-PLAN.md), in structured form — **the seam, not the router**: `ModelRouter` does not exist yet, so the transport is a single injected function and the language-model proposer is tested against stubs. See the scope note.
+- [x] Zod-validate every proposed patch before applying it; bounded retry loop, max 3 attempts, re-running the Sprint 24 harness after each
+- [x] Auto-repair audit log: what changed, why, on which attempt — including the attempts that were **refused**, which are the entries that make it an audit trail rather than a changelog
+- [x] **Added:** a deterministic rule-based proposer, so the loop runs in CI with no API key and no spend; a revert when a patch does not measurably improve the report; and a refusal to touch failures that are not scene problems at all
 
 **Tech notes:**
 
 - The safety argument is the same one behaviours make: the model proposes into a schema it cannot escape, the patch is narrow, the result is re-verified by a deterministic test, and the whole thing is logged. At no point does model output become executable code.
+- **The vocabulary is where the safety lives, not the prompt.** Five operations — `setPlayerSpawn`, `setObjectPosition`, `setObjectCollider`, `clearObjectTrigger`, `removeObject` — each of them data describing a field to set. There is deliberately no "replace the scene", no "set this JSON path", no "merge this object", and nothing that carries a string to be evaluated. A model cannot widen that by being persuasive, and the tests assert it: a proposal naming `runScript` is refused, and code smuggled in beside a legitimate `setPlayerSpawn` is stripped by the parse rather than carried through.
+- **The proposer does not decide whether it helped.** A patch is applied to a copy, the build is rebuilt and _played again_, and it is kept only if the report improved. Otherwise it is reverted. Three attempts that each leave an unhelpful edit behind would be a loop that degrades a level while reporting progress.
+- **Refusals are recorded, not merely absent.** "Did the model try to do something it should not have been able to do" is the first question anybody evaluating this will ask, and a log listing only successful edits cannot answer it.
+- The rule-based proposer is arithmetic: a deterministic spiral search for a clear point, not a model asked to compute one. It exists because a validation step that only works when a paid service answers is a validation step that gets switched off — and because "three broken scenes are repaired" has to be a reproducible claim rather than a report on what a model said this morning.
+- **Not every failure is a scene problem.** `page-loads`, `scene-loaded`, `physics-initialises` and `memory-stable` are broken _builds_; no document patch reaches them. The loop stops rather than spending its budget rearranging somebody's level to fix a corrupted bundle, and there is a test asserting it edits nothing when handed one.
 
 **Definition of Done:** All three deliberately broken scenes from Sprint 24 are detected and repaired within the retry budget, verified by the harness passing afterwards.
+
+**Met, with the third scene reinterpreted — deliberately, and here is why.** Sprint 24's three breakages were a spawn off the terrain, a model missing from the folder, and a corrupted WebAssembly payload. The first two are repairable and are repaired. **The third is not a scene problem at all.** No edit to a scene document fixes a damaged engine bundle, and a loop that responded to one by moving spawn points would spend three attempts degrading somebody's level and then report that it had tried. So the loop refuses it — and that refusal is the test: it must end with zero attempts, zero patches applied, and the scene it started with, unchanged.
+
+The repairable set is therefore **four scene-level faults**, each built, played, patched, rebuilt and played again:
+
+| Broken scene                      | Detected as            | Repaired by                             |
+| --------------------------------- | ---------------------- | --------------------------------------- |
+| Spawn off the edge of the terrain | `player-moves`         | `setPlayerSpawn` back over the terrain  |
+| Spawn inside the hut              | `player-moves`         | `setPlayerSpawn` clear of the building  |
+| Spawn on top of a goblin          | `player-survives-idle` | `setPlayerSpawn` out of its reach       |
+| Model missing from the build      | `assets-resolve`       | `removeObject`, disclosed as a deletion |
+
+The second of those is **Sprint 24's own finding, put back on purpose**: a fix nobody can re-break is a fix nobody can prove still works.
+
+Two further cases are asserted because they are how this feature would go wrong rather than how it goes right. A **healthy build is left completely alone** — zero attempts, nothing proposed. And a **hostile proposer changes nothing**: a stub returning `{"op":"runScript","code":"fetch('http://evil.invalid')"}` is refused on the schema, twice, with both refusals in the audit log and the scene returned byte-for-byte as it arrived.
+
+**Scope, stated plainly.** The task says "request a targeted patch through the shared `ModelRouter`". There is no `ModelRouter` — it belongs to AI-PROTOTYPE-PLAN.md's Phase 8, and no part of it exists. What is built is the seam it will plug into: a one-function transport, a prompt that asks for one of five named operations, JSON extraction that tolerates fences and prose, and validation that does not care where the reply came from. **No language model was called during this sprint**, because there is no provider configured here; the LLM proposer is exercised against stubs, including hostile ones. The claim "all four scenes are repaired" is a claim about the _rule-based_ proposer, which is the one that runs in CI — and which was chosen as the default precisely so that this claim does not depend on a paid service being up.
 
 ---
 

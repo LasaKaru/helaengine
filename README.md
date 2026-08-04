@@ -7,8 +7,9 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 24 — exports are playable games, checked in three browsers and played by a robot
-before anyone can have them. A working editor, behaviours, physics, enemies, trigger
+**Status:** Sprint 25 — exports are playable games, checked in three browsers, played by a robot
+before anyone can have them, and automatically repaired when that robot finds something fixable.
+A working editor, behaviours, physics, enemies, trigger
 volumes, a measured performance baseline, first/third/top-down cameras with one input layer covering
 keyboard, touch and gamepad, a schema-driven menu/HUD shell, and now combat: a weapon catalogue in
 the document, hitscan firing, ammo and reloading, pickups, player damage and respawn — plus secrets
@@ -88,6 +89,7 @@ Requires Node 20+ and pnpm 10+. Thumbnail rendering needs a Chromium that Playwr
 packages/schema        The scene + asset schema, in Zod. The contract everything else agrees on.
 packages/engine        Vanilla Three.js runtime. No React, no store, no DOM assumptions in the loader.
 packages/export        Scene + manifest in, runnable folder out. Pure functions, so it runs in Node too.
+packages/repair        Turns a failed play-test into a narrow, schema-validated patch. Proposes; never executes.
 packages/templates     The five starter worlds. Shared so the editor offers what the gate tests.
 tools/asset-pipeline   Ingest: raw GLBs in, compressed GLBs + thumbnails + manifest out.
 tools/smoke            Plays a build before a human can. Deterministic checks, exit code as verdict.
@@ -491,6 +493,49 @@ deliberately broken ones, which must each fail **on their own check** — a spaw
 terrain (`player-moves`, "fell out of the world"), a model missing from the folder
 (`assets-resolve`), and a corrupted inlined WebAssembly payload (`physics-initialises`). A gate
 nobody has watched fail is a gate nobody should trust.
+
+## Automatic repair
+
+When the gate blocks a build, `packages/repair` tries to fix it — bounded, validated, reverted if it
+does not help, and disclosed either way.
+
+```bash
+pnpm smoke path/to/export --repair
+```
+
+The safety argument is the same one behaviours make, and it is worth being precise about because
+this is the one place a _model_ writes into the product:
+
+- **The vocabulary is closed and it is data.** Five operations — `setPlayerSpawn`,
+  `setObjectPosition`, `setObjectCollider`, `clearObjectTrigger`, `removeObject` — each naming a
+  field to set. There is no "replace the scene", no "set this JSON path", no string that gets
+  evaluated. A model cannot widen that by being persuasive: a proposal naming an operation that is
+  not in the union fails to parse, and code smuggled in beside a legitimate one is stripped by Zod
+  rather than carried through. Both are tests, not assurances.
+- **Narrow.** A repair moves a spawn point or clears one collider. The worst case of a wrong repair
+  is a wrong spawn point, not a rewritten level.
+- **The proposer does not decide whether it helped.** The patch is applied to a copy, the export is
+  rebuilt and _played again_, and it is kept only if the report improved. Otherwise it is reverted.
+- **Bounded at three attempts**, because an unbounded loop against a paid model is an unbounded
+  bill, and one that keeps editing until something passes will eventually edit away what it was
+  meant to protect.
+- **Everything is logged, including refusals.** "Did the model try something it should not have been
+  able to do" is the first question anyone will ask, and a log of successful edits cannot answer it.
+- **Everything is disclosed.** Each patch carries a sentence written for the person whose scene it
+  is — "Your start point was inside the Hut, so the player spawned stuck and could not walk. We
+  moved the start point to [6, 0, 0], just clear of it." Quietly rewriting somebody's work and then
+  congratulating them on a passing build spends trust that cannot be earned back.
+
+The default proposer is **arithmetic, not a language model**: a deterministic spiral search for a
+clear point. That is what lets the gate run in CI with no API key and no spend, and it is what makes
+"these broken scenes are repaired" a reproducible claim rather than a report on what a model said
+this morning. `LlmRepairModel` implements the same interface behind an injected transport, for the
+failures arithmetic shrugs at.
+
+Not everything is repairable, and the loop says so rather than guessing. `page-loads`,
+`scene-loaded`, `physics-initialises` and `memory-stable` are broken _builds_ — no document patch
+reaches them, and a loop that answered a corrupted engine bundle by moving spawn points would be
+destroying work to fix a fault it cannot touch. Handed one, it stops with nothing changed.
 
 ## Where this is going
 

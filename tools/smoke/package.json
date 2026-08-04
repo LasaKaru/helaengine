@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@helaengine/export": "workspace:*",
+    "@helaengine/repair": "workspace:*",
     "@helaengine/schema": "workspace:*",
     "@helaengine/templates": "workspace:*",
     "playwright": "^1.62.0",

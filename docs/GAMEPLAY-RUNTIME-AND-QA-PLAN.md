@@ -340,11 +340,11 @@ _(Runs after renumbered Phase 3 Export System, Sprints 21-23)_
 
 **Sprint 25 — AI Diagnosis + Auto-Repair Loop**
 
-- [ ] Build the error-context extraction step: given a smoke-test failure, isolate the relevant slice of `scene.json` (not the whole document) and format it with the captured error for LLM input
-- [ ] Integrate with the `ModelRouter` (shared with AI-PROTOTYPE-PLAN.md) to request a targeted patch proposal in structured/JSON form
-- [ ] Zod-validate proposed patches before applying; implement the bounded retry loop (max 3 attempts) re-invoking Sprint 24's smoke test after each patch
-- [ ] Build the auto-repair audit log (what was changed, why, on which attempt) surfaced later to the user
-- **DoD:** Feeding the 3 deliberately-broken test scenes from Sprint 24 through the full pipeline results in all 3 being automatically detected and correctly repaired (spawn point adjusted, missing collider added, WASM path fixed) within the retry budget, verified by the smoke test passing afterward.
+- [x] Build the error-context extraction step: given a smoke-test failure, isolate the relevant slice of `scene.json` (not the whole document) and format it with the captured error for LLM input
+- [x] Integrate with the `ModelRouter` (shared with AI-PROTOTYPE-PLAN.md) to request a targeted patch proposal in structured/JSON form — **the seam only.** `ModelRouter` belongs to Phase 8 and does not exist; the transport is one injected function, and the language-model proposer is exercised against stubs. No model was called.
+- [x] Zod-validate proposed patches before applying; implement the bounded retry loop (max 3 attempts) re-invoking Sprint 24's smoke test after each patch
+- [x] Build the auto-repair audit log (what was changed, why, on which attempt) surfaced later to the user — including refused attempts, which are what make it an audit trail
+- **DoD:** Feeding the 3 deliberately-broken test scenes from Sprint 24 through the full pipeline results in all 3 being automatically detected and correctly repaired within the retry budget, verified by the smoke test passing afterward. **Met, with the WASM case reinterpreted:** a corrupted engine bundle is not a scene problem, and the loop refuses it rather than rearranging a level to fix a build. Four scene-level faults are repaired instead — spawn off the terrain, spawn inside a building, spawn on top of an enemy, and a model missing from the folder.
 
 **Sprint 26 — Release Gating + User-Facing Reporting**
 
