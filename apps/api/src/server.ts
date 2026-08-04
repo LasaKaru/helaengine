@@ -23,6 +23,16 @@ import {
 } from './auth.js';
 import type { Db } from './db.js';
 import { Forbidden, NotFound, requireRole, roleIn, Unauthorized } from './roles.js';
+import {
+  createProject,
+  deleteProject,
+  listProjects,
+  listVersions,
+  loadProject,
+  restoreVersion,
+  saveVersion,
+  updateProject,
+} from './projects.js';
 
 /**
  * The platform API.
@@ -328,42 +338,110 @@ export function createApiServer(options: ApiOptions): Server {
       // Editor: making things is what an editor is for. A viewer may look and no more.
       await requireRole(db, organizationId, userId, 'editor');
 
-      const body = JSON.parse(await readBody(request)) as { name?: unknown };
+      const body = JSON.parse(await readBody(request)) as { name?: unknown; scene?: unknown };
       const name = typeof body.name === 'string' ? body.name.trim() : '';
       if (!name) return send(response, 400, { error: 'name: a project needs a name' });
 
-      const created = await db.query<{ id: string; name: string; created_at: Date }>(
-        `insert into projects (organization_id, name, created_by) values ($1, $2, $3)
-         returning id, name, created_at`,
-        [organizationId, name, userId],
-      );
-
-      return send(response, 201, {
-        project: {
-          id: created.rows[0]!.id,
-          organizationId,
-          name: created.rows[0]!.name,
-          createdAt: created.rows[0]!.created_at.toISOString(),
-        },
+      const project = await createProject(db, {
+        organizationId,
+        name,
+        userId,
+        ...(body.scene === undefined ? {} : { scene: body.scene }),
       });
+      return send(response, 201, { project });
     }
 
     if (projectsMatch && method === 'GET') {
       const organizationId = projectsMatch[1]!;
       await requireRole(db, organizationId, userId, 'viewer');
+      return send(response, 200, { projects: await listProjects(db, organizationId) });
+    }
 
-      const rows = await db.query<{ id: string; name: string; created_at: Date }>(
-        'select id, name, created_at from projects where organization_id = $1 order by created_at',
-        [organizationId],
-      );
-      return send(response, 200, {
-        projects: rows.rows.map((row) => ({
-          id: row.id,
-          organizationId,
-          name: row.name,
-          createdAt: row.created_at.toISOString(),
-        })),
-      });
+    // Everything below is about one project. The organisation it belongs to decides who may touch
+    // it, so it is looked up once and the role checked against that — a project id in a URL is not
+    // an authorisation, and treating it as one is how tenants leak into each other.
+    const projectMatch = new RegExp(
+      `^/projects/(${UUID})(/versions|/versions/[0-9]+/restore)?$`,
+    ).exec(path);
+    if (projectMatch) {
+      const projectId = projectMatch[1]!;
+      const suffix = projectMatch[2] ?? '';
+      const loaded = await loadProject(db, projectId);
+      if (!loaded) throw new NotFound('no such project');
+
+      const organizationId = loaded.project.organizationId;
+
+      if (suffix === '' && method === 'GET') {
+        await requireRole(db, organizationId, userId, 'viewer');
+        return send(response, 200, {
+          project: loaded.project,
+          scene: loaded.scene,
+          version: loaded.version,
+        });
+      }
+
+      if (suffix === '' && method === 'PATCH') {
+        await requireRole(db, organizationId, userId, 'editor');
+        const body = JSON.parse(await readBody(request)) as {
+          name?: unknown;
+          thumbnail?: unknown;
+        };
+        await updateProject(db, {
+          projectId,
+          ...(typeof body.name === 'string' ? { name: body.name.trim() } : {}),
+          ...(typeof body.thumbnail === 'string' ? { thumbnail: body.thumbnail } : {}),
+        });
+        return send(response, 200, { project: (await loadProject(db, projectId))!.project });
+      }
+
+      if (suffix === '' && method === 'DELETE') {
+        // Admin, not editor. Deleting is the one action in this API that removes somebody else's
+        // work from view, and it should take more than the role that creates things.
+        await requireRole(db, organizationId, userId, 'admin');
+        await deleteProject(db, projectId);
+        // 204 means "no content", and a body attached to one is invalid HTTP that clients are
+        // entitled to choke on — `response.json()` certainly does.
+        response.writeHead(204).end();
+        return;
+      }
+
+      if (suffix === '/versions' && method === 'GET') {
+        await requireRole(db, organizationId, userId, 'viewer');
+        return send(response, 200, { versions: await listVersions(db, projectId) });
+      }
+
+      if (suffix === '/versions' && method === 'POST') {
+        await requireRole(db, organizationId, userId, 'editor');
+        const body = JSON.parse(await readBody(request)) as {
+          scene?: unknown;
+          baseVersion?: unknown;
+        };
+        if (typeof body.baseVersion !== 'number') {
+          // Required rather than defaulted. A save with no idea what it is based on is a save that
+          // silently wins every race, which is the opposite of what this field is for.
+          return send(response, 400, {
+            error: 'baseVersion: a save must say which version it was based on',
+          });
+        }
+        const saved = await saveVersion(db, {
+          projectId,
+          userId,
+          scene: body.scene,
+          baseVersion: body.baseVersion,
+        });
+        return send(response, 201, saved);
+      }
+
+      const restoreMatch = /^\/versions\/([0-9]+)\/restore$/.exec(suffix);
+      if (restoreMatch && method === 'POST') {
+        await requireRole(db, organizationId, userId, 'editor');
+        const restored = await restoreVersion(db, {
+          projectId,
+          userId,
+          version: Number(restoreMatch[1]),
+        });
+        return send(response, 201, restored);
+      }
     }
 
     send(response, 404, { error: 'no such endpoint' });

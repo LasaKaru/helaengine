@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–28 complete. Phase 3 (Export) is done — build a world visually, get real runnable code, verified in three browsers by a suite that exports it, serves it and compares the pixels — and **Phase 3B (Pre-Delivery Validation & Hosted Play, Sprints 24–27) has begun**: every build is now played by a robot before anybody can have it, which found a starter template whose player spawned inside a building on the very first run. Phases 1 (Editor MVP), 2 (Behaviours, Physics, AI) and 2B (Gameplay Runtime & UI) done — 2B was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–28 complete; Sprint 29's API is done and its editor UI is not. Phase 3 (Export) is done — build a world visually, get real runnable code, verified in three browsers by a suite that exports it, serves it and compares the pixels — and **Phase 3B (Pre-Delivery Validation & Hosted Play, Sprints 24–27) has begun**: every build is now played by a robot before anybody can have it, which found a starter template whose player spawned inside a building on the very first run. Phases 1 (Editor MVP), 2 (Behaviours, Physics, AI) and 2B (Gameplay Runtime & UI) done — 2B was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -851,16 +851,29 @@ CI runs it against `postgres:16` as a service container rather than a mock, for 
 
 **Tasks:**
 
-- [ ] Implement `Project` and `SceneVersion` Prisma models per the schema in DEVELOPMENT-PLAN.md section 3; build `POST /projects`, `GET /projects/:id`, `PUT /projects/:id` (metadata only — name, thumbnail), `POST /projects/:id/versions` (append a new SceneVersion — this is the actual "save")
-- [ ] Zod-validate incoming `sceneJson` server-side before persisting (reuse the shared `/packages/schema` package — same validation logic as the editor uses locally)
-- [ ] Build editor-side migration: replace Dexie/IndexedDB calls from Sprint 8 with API calls; implement autosave as a debounced `POST /projects/:id/versions` call (e.g., every 30-60s of activity, plus explicit manual save button)
-- [ ] Implement optimistic concurrency: `SceneVersion` has a `versionNumber`; if a save request's base version doesn't match the project's current latest version, reject with a conflict response (409) — editor surfaces a "someone else saved, reload?" prompt (full collab merge comes in Sprint 31, this is just conflict _detection_ for now)
-- [ ] Build Projects Dashboard UI: list of projects (thumbnail, name, last modified, org), create-new, delete (soft-delete with confirmation), duplicate
-- [ ] Build Version History panel: list last N `SceneVersion` rows with timestamp/author, "restore this version" action (creates a _new_ version copying the old one's content — never deletes/rewrites history)
+- [x] `Project` and `SceneVersion` models per DEVELOPMENT-PLAN.md section 3; `POST /orgs/:id/projects`, `GET /projects/:id`, `PATCH /projects/:id` (name and thumbnail), `POST /projects/:id/versions` (the actual save), plus `GET /projects/:id/versions` and `POST /projects/:id/versions/:n/restore`
+- [x] Zod-validate incoming `sceneJson` server-side before persisting, with the shared `@helaengine/schema` package — the same validation the editor runs locally
+- [x] Build editor-side migration: a `CloudProjects` adapter implementing the same interface as Sprint 8's local store — **the adapter and its tests, not the UI swap**, see the scope note
+- [x] Implement optimistic concurrency: a save carries the version it was based on; the server refuses one based on a version somebody has already moved past, with a 409 carrying the current number
+- [ ] Build Projects Dashboard UI — **not done**
+- [ ] Build Version History panel — **not done**; the API and the client method exist, the panel does not
+
+**Tech notes:**
+
+- **Saving appends; it never updates.** A save is a new `scene_versions` row, so version history is a property of the shape rather than a feature somebody had to build — and _restore is another append_, holding the old content at a new number. History is never destroyed, including by the button whose job is to go back. The test asserts the version list reads `[3, 2, 1]` after restoring version 1.
+- **The concurrency guard is inside the insert**, not a read followed by a write: `insert ... select ... where (select max(version)) = $base`. Two saves arriving together would both read the same maximum and both believe they were next. There is a test that fires two saves with `Promise.all` and asserts exactly one 201 and one 409 — which the read-then-write version would have failed.
+- **`baseVersion` is required, not defaulted.** A save with no idea what it is based on silently wins every race, which is the opposite of what the field is for.
+- **A project id in a URL is not an authorisation.** Each project route loads the project, reads the organisation it belongs to, and checks the caller's role against _that_. Treating the id as permission is how one tenant's work leaks into another's, and there is a test where a stranger holding the right id gets 404.
+- Deleting takes `admin`, not `editor`: it is the one action here that removes somebody else's work from view, and it should need more than the role that creates things. It is a soft delete — nothing reads a deleted project, nothing removes the rows.
+- A `DELETE` answers **204 with no body**. The first version sent `{}` with a content-length, which is invalid HTTP and which `response.json()` duly choked on — caught by the test that expected the delete to succeed.
 
 **Deliverables:** Cloud-backed project persistence with automatic version history.
 
 **Definition of Done:** User saves a project from Browser A, logs into the same account on Browser B, sees identical, up-to-date state. Version History panel shows the last 10+ saves; restoring an older version correctly reverts editor state and creates a new version entry (history is never destroyed).
+
+**Met at the API, not at the UI, and the difference matters.** Twenty-four integration tests against real Postgres cover the whole sentence: a project saved in one session is read back identically in a second session of the same account; twelve saves produce twelve versions with authors and timestamps; restoring version 1 creates version 3 holding version 1's content and leaves `[3, 2, 1]` in the history. Conflict detection, tenant isolation, server-side schema validation and soft delete are all tested.
+
+What is **not** built is the editor's side of it: there is a `CloudProjects` adapter with its own tests, implementing the same interface as Sprint 8's local store, but the projects screen still talks to IndexedDB and there is no version history panel. So "Browser A saves, Browser B sees it" is true of the API and not yet true of the product. Wiring the store over and building the panel is the remainder of this sprint, and calling it done because the hard half is done would be the kind of claim this project has spent twenty-eight sprints not making.
 
 ---
 

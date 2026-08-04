@@ -68,7 +68,9 @@ async function call<T = Record<string, unknown>>(
     },
     ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
   });
-  return { status: response.status, body: (await response.json()) as T };
+  // 204 has no body by definition, and parsing one would fail on a response that is correct.
+  const text = await response.text();
+  return { status: response.status, body: (text ? JSON.parse(text) : {}) as T };
 }
 
 async function signup(
@@ -372,5 +374,254 @@ describe('the role ladder itself', () => {
     // Added before anything uses it, on the plan's advice: an enum value now costs nothing, a
     // migration over live membership rows later costs a maintenance window.
     expect(roleAtLeast('enterprise_admin', 'owner')).toBe(true);
+  });
+});
+
+describe('projects and cloud save', () => {
+  async function workspace(): Promise<{ token: string; organizationId: string }> {
+    const owner = await signup(`saver-${Math.random().toString(36).slice(2)}@example.com`);
+    return { token: owner.token, organizationId: owner.personalOrganizationId };
+  }
+
+  function scene(name = 'Cloud Scene'): Record<string, unknown> {
+    return {
+      sceneId: 'scene_cloud',
+      version: 1,
+      name,
+      objects: [{ id: 'obj_0001', assetId: 'tree_pine_01', transform: { position: [1, 0, 2] } }],
+    };
+  }
+
+  it('saves from one session and reads back identically in another', async () => {
+    // The definition of done, as a test: Browser A saves, Browser B logs in, sees the same thing.
+    const { token, organizationId } = await workspace();
+    const created = await call<{ project: { id: string; latestVersion: number } }>(
+      'POST',
+      `/orgs/${organizationId}/projects`,
+      { token, body: { name: 'Goblin Valley', scene: scene() } },
+    );
+    expect(created.status).toBe(201);
+    expect(created.body.project.latestVersion).toBe(1);
+
+    // A different session for the same account — a second browser, not a second user.
+    const second = await call<{ session: { token: string } }>('POST', '/auth/login', {
+      body: {
+        email: (await call<{ user: { email: string } }>('GET', '/me', { token })).body.user.email,
+        password: 'a-long-enough-password',
+      },
+    });
+
+    const loaded = await call<{ scene: { name: string; objects: unknown[] }; version: number }>(
+      'GET',
+      `/projects/${created.body.project.id}`,
+      { token: second.body.session.token },
+    );
+
+    expect(loaded.status).toBe(200);
+    expect(loaded.body.version).toBe(1);
+    expect(loaded.body.scene.name).toBe('Cloud Scene');
+    expect(loaded.body.scene.objects).toHaveLength(1);
+  });
+
+  it('refuses a document the schema does not accept, before it is stored', async () => {
+    const { token, organizationId } = await workspace();
+    // Server-side validation with the same package the editor uses. A document only the client
+    // checked is a document nobody checked.
+    const bad = await call<{ error: string }>('POST', `/orgs/${organizationId}/projects`, {
+      token,
+      body: { name: 'Broken', scene: { sceneId: 'x', version: 1, objects: 'not an array' } },
+    });
+    expect(bad.status).toBe(400);
+  });
+
+  it('builds history by appending, and never rewrites it', async () => {
+    const { token, organizationId } = await workspace();
+    const created = await call<{ project: { id: string } }>(
+      'POST',
+      `/orgs/${organizationId}/projects`,
+      {
+        token,
+        body: { name: 'History', scene: scene('v1') },
+      },
+    );
+    const projectId = created.body.project.id;
+
+    for (let version = 2; version <= 12; version += 1) {
+      const saved = await call<{ version: number }>('POST', `/projects/${projectId}/versions`, {
+        token,
+        body: { scene: scene(`v${version}`), baseVersion: version - 1 },
+      });
+      expect(saved.status).toBe(201);
+      expect(saved.body.version).toBe(version);
+    }
+
+    const history = await call<{ versions: Array<{ version: number; authorName: string }> }>(
+      'GET',
+      `/projects/${projectId}/versions`,
+      { token },
+    );
+    expect(history.body.versions).toHaveLength(12);
+    expect(history.body.versions[0]!.version).toBe(12);
+    expect(history.body.versions[0]!.authorName).toBeTruthy();
+  });
+
+  it('restores an old version by adding a new one, leaving the history intact', async () => {
+    const { token, organizationId } = await workspace();
+    const created = await call<{ project: { id: string } }>(
+      'POST',
+      `/orgs/${organizationId}/projects`,
+      {
+        token,
+        body: { name: 'Restore', scene: scene('the good one') },
+      },
+    );
+    const projectId = created.body.project.id;
+
+    await call('POST', `/projects/${projectId}/versions`, {
+      token,
+      body: { scene: scene('the mistake'), baseVersion: 1 },
+    });
+
+    const restored = await call<{ version: number; scene: { name: string } }>(
+      'POST',
+      `/projects/${projectId}/versions/1/restore`,
+      { token },
+    );
+
+    // Version 3, holding version 1's content. Undoing a mistake must not be able to become a
+    // second, larger mistake.
+    expect(restored.status).toBe(201);
+    expect(restored.body.version).toBe(3);
+    expect(restored.body.scene.name).toBe('the good one');
+
+    const history = await call<{ versions: Array<{ version: number }> }>(
+      'GET',
+      `/projects/${projectId}/versions`,
+      { token },
+    );
+    expect(history.body.versions.map((entry) => entry.version)).toEqual([3, 2, 1]);
+  });
+
+  it('rejects a save based on a version somebody else has already moved past', async () => {
+    const { token, organizationId } = await workspace();
+    const created = await call<{ project: { id: string } }>(
+      'POST',
+      `/orgs/${organizationId}/projects`,
+      {
+        token,
+        body: { name: 'Race', scene: scene() },
+      },
+    );
+    const projectId = created.body.project.id;
+
+    // Two editors both loaded version 1. The first save wins.
+    const first = await call('POST', `/projects/${projectId}/versions`, {
+      token,
+      body: { scene: scene('theirs'), baseVersion: 1 },
+    });
+    expect(first.status).toBe(201);
+
+    const second = await call<{ error: string; latestVersion?: number }>(
+      'POST',
+      `/projects/${projectId}/versions`,
+      { token, body: { scene: scene('mine'), baseVersion: 1 } },
+    );
+
+    // 409 with the number the editor needs to say "someone else saved, reload?".
+    expect(second.status).toBe(409);
+    expect(second.body.error).toContain('version 2');
+  });
+
+  it('will not let two simultaneous saves both claim to be next', async () => {
+    const { token, organizationId } = await workspace();
+    const created = await call<{ project: { id: string } }>(
+      'POST',
+      `/orgs/${organizationId}/projects`,
+      {
+        token,
+        body: { name: 'Simultaneous', scene: scene() },
+      },
+    );
+    const projectId = created.body.project.id;
+
+    // Fired together rather than in sequence: the guard has to be in the insert, not in a read
+    // followed by a write, or both requests see the same maximum and both think they are next.
+    const [a, b] = await Promise.all([
+      call('POST', `/projects/${projectId}/versions`, {
+        token,
+        body: { scene: scene('a'), baseVersion: 1 },
+      }),
+      call('POST', `/projects/${projectId}/versions`, {
+        token,
+        body: { scene: scene('b'), baseVersion: 1 },
+      }),
+    ]);
+
+    expect([a.status, b.status].sort()).toEqual([201, 409]);
+  });
+
+  it('requires a save to say what it was based on', async () => {
+    const { token, organizationId } = await workspace();
+    const created = await call<{ project: { id: string } }>(
+      'POST',
+      `/orgs/${organizationId}/projects`,
+      {
+        token,
+        body: { name: 'Blind', scene: scene() },
+      },
+    );
+
+    const blind = await call<{ error: string }>(
+      'POST',
+      `/projects/${created.body.project.id}/versions`,
+      {
+        token,
+        body: { scene: scene() },
+      },
+    );
+    // A save with no base silently wins every race, which is the opposite of the point.
+    expect(blind.status).toBe(400);
+    expect(blind.body.error).toContain('baseVersion');
+  });
+
+  it('hides a deleted project without destroying it', async () => {
+    const { token, organizationId } = await workspace();
+    const created = await call<{ project: { id: string } }>(
+      'POST',
+      `/orgs/${organizationId}/projects`,
+      {
+        token,
+        body: { name: 'Doomed', scene: scene() },
+      },
+    );
+    const projectId = created.body.project.id;
+
+    expect((await call('DELETE', `/projects/${projectId}`, { token })).status).toBe(204);
+    expect((await call('GET', `/projects/${projectId}`, { token })).status).toBe(404);
+
+    const listed = await call<{ projects: unknown[] }>('GET', `/orgs/${organizationId}/projects`, {
+      token,
+    });
+    expect(listed.body.projects).toHaveLength(0);
+  });
+
+  it('keeps one organisation out of another, even with the right project id', async () => {
+    const mine = await workspace();
+    const stranger = await signup('nosy@example.com');
+
+    const created = await call<{ project: { id: string } }>(
+      'POST',
+      `/orgs/${mine.organizationId}/projects`,
+      {
+        token: mine.token,
+        body: { name: 'Private', scene: scene() },
+      },
+    );
+
+    // A project id in a URL is not an authorisation. Treating it as one is how tenants leak.
+    const peek = await call('GET', `/projects/${created.body.project.id}`, {
+      token: stranger.token,
+    });
+    expect(peek.status).toBe(404);
   });
 });
