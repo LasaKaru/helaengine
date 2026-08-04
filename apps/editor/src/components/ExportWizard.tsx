@@ -10,8 +10,57 @@ import {
   type ExportOptions,
 } from '@helaengine/export';
 import { runExport } from '../export/runExport';
+import { explainBlock, runGate, type GateResult, type GateStage } from '../validation/gate';
 
-type Phase = 'idle' | 'working' | 'done' | 'error';
+/**
+ * Where the dialog is.
+ *
+ * `checking` is the state this sprint adds, and it is the one that has to be visible: a build is
+ * played before anybody can download it, that takes a few seconds, and a few seconds of nothing is
+ * indistinguishable from broken.
+ */
+type Phase = 'idle' | 'checking' | 'blocked' | 'working' | 'done' | 'error';
+
+/**
+ * What the button says in each state.
+ *
+ * A table rather than nested ternaries, because "never a spinner that never resolves" starts with
+ * every state having a name somebody wrote on purpose. `blocked` says "Check again" rather than
+ * "Export": pressing it re-runs the gate, which is the only honest thing it could do.
+ */
+const BUTTON_TEXT: Record<Phase, string> = {
+  idle: 'Check and export',
+  checking: 'Checking…',
+  blocked: 'Check again',
+  working: 'Exporting…',
+  done: 'Export again',
+  error: 'Try again',
+};
+
+const STAGE_TEXT: Record<GateStage['kind'], string> = {
+  playing: 'Playing your game…',
+  thinking: 'Working out what went wrong…',
+  fixing: 'Trying a fix…',
+  done: 'Finishing up…',
+};
+
+const CHECK_MARK: Record<string, string> = {
+  passed: '✓',
+  failed: '✗',
+  skipped: '–',
+  'not-applicable': '·',
+};
+
+/** The checks in the user's words. The ids are for logs; these are for people. */
+const CHECK_LABEL: Record<string, string> = {
+  'page-loads': 'The game starts without errors',
+  'assets-resolve': 'Every model loads',
+  'scene-loaded': 'The world builds',
+  'physics-initialises': 'Physics starts',
+  'player-moves': 'The player can move',
+  'player-survives-idle': 'The player is safe at the start point',
+  'memory-stable': 'Memory stays steady',
+};
 
 /**
  * The export dialog.
@@ -28,6 +77,7 @@ export function ExportWizard({
   onClose(): void;
 }): React.JSX.Element {
   const scene = useSceneStore((state) => state.scene);
+  const setScene = useSceneStore((state) => state.setScene);
   const [options, setOptions] = useState<ExportOptions>({
     ...DEFAULT_EXPORT_OPTIONS,
     projectName: scene.name || DEFAULT_EXPORT_OPTIONS.projectName,
@@ -39,6 +89,8 @@ export function ExportWizard({
     warnings: string[];
   } | null>(null);
   const [error, setError] = useState<string>('');
+  const [stage, setStage] = useState<GateStage>({ kind: 'done' });
+  const [gate, setGate] = useState<GateResult | null>(null);
 
   const summary = useMemo(() => collectUsedAssets(scene, manifest), [scene, manifest]);
 
@@ -62,21 +114,48 @@ export function ExportWizard({
   // dismissing the dialog mid-write would leave somebody wondering whether they got a file.
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape' && phase !== 'working') onClose();
+      if (event.key === 'Escape' && phase !== 'working' && phase !== 'checking') onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose, phase]);
 
+  /**
+   * Plays the game, then exports it — in that order, and only in that order.
+   *
+   * The gate is not advisory. A build that has not been proved to run does not get a download
+   * button, because "here is your game, we have no idea whether it works" is the promise this
+   * product exists not to make. A repair, if one was needed, is applied to the real document and
+   * disclosed before the file is written.
+   */
   const start = async (): Promise<void> => {
-    setPhase('working');
+    setPhase('checking');
     setError('');
+    setGate(null);
+
     try {
-      const outcome = await runExport(scene, manifest, options);
+      const outcome = await runGate({
+        scene,
+        manifest,
+        onStage: setStage,
+      });
+      setGate(outcome);
+
+      if (!outcome.releasable) {
+        setPhase('blocked');
+        return;
+      }
+
+      // Kept in the user's project, not just in the exported copy. A repair that only exists inside
+      // a zip is one they hit again the next time they press Export.
+      if (outcome.disclosure.length > 0) setScene(outcome.scene);
+
+      setPhase('working');
+      const written = await runExport(outcome.scene, manifest, options);
       setResult({
-        filename: outcome.filename,
-        bytes: outcome.bytes,
-        warnings: outcome.plan.warnings,
+        filename: written.filename,
+        bytes: written.bytes,
+        warnings: written.plan.warnings,
       });
       setPhase('done');
     } catch (caught) {
@@ -89,7 +168,7 @@ export function ExportWizard({
     <div
       className="modal-backdrop"
       role="presentation"
-      onClick={() => phase !== 'working' && onClose()}
+      onClick={() => phase !== 'working' && phase !== 'checking' && onClose()}
     >
       <div
         className="modal export-modal"
@@ -195,6 +274,58 @@ export function ExportWizard({
           )}
         </div>
 
+        {phase === 'checking' && (
+          <div className="export-summary" role="status" aria-live="polite">
+            <p>
+              <strong>{STAGE_TEXT[stage.kind]}</strong>
+              {stage.kind !== 'done' && stage.attempt > 0 ? ` (attempt ${stage.attempt} of 3)` : ''}
+            </p>
+            <p className="panel-hint">
+              Your game is being played before you download it — the start point, the physics, the
+              models and whether the player can actually move.
+            </p>
+          </div>
+        )}
+
+        {phase === 'blocked' && gate && (
+          <div className="export-summary" role="alert">
+            <p className="panel-hint error">
+              <strong>This build was not exported.</strong> {explainBlock(gate.report).headline}
+            </p>
+            <p className="panel-hint">{explainBlock(gate.report).suggestion}</p>
+            <ul className="check-list">
+              {gate.report.checks.map((item) => (
+                <li key={item.id} className={`check-${item.status}`}>
+                  <span aria-hidden="true">{CHECK_MARK[item.status]}</span> {CHECK_LABEL[item.id]}
+                </li>
+              ))}
+            </ul>
+            {gate.log.attempts.length > 0 && (
+              <p className="panel-hint">
+                We tried to fix it automatically {gate.log.attempts.length}{' '}
+                {gate.log.attempts.length === 1 ? 'time' : 'times'} and could not.
+              </p>
+            )}
+          </div>
+        )}
+
+        {gate && gate.disclosure.length > 0 && phase !== 'blocked' && (
+          <div className="export-summary" role="status">
+            <p>
+              <strong>We changed your scene to make it work:</strong>
+            </p>
+            <ul className="check-list">
+              {gate.disclosure.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+            <p className="panel-hint">
+              The change is in your project, not only in the download — undo it with Ctrl+Z if you
+              would rather fix it yourself.
+            </p>
+          </div>
+        )}
+
         {phase === 'error' && (
           <p className="panel-hint error" role="alert">
             Export failed: {error}
@@ -219,16 +350,20 @@ export function ExportWizard({
         )}
 
         <div className="modal-actions">
-          <button type="button" onClick={onClose} disabled={phase === 'working'}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={phase === 'working' || phase === 'checking'}
+          >
             {phase === 'done' ? 'Close' : 'Cancel'}
           </button>
           <button
             type="button"
             className="primary"
             onClick={() => void start()}
-            disabled={phase === 'working'}
+            disabled={phase === 'working' || phase === 'checking'}
           >
-            {phase === 'working' ? 'Exporting…' : phase === 'done' ? 'Export again' : 'Export'}
+            {BUTTON_TEXT[phase]}
           </button>
         </div>
       </div>

@@ -2633,7 +2633,7 @@ test.describe('export', () => {
     await dialog.getByLabel('Project name').fill('export-check');
 
     const downloadPromise = page.waitForEvent('download', { timeout: 120_000 });
-    await dialog.getByRole('button', { name: 'Export', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Check and export' }).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toBe('export-check.zip');
 
@@ -2802,7 +2802,7 @@ test.describe('game export', () => {
     await dialog.getByLabel('Project name').fill('playable');
 
     const downloadPromise = page.waitForEvent('download', { timeout: 180_000 });
-    await dialog.getByRole('button', { name: 'Export', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Check and export' }).click();
     const download = await downloadPromise;
 
     const zipPath = testInfo.outputPath('playable.zip');
@@ -2882,7 +2882,7 @@ test.describe('game export', () => {
     await dialog.getByLabel('Project name').fill('readable');
 
     const downloadPromise = page.waitForEvent('download', { timeout: 120_000 });
-    await dialog.getByRole('button', { name: 'Export', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Check and export' }).click();
     const download = await downloadPromise;
 
     const zipPath = testInfo.outputPath('readable.zip');
@@ -2902,5 +2902,117 @@ test.describe('game export', () => {
     const credits = readFileSync(join(extractedTo, 'readable', 'CREDITS.md'), 'utf8');
     expect(credits).toContain('Three.js');
     expect(credits).toContain('tree_pine_01');
+  });
+});
+
+/**
+ * Sprint 26 — the release gate, in the real editor.
+ *
+ * The claim is the definition of done, in three cases: a good scene shows a brief checking state
+ * and then a download; a broken one is repaired, disclosed and downloaded; an unrepairable one is
+ * refused with a specific reason. What must never happen is the fourth case — a spinner that never
+ * resolves, or a rejection with nothing to act on.
+ */
+test.describe('release gate', () => {
+  test('a good scene is played, then downloaded', async ({ page }, testInfo) => {
+    test.setTimeout(240_000);
+    await openEditor(page, /Forest clearing/);
+
+    await page.getByRole('button', { name: 'Export' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Export' });
+    await dialog.getByLabel('Project name').fill('gated');
+
+    const download = page.waitForEvent('download', { timeout: 180_000 });
+    await dialog.getByRole('button', { name: 'Check and export' }).click();
+
+    // The checking state is visible rather than implied. A few seconds of nothing is
+    // indistinguishable from broken, which is the thing this sprint exists to prevent.
+    await expect(dialog).toContainText('Playing your game', { timeout: 30_000 });
+
+    await download;
+    await expect(dialog).toContainText('Downloaded');
+    // Nothing was wrong, so nothing was changed, and nothing is claimed to have been.
+    await expect(dialog).not.toContainText('We changed your scene');
+    void testInfo;
+  });
+
+  test('a scene whose player starts inside a building is repaired, disclosed and downloaded', async ({
+    page,
+  }) => {
+    test.setTimeout(300_000);
+    await openEditor(page, /Village outpost/);
+
+    // Sprint 24's bug, put back deliberately: the hut is at the origin, so a spawn there leaves the
+    // player wedged in its collider with nowhere to walk.
+    await page.evaluate(() => {
+      const state = window.helaengine!.store.getState();
+      state.setScene({ ...state.scene, player: { ...state.scene.player, spawn: [0, 0, 0] } });
+    });
+    await page.waitForTimeout(300);
+
+    await page.getByRole('button', { name: 'Export' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Export' });
+    await dialog.getByLabel('Project name').fill('repaired');
+
+    const download = page.waitForEvent('download', { timeout: 240_000 });
+    await dialog.getByRole('button', { name: 'Check and export' }).click();
+    await download;
+
+    // Told, in a sentence written for the person whose scene it is.
+    await expect(dialog).toContainText('We changed your scene to make it work');
+    await expect(dialog).toContainText('start point');
+    await expect(dialog).toContainText('Downloaded');
+
+    // And the change is in the project, not only in the zip — otherwise they meet it again next
+    // time they press Export.
+    const spawn = await page.evaluate(() => window.helaengine!.store.getState().scene.player.spawn);
+    expect(spawn).not.toEqual([0, 0, 0]);
+  });
+
+  test('an unrepairable scene is refused with a reason and a suggestion, not a spinner', async ({
+    page,
+  }) => {
+    test.setTimeout(300_000);
+    await openEditor(page, /Empty field/);
+
+    // A hut every three metres over a wide area: wherever the repair moves the spawn, it is inside
+    // something. The loop runs out of attempts, which is the case that has to end in a sentence.
+    await page.evaluate(() => {
+      const state = window.helaengine!.store.getState();
+      const objects: (typeof state)['scene']['objects'] = [];
+      let n = 0;
+      for (let x = -30; x <= 30; x += 3) {
+        for (let z = -30; z <= 30; z += 3) {
+          n += 1;
+          objects.push({
+            id: `obj_${String(n).padStart(4, '0')}`,
+            assetId: 'building_hut_01',
+            parentId: null,
+            transform: {
+              position: [x, 0, z] as [number, number, number],
+              rotation: [0, 0, 0] as [number, number, number],
+              scale: [1, 1, 1] as [number, number, number],
+            },
+            behaviors: [],
+            physics: { body: 'static' as const, collider: 'auto' as const },
+            trigger: null,
+            metadata: {},
+          });
+        }
+      }
+      state.setScene({ ...state.scene, objects });
+    });
+    await page.waitForTimeout(500);
+
+    await page.getByRole('button', { name: 'Export' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Export' });
+    await dialog.getByRole('button', { name: 'Check and export' }).click();
+
+    // Refused, with the failing check named in words and something to do about it. The button goes
+    // back to offering another go rather than sitting on "Checking…" forever.
+    await expect(dialog).toContainText('This build was not exported', { timeout: 240_000 });
+    await expect(dialog).toContainText('The player can move');
+    await expect(dialog.getByRole('button', { name: 'Check again' })).toBeVisible();
+    await expect(dialog).not.toContainText('Downloaded');
   });
 });

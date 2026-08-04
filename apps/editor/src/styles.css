@@ -1494,3 +1494,36 @@ body,
   background: var(--accent);
   border-color: var(--accent);
 }
+
+/*
+ * The pre-export check list.
+ *
+ * Deliberately plain: this appears when somebody's game has just been refused, and a refusal is not
+ * the moment for decoration. Colour carries the state, and the mark beside each line carries it
+ * again for anyone who cannot see the colour.
+ */
+.check-list {
+  margin: 0.5rem 0 0;
+  padding-left: 0;
+  list-style: none;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.check-list li {
+  color: var(--text-dim);
+}
+
+.check-list li.check-passed {
+  color: var(--text);
+}
+
+.check-list li.check-failed {
+  color: #d98a7a;
+  font-weight: 600;
+}
+
+.check-list li.check-skipped,
+.check-list li.check-not-applicable {
+  opacity: 0.65;
+}

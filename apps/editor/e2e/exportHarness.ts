@@ -102,7 +102,7 @@ export async function exportAndExtract(
   await dialog.getByLabel('Project name').fill(options.name);
 
   const downloadPromise = page.waitForEvent('download', { timeout: 180_000 });
-  await dialog.getByRole('button', { name: 'Export', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Check and export' }).click();
   const download = await downloadPromise;
 
   const zipPath = testInfo.outputPath(`${options.name}.zip`);

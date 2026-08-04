@@ -165,9 +165,7 @@ test.describe('export edge cases', () => {
     }
   });
 
-  test('a broken asset reference warns loudly and still produces a working export', async ({
-    page,
-  }, testInfo) => {
+  test('a broken asset reference is caught, repaired and disclosed', async ({ page }, testInfo) => {
     test.setTimeout(240_000);
     await openTemplate(page, 'Empty field');
 
@@ -201,12 +199,16 @@ test.describe('export edge cases', () => {
 
     await dialog.getByRole('button', { name: 'Static scene' }).click();
     await dialog.getByLabel('Project name').fill('broken');
-    const downloadPromise = page.waitForEvent('download', { timeout: 120_000 });
-    await dialog.getByRole('button', { name: 'Export', exact: true }).click();
+    const downloadPromise = page.waitForEvent('download', { timeout: 180_000 });
+    await dialog.getByRole('button', { name: 'Check and export' }).click();
     await downloadPromise;
 
-    // And afterwards, in the result panel, so it survives being missed the first time.
-    await expect(dialog.getByRole('status').last()).toContainText('asset_that_does_not_exist');
+    // Sprint 26 changed what happens next, and for the better: this used to ship a folder full of
+    // placeholder boxes with a warning nobody had to read. Now the gate refuses it, the repair loop
+    // removes the object whose model does not exist, and the download only starts afterwards —
+    // with the change stated in the user's own words rather than buried in a warnings list.
+    await expect(dialog).toContainText('We changed your scene to make it work');
+    await expect(dialog).toContainText('asset_that_does_not_exist');
     void testInfo;
   });
 

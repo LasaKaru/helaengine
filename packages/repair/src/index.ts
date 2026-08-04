@@ -25,3 +25,5 @@ export {
 } from './model.js';
 export type { ModelTransport, RepairModel } from './model.js';
 export { proposeByRule, RuleBasedRepairModel } from './rules.js';
+export { runRepairLoop } from './loop.js';
+export type { RepairLoopOptions, RepairLoopResult, VerifyScene } from './loop.js';

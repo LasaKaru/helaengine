@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–25 complete. Phase 3 (Export) is done — build a world visually, get real runnable code, verified in three browsers by a suite that exports it, serves it and compares the pixels — and **Phase 3B (Pre-Delivery Validation & Hosted Play, Sprints 24–27) has begun**: every build is now played by a robot before anybody can have it, which found a starter template whose player spawned inside a building on the very first run. Phases 1 (Editor MVP), 2 (Behaviours, Physics, AI) and 2B (Gameplay Runtime & UI) done — 2B was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–26 complete. Phase 3 (Export) is done — build a world visually, get real runnable code, verified in three browsers by a suite that exports it, serves it and compares the pixels — and **Phase 3B (Pre-Delivery Validation & Hosted Play, Sprints 24–27) has begun**: every build is now played by a robot before anybody can have it, which found a starter template whose player spawned inside a building on the very first run. Phases 1 (Editor MVP), 2 (Behaviours, Physics, AI) and 2B (Gameplay Runtime & UI) done — 2B was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -722,11 +722,30 @@ Two further cases are asserted because they are how this feature would go wrong 
 
 **Tasks:**
 
-- [ ] Gate access on the pipeline outcome: the download button and play link appear only after a pass
-- [ ] Build the report UI — auto-fixes applied, stated plainly ("we moved your spawn point up 1.2 m so the player would not fall through the terrain"), or a specific human-readable failure with a suggested manual fix
-- [ ] Handle unrecoverable failure explicitly: never a spinner that never resolves
+- [x] Gate access on the pipeline outcome: the download button and play link appear only after a pass — the Export button is now **Check and export**, and nothing is written until the scene has been played
+- [x] Build the report UI — auto-fixes applied, stated plainly ("Your start point was inside the Hut, so the player spawned stuck and could not walk. We moved the start point to [6, 0, 0], just clear of it."), or a specific human-readable failure with a suggested manual fix
+- [x] Handle unrecoverable failure explicitly: never a spinner that never resolves
+- [x] **Added:** the repair is applied to the _project_, not only to the exported copy, and can be undone with Ctrl+Z; and the check list is shown in the user's words rather than as check ids
+
+**Tech notes:**
+
+- **There are now two gates, and they check different things.** `tools/smoke` builds a real export, serves it and plays it in a real browser: it is the authority on whether a _build_ works — bundles, paths, content types, the decoder shipping — and it needs Node and Playwright, so it lives in CI. The editor's gate drives **Play Preview**, which is the same engine, the same physics and the same document: it is the authority on whether a _level_ works. The overlap is the part users actually hit, and the editor can answer it _before_ the download starts rather than after the zip has landed on somebody's disk.
+- Both produce the same `SmokeReport` and both are graded by the same `isReleasable`, so there is one definition of "may this be handed to somebody" rather than one per surface. The repair loop's policy moved into `@helaengine/repair` for the same reason: the Node harness and the editor now hand in a `verify` function and get identical guarantees.
+- **The editor's gate says what it cannot answer.** `page-loads` is reported `not-applicable` rather than passed, because Play Preview shares the editor's page — "the page loaded without throwing" is a question about the editor, and answering it here under the same name would be answering a different question. The CI gate is where that one is real.
+- The suggestions are a `Record` keyed on the closed check vocabulary, so a new check cannot ship without somebody writing the sentence that goes with it. That is how "never an unexplained rejection" survives the gate growing.
+- Input is dispatched as real keyboard events into the real preview rather than by calling the character controller. A validation step that runs its own private copy of the world can pass while the thing users press Play on fails, and the drift would be invisible until somebody reported it.
 
 **Definition of Done:** A good scene shows a brief validating state and then the download; a broken one either shows a transparent auto-fix notice with working output or a clear, specific failure — never a silent hang or an unexplained rejection.
+
+**Met, and asserted as three cases in the editor's own e2e suite** — because "never a spinner" is a claim about the state machine, and a state machine is only as honest as its worst path:
+
+1. **A good scene** (Forest clearing) shows "Playing your game…", then downloads, and says nothing about having changed anything, because it did not.
+2. **A broken scene** — the Village Outpost with its spawn put back inside the hut, Sprint 24's bug on purpose — is repaired, discloses "We changed your scene to make it work" with the reason in plain words, downloads, and the new spawn is in the _project_ rather than only in the zip.
+3. **An unrepairable scene** — a hut every three metres for sixty metres, so there is nowhere clear to move the spawn to — is refused with the failing check named in the user's words ("The player can move"), a suggestion, and a button that says **Check again** rather than sitting on "Checking…".
+
+One behaviour deliberately changed rather than preserved: a scene naming an asset the library does not have used to export a folder full of placeholder boxes with a warning nobody had to read. It is now blocked, repaired by removing the object, and disclosed. The Sprint 23 test that asserted the old behaviour was rewritten rather than worked around — it was testing something this sprint decided was wrong.
+
+**Scope.** "The download button _and play link_" — there is no play link yet; hosted play is Sprint 27, and there is no server until Sprint 28. What is gated is the download, which is the only way to get a build today.
 
 ---
 

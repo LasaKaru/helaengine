@@ -16,6 +16,7 @@
   "dependencies": {
     "@helaengine/engine": "workspace:*",
     "@helaengine/export": "workspace:*",
+    "@helaengine/repair": "workspace:*",
     "@helaengine/schema": "workspace:*",
     "@helaengine/templates": "workspace:*",
     "@react-three/drei": "^9.120.4",

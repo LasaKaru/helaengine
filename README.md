@@ -7,9 +7,9 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 25 — exports are playable games, checked in three browsers, played by a robot
-before anyone can have them, and automatically repaired when that robot finds something fixable.
-A working editor, behaviours, physics, enemies, trigger
+**Status:** Sprint 26 — exports are playable games, checked in three browsers, played before anyone
+can download them, automatically repaired where a fix exists, and refused with a reason where one
+does not. A working editor, behaviours, physics, enemies, trigger
 volumes, a measured performance baseline, first/third/top-down cameras with one input layer covering
 keyboard, touch and gamepad, a schema-driven menu/HUD shell, and now combat: a weapon catalogue in
 the document, hitscan firing, ammo and reloading, pickups, player damage and respawn — plus secrets
@@ -493,6 +493,33 @@ deliberately broken ones, which must each fail **on their own check** — a spaw
 terrain (`player-moves`, "fell out of the world"), a model missing from the folder
 (`assets-resolve`), and a corrupted inlined WebAssembly payload (`physics-initialises`). A gate
 nobody has watched fail is a gate nobody should trust.
+
+## The release gate
+
+**Export** does not hand over a build it has not played. Pressing **Check and export** starts the
+scene in Play Preview, runs the same seven checks the CI gate runs, and only then writes the file.
+
+Three outcomes, and there is deliberately no fourth:
+
+- **Passes** — a brief "Playing your game…", then the download. Nothing is claimed to have been
+  changed, because nothing was.
+- **Repaired** — the fix is applied, disclosed in the user's own words ("Your start point was inside
+  the Hut, so the player spawned stuck and could not walk. We moved the start point to [6, 0, 0],
+  just clear of it."), and the change lands in the **project**, not only in the zip — undo it with
+  Ctrl+Z if you would rather fix it yourself.
+- **Blocked** — the failing check named in plain language, a suggestion to act on, and a button that
+  says _Check again_. Never a spinner that never resolves, and never a rejection with nothing to do
+  about it.
+
+There are two gates and they answer different questions, which is worth stating rather than
+blurring. `tools/smoke` builds a real export and plays it in a real browser: it is the authority on
+whether a **build** works — bundles, paths, content types, the decoder shipping — and it needs Node,
+so it runs in CI. The editor's gate drives Play Preview, which is the same engine and the same
+document: it is the authority on whether a **level** works, and it can answer that before the
+download starts rather than after the zip is on somebody's disk. Both produce the same
+`SmokeReport`, both are graded by the same `isReleasable`, and the editor's gate reports
+`page-loads` as _not-applicable_ rather than passed — Play Preview shares the editor's page, so
+answering that one here would be answering a different question with the same name.
 
 ## Automatic repair
 

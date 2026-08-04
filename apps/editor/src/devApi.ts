@@ -205,6 +205,23 @@ export function setGameRuntime(runtime: GameRuntime | null): void {
   currentGame = runtime;
 }
 
+/**
+ * The running preview, for code inside the editor rather than for tests.
+ *
+ * The pre-export validation gate needs the same two facts the dev API exposes — where the player is
+ * and how much health they have — and reaching them through `window.helaengine` would make a
+ * shipped feature depend on a debugging surface. These are the same values, named as app code.
+ */
+export function livePlayerPosition(): [number, number, number] | null {
+  if (!currentPlayer) return null;
+  const { x, y, z } = currentPlayer.position;
+  return [x, y, z];
+}
+
+export function livePlayerHealth(): number | null {
+  return currentGame?.playerHealth() ?? null;
+}
+
 let cameraPoseHandler:
   ((position: [number, number, number], target: [number, number, number]) => void) | null = null;
 

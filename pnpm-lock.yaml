@@ -66,6 +66,9 @@ importers:
       '@helaengine/export':
         specifier: workspace:*
         version: link:../../packages/export
+      '@helaengine/repair':
+        specifier: workspace:*
+        version: link:../../packages/repair
       '@helaengine/schema':
         specifier: workspace:*
         version: link:../../packages/schema
