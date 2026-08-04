@@ -778,9 +778,17 @@ One behaviour deliberately changed rather than preserved: a scene naming an asse
 - Plain `node:http`, like the co-op server's listener and for the reason learned there in Sprint 20: five routes do not need a framework's opinion about which handler owns a request.
 - A malformed request answers **400 with the field named**, not 500. The first version returned 500 for a path that failed schema validation, which tells a caller to retry something that will never work; the test that caught it originally asserted the 500, and was corrected rather than kept.
 
+**Three bugs, all in the seams, all found by running it rather than reading it.** Worth listing because the pattern is the point — the service's _logic_ held up throughout, and everything that broke was a join between two components:
+
+1. **Schema rejection answered 500.** My own test asserted the 500, so the bug had been encoded as expected behaviour before it was noticed.
+2. **No CORS preflight.** The editor is on 5174 and the service on 4000, so every publish is cross-origin. The editor reported "could not reach the share service" while it was running perfectly and answering everything else. `fetch` rejects identically for "nothing is listening" and "the browser blocked it", so the message now names both instead of confidently blaming one.
+3. **The service served nothing at all from its own default directory.** The guard stopping a build's metadata being served was `path.includes('/.hela-')` — also true of every file in a store rooted at `.hela-shared`, which is the default it ships with. Every one of the fourteen unit tests missed it by creating stores in temp directories without the leading dot; the end-to-end test used the real default and hit it on the first request.
+
+The third is the one to remember. The share succeeded, the link came back, and the hosted page was blank — a failure invisible to every test that did not go all the way through.
+
 **Definition of Done:** A user generates a share link for a validated build, sends it to someone else, and that person plays it in-browser — including joining a co-op session — with no download and no local server.
 
-**Met for the single-player half; the co-op half is not done.** The e2e test shares a validated build from the editor, gets a link, and opens it in a **second browser context** — a different person, with none of the editor's IndexedDB or memory available to it, holding nothing but a URL. The game's home screen appears, Play starts the world, the HUD reads out, no page errors, and the service's play count goes up. No download, and nothing started locally by the person playing.
+**Met for the single-player half; the co-op half is not done.** The end-to-end test passes: it shares a validated build from the editor, gets a link, and opens it in a **second browser context** — a different person, with none of the editor's IndexedDB or memory available to it, holding nothing but a URL. The game's home screen appears, Play starts the world, the HUD reads out, no page errors, and the service's play count goes up. No download, and nothing started locally by the person playing.
 
 What is **not** verified is "including joining a co-op session". The co-op server exists and works (Sprint 20), and a hosted build can point at it, but two strangers meeting in a room reached through a hosted link is a different test from the one written — it needs two hosted contexts, a room id in the URL, and a decision about who owns the room's scene that Sprint 20 explicitly left open ("the room takes its scene from whichever client opens it, which is fine among invited players and is not a security model"). Ticking that box today would be claiming a thing nobody has watched happen.
 

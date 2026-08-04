@@ -22,6 +22,9 @@ export default tseslint.config(
       // generated `main.js` files — which are lint targets only in the sense that a zip is.
       '**/test-results/**',
       '**/playwright-report/**',
+      // Builds published to the local share service. Whole exports — minified engine bundles and
+      // third-party decoders — which are lint targets only in the sense that a zip is.
+      '**/.hela-shared*/**',
     ],
   },
   js.configs.recommended,
