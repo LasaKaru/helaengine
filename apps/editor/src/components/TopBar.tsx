@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { AssetManifest } from '@helaengine/schema';
 import { ExportWizard } from './ExportWizard';
+import { VersionHistory } from './VersionHistory';
 import { useProjectStore } from '../store/projectStore';
 import { useSceneStore } from '../store/sceneStore';
 
@@ -23,6 +24,7 @@ function saveLabel(
  */
 export function TopBar({ manifest }: { manifest?: AssetManifest } = {}): React.JSX.Element {
   const [exporting, setExporting] = useState(false);
+  const [showingHistory, setShowingHistory] = useState(false);
   const name = useSceneStore((state) => state.scene.name);
   const setName = useSceneStore((state) => state.setName);
   const objectCount = useSceneStore((state) => state.scene.objects.length);
@@ -88,6 +90,13 @@ export function TopBar({ manifest }: { manifest?: AssetManifest } = {}): React.J
         </button>
         <button
           type="button"
+          onClick={() => setShowingHistory(true)}
+          title="Every save, and a way back to any of them"
+        >
+          History
+        </button>
+        <button
+          type="button"
           onClick={() => setExporting(true)}
           disabled={!manifest}
           title={manifest ? 'Download a runnable copy' : 'Waiting for the asset library'}
@@ -98,6 +107,7 @@ export function TopBar({ manifest }: { manifest?: AssetManifest } = {}): React.J
       {exporting && manifest && (
         <ExportWizard manifest={manifest} onClose={() => setExporting(false)} />
       )}
+      {showingHistory && <VersionHistory onClose={() => setShowingHistory(false)} />}
     </header>
   );
 }

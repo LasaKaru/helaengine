@@ -1527,3 +1527,31 @@ body,
 .check-list li.check-not-applicable {
   opacity: 0.65;
 }
+
+/* The version list. One row per save: which, when, who, and a way back. */
+.version-list {
+  margin: 0.5rem 0;
+  padding: 0;
+  list-style: none;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.version-list li {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr auto auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
+.version-number {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
+.version-who {
+  color: var(--text-dim);
+}

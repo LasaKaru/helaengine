@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–28 complete; Sprint 29's API is done and its editor UI is not. Phase 3 (Export) is done — build a world visually, get real runnable code, verified in three browsers by a suite that exports it, serves it and compares the pixels — and **Phase 3B (Pre-Delivery Validation & Hosted Play, Sprints 24–27) has begun**: every build is now played by a robot before anybody can have it, which found a starter template whose player spawned inside a building on the very first run. Phases 1 (Editor MVP), 2 (Behaviours, Physics, AI) and 2B (Gameplay Runtime & UI) done — 2B was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–29 complete, with one gap named in Sprint 29: the editor's cloud path is unit-tested but has not been driven end to end against a running API. Phase 3 (Export) is done — build a world visually, get real runnable code, verified in three browsers by a suite that exports it, serves it and compares the pixels — and **Phase 3B (Pre-Delivery Validation & Hosted Play, Sprints 24–27) has begun**: every build is now played by a robot before anybody can have it, which found a starter template whose player spawned inside a building on the very first run. Phases 1 (Editor MVP), 2 (Behaviours, Physics, AI) and 2B (Gameplay Runtime & UI) done — 2B was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -853,10 +853,10 @@ CI runs it against `postgres:16` as a service container rather than a mock, for 
 
 - [x] `Project` and `SceneVersion` models per DEVELOPMENT-PLAN.md section 3; `POST /orgs/:id/projects`, `GET /projects/:id`, `PATCH /projects/:id` (name and thumbnail), `POST /projects/:id/versions` (the actual save), plus `GET /projects/:id/versions` and `POST /projects/:id/versions/:n/restore`
 - [x] Zod-validate incoming `sceneJson` server-side before persisting, with the shared `@helaengine/schema` package — the same validation the editor runs locally
-- [x] Build editor-side migration: a `CloudProjects` adapter implementing the same interface as Sprint 8's local store — **the adapter and its tests, not the UI swap**, see the scope note
+- [x] Build editor-side migration: a `CloudProjects` adapter and a `backend` facade that dispatches to it or to IndexedDB; the project store now calls the facade and is otherwise unchanged
 - [x] Implement optimistic concurrency: a save carries the version it was based on; the server refuses one based on a version somebody has already moved past, with a 409 carrying the current number
-- [ ] Build Projects Dashboard UI — **not done**
-- [ ] Build Version History panel — **not done**; the API and the client method exist, the panel does not
+- [x] Projects Dashboard UI — **Sprint 8's screen, now backed by either store.** Its list, create, delete and duplicate all work against the cloud without the screen knowing; what is _not_ added is an organisation switcher, so a signed-in user works in their personal workspace
+- [x] Build Version History panel: the last N versions with timestamp and author, and a restore that appends rather than rewinds
 
 **Tech notes:**
 
@@ -871,9 +871,13 @@ CI runs it against `postgres:16` as a service container rather than a mock, for 
 
 **Definition of Done:** User saves a project from Browser A, logs into the same account on Browser B, sees identical, up-to-date state. Version History panel shows the last 10+ saves; restoring an older version correctly reverts editor state and creates a new version entry (history is never destroyed).
 
-**Met at the API, not at the UI, and the difference matters.** Twenty-four integration tests against real Postgres cover the whole sentence: a project saved in one session is read back identically in a second session of the same account; twelve saves produce twelve versions with authors and timestamps; restoring version 1 creates version 3 holding version 1's content and leaves `[3, 2, 1]` in the history. Conflict detection, tenant isolation, server-side schema validation and soft delete are all tested.
+**Met at the API, and now wired through the editor — with one honest gap.** Twenty-four integration tests against real Postgres cover the whole sentence: a project saved in one session is read back identically in a second session of the same account; twelve saves produce twelve versions with authors and timestamps; restoring version 1 creates version 3 holding version 1's content and leaves `[3, 2, 1]` in the history. Conflict detection, tenant isolation, server-side schema validation and soft delete are all tested.
 
-What is **not** built is the editor's side of it: there is a `CloudProjects` adapter with its own tests, implementing the same interface as Sprint 8's local store, but the projects screen still talks to IndexedDB and there is no version history panel. So "Browser A saves, Browser B sees it" is true of the API and not yet true of the product. Wiring the store over and building the panel is the remainder of this sprint, and calling it done because the hard half is done would be the kind of claim this project has spent twenty-eight sprints not making.
+The editor now goes through a `backend` facade with the same six functions it already called, dispatching to IndexedDB or to the API. The project store changed by two lines — the import, and letting the backend mint the id — which is the whole argument for having written the cloud adapter against the local store's interface rather than a nicer one. **Local stays the default**: somebody who opens the editor with no account can still build something, because requiring a sign-up before the first click would be charging admission to a demo.
+
+The version cursor lives in the facade rather than in the scene store, because it is a fact about _storage_ — the same scene saved to a different backend has a different version, and to no backend at all has none. It advances on load and on a successful save, and deliberately **does not move on a conflict**: a client that advanced on a refusal would then send a base the server has never seen. There is a test for exactly that.
+
+**The gap, stated rather than buried:** none of the editor-side wiring has been driven end to end against a running API. The pieces are unit-tested — the adapter against every answer the API can give, the facade against dispatch and version bookkeeping — and the API is integration-tested against real Postgres, but nobody has watched a browser sign in, save, and reload into the same state. Sprint 26 taught this exact lesson twice in one afternoon: the logic was right and the seams were wrong, both times. Until that test exists, "Browser A saves, Browser B sees it" is a well-founded expectation rather than an observation.
 
 ---
 

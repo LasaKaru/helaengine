@@ -2,14 +2,14 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import type { Scene } from '@helaengine/schema';
 import {
+  createProject,
   deleteProject,
   duplicateProject,
   listProjects,
   loadProject,
-  newProjectId,
   saveProject,
   type ProjectSummary,
-} from '../storage/projects';
+} from '../storage/backend';
 import { templateById } from '@helaengine/templates';
 import { useSceneStore } from './sceneStore';
 
@@ -69,11 +69,11 @@ export const useProjectStore = create<ProjectState>()(
         if (!template) throw new Error(`Unknown template "${templateId}"`);
 
         const scene = template.build();
-        const id = newProjectId();
 
         // Written to storage immediately, so a new project survives a reload even if the user
-        // never touches the save button.
-        await saveProject({ id, scene });
+        // never touches the save button. The backend mints the id — locally that is a generated
+        // string, in the cloud it is whatever the server assigned.
+        const id = await createProject(scene.name, scene);
         useSceneStore.getState().setScene(scene);
 
         set(
