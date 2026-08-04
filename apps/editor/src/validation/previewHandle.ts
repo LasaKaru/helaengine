@@ -1,5 +1,6 @@
 import type { Scene } from '@helaengine/schema';
 import { useEditorStore } from '../store/editorStore';
+import { useSceneStore } from '../store/sceneStore';
 import { livePlayerHealth, livePlayerPosition } from '../devApi';
 import type { PreviewHandle } from './validateScene';
 
@@ -43,6 +44,11 @@ async function startTheGame(
 export function createPreviewHandle(): PreviewHandle {
   const errors: string[] = [];
   const failedAssets: string[] = [];
+  // The document as it was before the gate started, so a candidate that is not kept leaves no
+  // trace. Play Preview builds the world from the store, so playing a *candidate* scene means
+  // putting it in the store — which the first version of this did not do, and which is why three
+  // repair attempts in a row re-tested the original and reported the same failure each time.
+  let restoreTo: ReturnType<typeof useSceneStore.getState>['scene'] | null = null;
 
   const originalError = console.error;
   let listening = false;
@@ -80,13 +86,24 @@ export function createPreviewHandle(): PreviewHandle {
   };
 
   return {
-    async start(_scene: Scene) {
+    async start(scene: Scene) {
       listen();
       errors.length = 0;
       failedAssets.length = 0;
 
-      const store = useEditorStore.getState();
-      store.setWalking(true);
+      const sceneStore = useSceneStore.getState();
+      restoreTo ??= sceneStore.scene;
+      if (scene !== sceneStore.scene) {
+        // `setScene` rather than `replaceScene`: a candidate is not an edit somebody made, and
+        // filling their undo stack with rejected guesses would be its own kind of damage. The one
+        // that survives is committed properly, by the gate, once it has been proved to work.
+        sceneStore.setScene(scene);
+        // The viewport rebuilds on the next frames; walking before it has would measure the old
+        // world with the new document's spawn.
+        await wait(400);
+      }
+
+      useEditorStore.getState().setWalking(true);
 
       const settled = await until(() => {
         const status = useEditorStore.getState().physicsStatus;
@@ -114,6 +131,11 @@ export function createPreviewHandle(): PreviewHandle {
       useEditorStore.getState().setWalking(false);
       release();
       await wait(200);
+      if (restoreTo) {
+        useSceneStore.getState().setScene(restoreTo);
+        restoreTo = null;
+        await wait(200);
+      }
     },
 
     position: () => livePlayerPosition(),

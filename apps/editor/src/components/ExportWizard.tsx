@@ -77,7 +77,7 @@ export function ExportWizard({
   onClose(): void;
 }): React.JSX.Element {
   const scene = useSceneStore((state) => state.scene);
-  const setScene = useSceneStore((state) => state.setScene);
+  const replaceScene = useSceneStore((state) => state.replaceScene);
   const [options, setOptions] = useState<ExportOptions>({
     ...DEFAULT_EXPORT_OPTIONS,
     projectName: scene.name || DEFAULT_EXPORT_OPTIONS.projectName,
@@ -148,7 +148,9 @@ export function ExportWizard({
 
       // Kept in the user's project, not just in the exported copy. A repair that only exists inside
       // a zip is one they hit again the next time they press Export.
-      if (outcome.disclosure.length > 0) setScene(outcome.scene);
+      if (outcome.disclosure.length > 0) {
+        replaceScene(outcome.scene, 'gate/repair');
+      }
 
       setPhase('working');
       const written = await runExport(outcome.scene, manifest, options);

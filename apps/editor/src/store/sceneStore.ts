@@ -63,6 +63,15 @@ export interface SceneState {
   history: History;
 
   setScene(scene: Scene): void;
+  /**
+   * Replaces the document as a single undoable edit.
+   *
+   * `setScene` is for *loading* — a fresh document whose history is not this one's. This is for a
+   * change made to the document somebody is already working on, which the release gate's automatic
+   * repair is: it has to be visible in the undo stack, because a tool that edits your level and
+   * leaves you no way back has not asked permission, it has taken it.
+   */
+  replaceScene(scene: Scene, label: string): void;
   addObject(object: SceneObject): void;
   removeObject(objectId: string): void;
   removeObjects(objectIds: string[]): void;
@@ -194,6 +203,15 @@ export const useSceneStore = create<SceneState>()(
         // document does not describe this one, and applying its patches would corrupt it.
         setScene: (scene) =>
           set({ scene, selectedIds: [], history: EMPTY_HISTORY }, false, 'scene/set'),
+
+        replaceScene: (next, label) =>
+          commit(label, (draft) => {
+            // Assigned field by field rather than returned, because Immer's draft is the document
+            // being patched — replacing the reference would produce a patch nobody can invert.
+            for (const key of Object.keys(next) as Array<keyof Scene>) {
+              (draft as Record<string, unknown>)[key] = next[key];
+            }
+          }),
 
         addObject: (object) =>
           commit('object/add', (draft) => {
