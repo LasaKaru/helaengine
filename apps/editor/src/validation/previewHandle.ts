@@ -15,6 +15,31 @@ import type { PreviewHandle } from './validateScene';
  * driven by `InputManager`, and calling into the controller directly would skip the layer where
  * "held forward" actually means something.
  */
+
+/**
+ * Presses the game's own Play button and waits for the world.
+ *
+ * Through the shell's real DOM rather than by setting `uiScreen` directly: the button is what a
+ * player presses, and a gate that skipped it would be validating a path nobody takes.
+ */
+async function startTheGame(
+  until: (predicate: () => boolean, timeoutMs: number) => Promise<boolean>,
+): Promise<boolean> {
+  if (useEditorStore.getState().uiScreen === 'playing') return true;
+
+  const pressed = await until(() => {
+    const button = [...document.querySelectorAll<HTMLButtonElement>('.hela-panel button')].find(
+      (candidate) => candidate.textContent?.trim().length,
+    );
+    if (!button) return false;
+    button.click();
+    return true;
+  }, 15_000);
+
+  if (!pressed) return false;
+  return until(() => useEditorStore.getState().uiScreen === 'playing', 15_000);
+}
+
 export function createPreviewHandle(): PreviewHandle {
   const errors: string[] = [];
   const failedAssets: string[] = [];
@@ -73,9 +98,15 @@ export function createPreviewHandle(): PreviewHandle {
       // before the controller exists, and a check that ran in that gap would measure nothing.
       const hasPlayer = await until(() => livePlayerPosition() !== null, 10_000);
 
+      // Walk opens the *home screen*, not the world — that is the point of the shell, and it is
+      // also why the first version of this reported every scene as "the player could not move".
+      // Nothing is driven by input until the shell says `playing`, so the gate has to press Play
+      // exactly like a person does.
+      const playing = await startTheGame(until);
+
       return {
         sceneReady: settled && status !== 'error',
-        physicsReady: status === 'ready' && hasPlayer,
+        physicsReady: status === 'ready' && hasPlayer && playing,
       };
     },
 
