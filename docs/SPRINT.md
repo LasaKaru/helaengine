@@ -668,6 +668,10 @@ The rest: all five templates pass, and each of the three deliberate breakages fa
 
 One more honest limit: this runs in **Chromium only**. The export QA suite covers three browsers for rendering, and adding two more browsers here would triple a two-minute gate to catch a class of bug — a scene that plays in one engine and not another — that has not been seen once. Worth revisiting the day it is.
 
+**Known debt, found while verifying this sprint and deliberately not fixed in it.** Four of the editor's save-and-reload e2e tests are **flaky on first attempt and pass on retry** — `edits survive a full page reload`, `leaving the editor saves first`, `the whole shell config survives a save and reload`, `progress survives a full page reload`, and occasionally `music follows the game`. They were suspected as fallout from moving the templates out of the editor, so the same tests were run against the previous commit: **three of them flake there too**, before any of this sprint's changes existed. It is pre-existing, and the retry has been hiding it since roughly Sprint 18.
+
+The likely cause is test isolation rather than product behaviour: these tests reopen a project by name with `.first()`, and when a previous test in the same file has left an identically-named project in IndexedDB, the ordering of the list decides which one gets opened. That would explain why the failing set moves between runs and why a retry — with a different database state — passes. Worth fixing as its own piece of work, because a suite that goes green on the second try is a suite that will one day hide a real regression; it is not worth doing inside a sprint about validating exports, and pretending it is Sprint 24's finding would be pretending it is Sprint 24's fault.
+
 ---
 
 ### Sprint 25 — AI Diagnosis + Auto-Repair Loop
