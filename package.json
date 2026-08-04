@@ -22,7 +22,8 @@
     "e2e": "pnpm --filter @helaengine/editor e2e",
     "bench": "node tools/benchmark/run.mjs",
     "smoke": "pnpm --filter @helaengine/smoke smoke",
-    "smoke:test": "pnpm --filter @helaengine/smoke smoke:test"
+    "smoke:test": "pnpm --filter @helaengine/smoke smoke:test",
+    "api": "pnpm --filter @helaengine/api start"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

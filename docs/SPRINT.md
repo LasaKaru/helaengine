@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–27 complete. Phase 3 (Export) is done — build a world visually, get real runnable code, verified in three browsers by a suite that exports it, serves it and compares the pixels — and **Phase 3B (Pre-Delivery Validation & Hosted Play, Sprints 24–27) has begun**: every build is now played by a robot before anybody can have it, which found a starter template whose player spawned inside a building on the very first run. Phases 1 (Editor MVP), 2 (Behaviours, Physics, AI) and 2B (Gameplay Runtime & UI) done — 2B was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–28 complete. Phase 3 (Export) is done — build a world visually, get real runnable code, verified in three browsers by a suite that exports it, serves it and compares the pixels — and **Phase 3B (Pre-Delivery Validation & Hosted Play, Sprints 24–27) has begun**: every build is now played by a robot before anybody can have it, which found a starter template whose player spawned inside a building on the very first run. Phases 1 (Editor MVP), 2 (Behaviours, Physics, AI) and 2B (Gameplay Runtime & UI) done — 2B was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -810,20 +810,38 @@ What is **not** verified is "including joining a co-op session". The co-op serve
 
 **Tasks:**
 
-- [ ] Scaffold `/apps/api` with NestJS; set up module structure per DEVELOPMENT-PLAN.md section 4 (`auth`, `orgs`, `projects`, `assets`, `exports`, `billing`, `collab`, `audit`)
-- [ ] Set up Postgres (local Docker for dev; Neon/Supabase/Fly Postgres for hosted dev+staging) + Prisma; write initial schema migration covering `User, Organization, Membership, Project, SceneVersion` (start with these 5, expand in later sprints as each feature needs its table)
-- [ ] Integrate Clerk (or chosen auth provider) for sign-up/login/session management; build a webhook handler so Clerk user-created events provision a corresponding `User` row (and auto-create a personal `Organization` for solo users, matching a "personal workspace + team workspace" model)
-- [ ] Implement `RoleGuard`: NestJS guard reading `Membership.role` for the requesting user + target org/project, gating endpoints by role (owner/admin/editor/viewer)
-- [ ] Build invite flow: `POST /orgs/:id/invites` (email-based invite, generates a token, sends email — use a transactional email service like Resend or Postmark), invite acceptance creates the `Membership` row
-- [ ] Write integration tests (Vitest + supertest or NestJS's testing utilities) covering: signup → org auto-created, invite teammate → role assigned correctly, unauthorized role attempting a gated action → 403
+- [x] Scaffold `/apps/api`; set up module structure per DEVELOPMENT-PLAN.md section 4 — **not NestJS**, see the deviations below
+- [x] Set up Postgres + a migration covering `User, Organization, Membership, Project, SceneVersion` — **hand-written SQL**, not Prisma
+- [x] Integrate an auth provider for sign-up/login/session management, provisioning a `User` row and auto-creating a personal `Organization` — **the seam, with a local implementation**, not Clerk
+- [x] Implement the role guard: reads `Membership.role` for the requesting user + target org, gating endpoints by role
+- [x] Build invite flow: `POST /orgs/:id/invites` generates a token; acceptance creates the `Membership` row — **email delivery is a function you pass in**, and the default logs
+- [x] Write integration tests covering: signup → org auto-created, invite teammate → role assigned correctly, unauthorized role attempting a gated action → 403
+- [x] **Added:** nobody may invite above their own rank; invites are addressed and cannot be redeemed by whoever intercepts the link; non-membership answers 404 rather than 403
 
 **Tech notes:**
 
-- Design the `Membership.role` enum now with SSO/enterprise in mind even though SSO itself isn't wired until later — e.g., include an `enterprise_admin` distinction if you anticipate needing it, cheaper to add the enum value now than migrate later.
+- Design the `Membership.role` enum now with SSO/enterprise in mind even though SSO itself isn't wired until later — e.g., include an `enterprise_admin` distinction if you anticipate needing it, cheaper to add the enum value now than migrate later. **Taken**: `enterprise_admin` exists, ranks above `owner`, and is asserted in a test although nothing uses it yet.
+- **Roles are a ladder, not a capability table.** Every permission this product has so far is genuinely ordered — an admin can do everything an editor can — so the guard is a comparison. The day that stops being true it becomes a table and the guard changes shape; building the table now would be a permissions engine for one straight line.
+- **Non-membership answers 404, not 403.** "You are not allowed in organisation X" confirms X exists, which is a membership oracle for anyone willing to guess ids. A member of insufficient _rank_ gets 403, because they already know the place exists.
+- Session and invite tokens are stored as **hashes**, never as themselves: a leaked backup should not be a set of live keys. SHA-256 rather than scrypt for those, which is not an inconsistency — a password is low-entropy and needs the cost, a 256-bit random token cannot be guessed at all and only needs protecting at rest.
+- Login answers **identically** for a wrong password and an unknown address, and verifies a hash even when there is no user, so the response time does not say which it was.
+- **Nobody may invite above their own rank.** Without it, an admin promotes a friend to owner and the privilege ladder has a rung going upwards.
+
+**Three deviations from the plan's stack, each a decision rather than an omission.** All three are written up in `apps/api/README.md`; the short version:
+
+- **No NestJS.** Two services here already run on plain `node:http`. Decorators and DI would be the only such pattern in the repo, and the plan's `RoleGuard` reads better as `requireRole(...)` called explicitly at the top of a handler — you can see what a route requires by reading it.
+- **No Prisma.** Types come from Zod, and a second generator producing a second set of types for the same concepts is a drift waiting to happen. Migrations are hand-written SQL in transactions. The cost is real and stated: queries are strings and result shapes are asserted rather than inferred. Past a few dozen tables, revisit it.
+- **No Clerk.** There is no account and no way to receive webhooks from this environment. What exists is the interface it plugs into — everything downstream depends on `AuthProvider.identify()` returning a user id, not on how the user proved anything. Local passwords use scrypt from the standard library.
+
+Email is the same shape: `sendInvite` is a function passed in, the default logs the token at `warn` level, and the message says no email service is configured. Pretending mail had been sent would be worse than saying it had not.
 
 **Deliverables:** Working auth, org/membership model, role-gated API.
 
 **Definition of Done:** A new user can sign up, gets a personal org automatically, can create an org, invite a teammate by email with a specific role, and the API correctly allows/denies actions based on that role — verified via integration test suite, not just manual clicking.
+
+**Met.** Fifteen integration tests against a **real Postgres 16**, over **real HTTP** — both deliberate, because the constraints, the cascades and the transaction boundaries are half the design here, and a mocked database would test only the half that is code. The suite walks the whole sentence: sign up, get a personal workspace owned by you, create an organisation, invite a teammate by email, read the token the way a recipient would (from what was sent to them, not from the database), accept, and find both roles in the member list. Then the refusals: an editor may create a project and a viewer may not; a viewer may still read the member list, because being in a room is not a privilege; a stranger gets 404 rather than 403; an invite cannot be redeemed twice, cannot be redeemed by the wrong person, and cannot be issued above the issuer's rank.
+
+CI runs it against `postgres:16` as a service container rather than a mock, for the same reason.
 
 ---
 

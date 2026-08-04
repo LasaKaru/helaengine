@@ -7,9 +7,10 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 27 — exports are playable games, checked in three browsers, played before anyone
-can have them, automatically repaired where a fix exists, refused with a reason where one does not,
-and shareable as a link rather than a zip. A working editor, behaviours, physics, enemies, trigger
+**Status:** Sprint 28 — the platform has accounts. Exports are playable games, checked in three
+browsers, played before anyone can have them, automatically repaired where a fix exists, refused
+with a reason where one does not, shareable as a link rather than a zip, and now owned by a user in
+an organisation with role-gated access. A working editor, behaviours, physics, enemies, trigger
 volumes, a measured performance baseline, first/third/top-down cameras with one input layer covering
 keyboard, touch and gamepad, a schema-driven menu/HUD shell, and now combat: a weapon catalogue in
 the document, hitscan firing, ammo and reloading, pickups, player damage and respawn — plus secrets
@@ -98,7 +99,7 @@ raw-assets/            Hand-authored .glb sources. The artefacts under version c
 apps/demo              Framework-free harness rendering a scene document. Proves the engine stands alone.
 apps/editor            The editor: React + react-three-fiber shell around the engine.
 apps/realtime          Colyseus co-op server. Runs the engine's own physics, in Node.
-apps/api               Empty until Sprint 28 (NestJS + Postgres).
+apps/api               Accounts, orgs, memberships, role gating. Postgres + hand-written SQL.
 docs/                  GUIDE, DEVELOPMENT-PLAN, SPRINT, ASSET-CONVENTIONS — the plan of record.
 ```
 

@@ -1,0 +1,59 @@
+name: API
+
+# The platform tests need a real Postgres, so CI provides one as a service container. Mocking the
+# database would leave the constraints, cascades and transaction boundaries untested — and those
+# are half the design in this package.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'apps/api/**'
+      - 'packages/schema/**'
+      - '.github/workflows/api.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: api-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: Accounts, orgs and role gating
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hela
+          POSTGRES_PASSWORD: hela
+          POSTGRES_DB: helaengine_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run the API integration suite
+        run: pnpm --filter @helaengine/api test
+        env:
+          TEST_DATABASE_URL: postgres://hela:hela@localhost:5432/helaengine_test
