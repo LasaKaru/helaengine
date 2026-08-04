@@ -1,0 +1,88 @@
+name: Export QA
+
+# The export suite is the expensive one — three browsers, five templates, a real archive extracted
+# and served over HTTP for each — so it runs when the code it protects changes rather than on every
+# push. Everything under `packages/engine` ships *inside* an export, so a change there is an export
+# change even when nothing in `apps/editor/src/export` moved.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'packages/engine/**'
+      - 'packages/schema/**'
+      - 'apps/editor/src/export/**'
+      - 'apps/editor/e2e/export-qa.spec.ts'
+      - 'apps/editor/e2e/exportHarness.ts'
+      - 'apps/editor/playwright.config.ts'
+      - 'tools/asset-pipeline/**'
+      - '.github/workflows/export-qa.yml'
+  # Available by hand, because "does the export still work in Safari" is a question worth being able
+  # to ask without pushing a commit to provoke it.
+  workflow_dispatch:
+
+concurrency:
+  group: export-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  export-qa:
+    name: Export QA (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    strategy:
+      # One browser failing is a finding about that browser, not a reason to stop learning about the
+      # other two — which is the whole point of running three.
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright ${{ matrix.browser }}
+        run: pnpm --filter @helaengine/editor exec playwright install --with-deps ${{ matrix.browser }}
+
+      # The editor has nothing to export without the asset library, and the library is generated
+      # output rather than something committed.
+      - name: Build asset library
+        run: pnpm ingest-assets
+        env:
+          SKIP_THUMBNAILS: '1'
+
+      # The exports serve `engine-runtime.js` and `engine-runtime-full.js` out of the engine's dist,
+      # so the engine has to be built before anything can be exported.
+      - name: Build packages
+        run: pnpm build
+
+      # Under Xvfb for every browser, because Firefox needs it: it probes for a GL driver with a
+      # GLX-based helper, and GLX with no display means no driver, which means no WebGL and a
+      # canvas-shaped hole where the editor should be. Chromium and WebKit do not need it and are
+      # not harmed by it, so one command covers the matrix.
+      - name: Run export QA suite
+        run: xvfb-run -a pnpm --filter @helaengine/editor exec playwright test export-qa --project=${{ matrix.browser }}
+
+      # Uploaded on failure and only then: the attachments are the editor frame, the export frame
+      # and the pixel diff between them, which is the only way to tell a real regression from a
+      # tolerance that needs arguing about.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: export-qa-${{ matrix.browser }}
+          path: |
+            apps/editor/playwright-report/
+            apps/editor/test-results/
+          retention-days: 7

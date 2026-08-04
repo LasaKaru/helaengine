@@ -7,7 +7,7 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 22 — exports are playable games. A working editor, behaviours, physics, enemies, trigger
+**Status:** Sprint 23 — exports are playable games, checked in three browsers. A working editor, behaviours, physics, enemies, trigger
 volumes, a measured performance baseline, first/third/top-down cameras with one input layer covering
 keyboard, touch and gamepad, a schema-driven menu/HUD shell, and now combat: a weapon catalogue in
 the document, hitscan firing, ammo and reloading, pickups, player damage and respawn — plus secrets
@@ -15,7 +15,8 @@ that hide areas, grant weapons or teleport the player, and checkpoints whose pro
 closing the tab, and sound — state-driven music with a crossfade, effects bound to engine events,
 a volume mixer, and a co-op multiplayer slice with a server-authoritative Colyseus service. The
 **Skirmish** template is a playable level built from all of it, and **Export** produces a folder you
-can unzip, serve and play.
+can unzip, serve and play — with an automated suite that exports every template, serves it and
+compares what it draws against the editor.
 
 ---
 
@@ -270,7 +271,7 @@ enemy behaviour, so a weapon hurts anything that listens, including things it ha
 It takes its ray cast as a callback rather than a physics world, which keeps combat testable without
 WebAssembly and keeps physics ignorant of weapons.
 
-The **Pickup** behaviour is the interesting one. It *asks* the world to take the item and does what
+The **Pickup** behaviour is the interesting one. It _asks_ the world to take the item and does what
 the answer says: a medkit at full health, or an ammo box for a gun you are not carrying, refuses and
 the pickup stays exactly where it is. Swallowing an item and giving nothing is the single most
 annoying bug this kind of behaviour has. Pickups can respawn on a timer, in which case they hide
@@ -291,13 +292,13 @@ goblins that fight back.
 named event** on the bus, or by **collecting a number of pickups**. Finding one can teleport the
 player, grant a weapon, reveal hidden objects, or raise an event.
 
-Both halves are a Zod discriminated union, and that union *is* the closed vocabulary — the same
+Both halves are a Zod discriminated union, and that union _is_ the closed vocabulary — the same
 guarantee behaviours and trigger actions get, obtained at both ends at once. A document naming a
 method the engine has never heard of is rejected when it is parsed, and a runtime that failed to
 handle one of the arms would not compile. There is no expression to evaluate and no snippet to run,
 which matters most for exactly the feature whose whole appeal is being sneaky.
 
-Hidden objects start hidden *because* something reveals them: the runtime hides everything a
+Hidden objects start hidden _because_ something reveals them: the runtime hides everything a
 `revealArea` names at startup rather than asking the author to keep a second flag in sync. Hiding
 takes the collider with it, so a secret area is not an invisible wall.
 
@@ -312,11 +313,11 @@ back restores: full, partial or no health, and whether the ammo comes back with 
 rather than per game, because the two ends of a level want different answers.
 
 Reaching a checkpoint writes a save, keyed by scene id. Saving on the checkpoint rather than on a
-timer is the point: a checkpoint *is* the author saying this moment is worth keeping.
+timer is the point: a checkpoint _is_ the author saying this moment is worth keeping.
 
 A save holds **state, never structure** — health, weapons, which checkpoint, which secrets. Nothing
 in one names an object, an asset or a behaviour, so no save can change what a scene contains. And it
-is validated on the way *in*: `localStorage` is a text field the player can edit, so a save that
+is validated on the way _in_: `localStorage` is a text field the player can edit, so a save that
 fails to parse is discarded and the run starts fresh, and counts are clamped to each weapon's own
 ceilings so a hand-edited save cannot mint ammo.
 
@@ -340,7 +341,7 @@ levels each clip towards a target with the gain capped so a spiky sample is quie
 clipped. It does **not** transcode — that needs ffmpeg, which is not part of this toolchain — so
 what it publishes is levelled WAV, and it says so rather than implying a web-optimised codec.
 
-The settings menu has master, music and effects sliders. Those are the *player's*, stored on their
+The settings menu has master, music and effects sliders. Those are the _player's_, stored on their
 machine and not in `scene.json`: how loud somebody likes their music is a property of that person,
 and putting it in the document would carry one player's preference to everyone the project reaches.
 The author's own defaults live in the scene, and the two multiply.
@@ -397,7 +398,7 @@ wants to show. **Game** starts everything: physics, behaviours, enemy AI, menus,
 and sound. They need different engine bundles, which is why it is a mode rather than a checkbox.
 
 There is one thing worth knowing about the physics bundle: `rapier3d-compat` encodes its
-WebAssembly as base64 *inside* the JavaScript, so a game export has no physics `.wasm` file at all —
+WebAssembly as base64 _inside_ the JavaScript, so a game export has no physics `.wasm` file at all —
 that is most of why the bundle is 3 MB. The only real `.wasm` is Draco's model decoder, and each
 export's README says so rather than warning about a file that is not there.
 
@@ -409,6 +410,44 @@ reproduces the document beside it. It exists because opening an export and findi
 Every export also carries a generated `CREDITS.md` — engine and third-party licences, plus per-asset
 attribution from the manifest, with anything unrecorded listed as unrecorded rather than omitted —
 and a `LICENSE.md` with your own project's licence left for you to choose.
+
+### Export QA
+
+`apps/editor/e2e/export-qa.spec.ts` is what turns "exports work" from a claim into a check. For each
+of the five templates it drives the real wizard, saves the real download, extracts it with `unzip`
+rather than a library — an archive only its author can read is not an archive — serves the folder
+over HTTP with the content types a static host would use, opens it, and compares the frame against
+the editor's, pixel for pixel.
+
+```bash
+pnpm --filter @helaengine/editor e2e:export              # all three browsers
+pnpm --filter @helaengine/editor e2e:export --project=firefox
+```
+
+Two details that took a while to get right, and that anyone extending this will hit:
+
+**Screenshots, never `canvas.toDataURL()`.** A WebGL canvas without `preserveDrawingBuffer` hands
+back a blank image, because the back buffer is gone the moment it has been presented. The editor
+sets that flag for its thumbnails; an export has no reason to. An in-page check therefore calls
+every export blank — convincingly, and for the wrong reason.
+
+**The camera is placed, not defaulted.** The export publishes its framing on `window.helaengineExport`
+and the editor is put in exactly that pose before the shot. Comparing two cameras that merely default
+similarly compares the defaults, not the render.
+
+The budget is 6% of pixels. Not zero, and pretending otherwise would be dishonest: the editor runs
+TypeScript through Vite, an export runs a minified bundle, and both draw through a software
+rasteriser. What that catches is a missing model, a black screen, a wrong sky, a terrain that never
+loaded. What it does not catch is a shadow one shade off, and it should not.
+
+Beyond the visual tests: a scene with no objects, a scene naming an asset the library does not have,
+a large sculpted terrain, the pre-export size estimate, and a genuinely throttled connection —
+server-side delay and 16 KB chunks rather than Playwright's CDP emulation, which only Chromium has.
+
+**Firefox needs an X server**, even headless, which is why `e2e:export` runs under `xvfb-run`. It
+finds its GL driver by running a GLX-based helper; with no display there is no driver, and every
+canvas is dead with `FEATURE_FAILURE_WEBGL_EXHAUSTED_DRIVERS` in the console. Chromium carries
+SwiftShader and WebKit brings its own software path, so neither notices.
 
 ## Where this is going
 

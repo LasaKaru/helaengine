@@ -21,15 +21,83 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:5174',
     trace: 'on-first-retry',
-    launchOptions: {
-      // The viewport needs a real WebGL context, which headless Chromium only gets via SwiftShader
-      // on a machine with no GPU — CI and containers both qualify.
-      args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'],
-      // Honour a preinstalled browser when one is provided rather than downloading another.
-      ...(process.env['CHROMIUM_PATH'] ? { executablePath: process.env['CHROMIUM_PATH'] } : {}),
-    },
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  /**
+   * Chromium runs everything; Firefox and WebKit run the export QA suite.
+   *
+   * Not because the editor does not matter in other browsers — it does — but because the editor
+   * suite drives pointer lock, drag-and-drop and IndexedDB in ways that are genuinely
+   * browser-specific to *test*, while an export is the thing users hand to strangers. Three WebGL
+   * implementations disagreeing about an export is a product bug; three of them disagreeing about
+   * a drag ghost is a test to write later.
+   *
+   * `PW_BROWSERS=chromium` narrows it back down while iterating, which is most of the time.
+   *
+   * **Firefox needs an X server**, even headless: it probes for a GL driver by running its
+   * `glxtest` helper, that helper speaks GLX, and GLX without a display fails — after which Firefox
+   * reports "Exhausted GL driver options" and every canvas in the editor is dead. Chromium carries
+   * its own SwiftShader and WebKit brings its own software path, so neither cares. Run the suite
+   * under `xvfb-run -a` (see `e2e:export`), where Firefox finds Mesa's llvmpipe and works.
+   */
+  projects: [
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        // Honour a preinstalled Chromium when one is provided rather than downloading another.
+        // Scoped to this project on purpose: as a global `use` it was also handed to Firefox and
+        // WebKit, which would then launch Chromium's binary and report themselves as those browsers.
+        launchOptions: {
+          // The viewport needs a real WebGL context, which headless Chromium only gets via
+          // SwiftShader on a machine with no GPU — CI and containers both qualify. Chromium-only
+          // flags, which is why they live on this project rather than in the shared `use`.
+          args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'],
+          ...(process.env['CHROMIUM_PATH'] ? { executablePath: process.env['CHROMIUM_PATH'] } : {}),
+        },
+      },
+    },
+    ...(process.env['PW_BROWSERS'] === 'chromium'
+      ? []
+      : [
+          {
+            name: 'firefox',
+            testMatch: /export-qa\.spec\.ts/,
+            use: {
+              ...devices['Desktop Firefox'],
+              launchOptions: {
+                firefoxUserPrefs: {
+                  // llvmpipe is on Firefox's driver blocklist, and being on it is the correct
+                  // default for a user with a real GPU. Here it is the only renderer there is.
+                  'webgl.force-enabled': true,
+                  'webgl.allow-software': true,
+                },
+              },
+            },
+          },
+          {
+            name: 'webkit',
+            testMatch: /export-qa\.spec\.ts/,
+            use: { ...devices['Desktop Safari'] },
+          },
+        ]),
+    /**
+     * Edge, opt-in with `PW_EDGE=1`.
+     *
+     * Off by default because it is not a fourth rendering engine — it is Chromium with a different
+     * badge, and the `msedge` channel needs Microsoft's own build installed, which Linux CI images
+     * and this container do not have. Running it would add wall-clock time and no new information
+     * about WebGL. It is wired up so that anyone with Edge on their machine can check the badge.
+     */
+    ...(process.env['PW_EDGE'] === '1'
+      ? [
+          {
+            name: 'edge',
+            testMatch: /export-qa\.spec\.ts/,
+            use: { ...devices['Desktop Edge'], channel: 'msedge' },
+          },
+        ]
+      : []),
+  ],
   webServer: [
     {
       command: 'pnpm dev --port 5174 --strictPort',

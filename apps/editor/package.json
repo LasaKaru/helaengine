@@ -10,7 +10,8 @@
     "preview": "vite preview --port 5174",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "e2e": "playwright test"
+    "e2e": "PW_BROWSERS=chromium playwright test",
+    "e2e:export": "xvfb-run -a playwright test export-qa"
   },
   "dependencies": {
     "@helaengine/engine": "workspace:*",
@@ -34,12 +35,15 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@testing-library/user-event": "^14.6.1",
+    "@types/pngjs": "6.0.5",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@types/three": "^0.172.0",
     "@vitejs/plugin-react": "^4.3.4",
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^25.0.1",
+    "pixelmatch": "6.0.0",
+    "pngjs": "7.0.0",
     "typescript": "^5.7.3",
     "vite": "^6.0.7",
     "vitest": "^2.1.8"

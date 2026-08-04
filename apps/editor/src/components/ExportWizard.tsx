@@ -4,7 +4,9 @@ import { useSceneStore } from '../store/sceneStore';
 import {
   collectUsedAssets,
   DEFAULT_EXPORT_OPTIONS,
+  formatBytes,
   slugify,
+  SIZE_WARN_BYTES,
   type ExportOptions,
 } from '../export/bundle';
 import { runExport } from '../export/runExport';
@@ -31,12 +33,30 @@ export function ExportWizard({
     projectName: scene.name || DEFAULT_EXPORT_OPTIONS.projectName,
   });
   const [phase, setPhase] = useState<Phase>('idle');
-  const [result, setResult] = useState<{ filename: string; bytes: number; warnings: string[] } | null>(
-    null,
-  );
+  const [result, setResult] = useState<{
+    filename: string;
+    bytes: number;
+    warnings: string[];
+  } | null>(null);
   const [error, setError] = useState<string>('');
 
   const summary = useMemo(() => collectUsedAssets(scene, manifest), [scene, manifest]);
+
+  /**
+   * A size estimate, before anything is fetched.
+   *
+   * Estimated rather than measured because measuring means downloading every asset — which is the
+   * export. Somebody deciding whether to press the button deserves a number first, and a rough one
+   * they get instantly beats an exact one they get afterwards.
+   */
+  const estimatedBytes = useMemo(() => {
+    const runtime = options.mode === 'game' ? 3_200_000 : 920_000;
+    const perAsset = summary.used.reduce(
+      (sum, asset) => sum + (asset.polyCount ? asset.polyCount * 40 : 8_000),
+      0,
+    );
+    return runtime + perAsset + JSON.stringify(scene).length * (options.includeSource ? 2 : 1);
+  }, [options.mode, options.includeSource, summary.used, scene]);
 
   // Escape closes, like every other modal in the editor. Not while an export is running, though —
   // dismissing the dialog mid-write would leave somebody wondering whether they got a file.
@@ -66,7 +86,11 @@ export function ExportWizard({
   };
 
   return (
-    <div className="modal-backdrop" role="presentation" onClick={() => phase !== 'working' && onClose()}>
+    <div
+      className="modal-backdrop"
+      role="presentation"
+      onClick={() => phase !== 'working' && onClose()}
+    >
       <div
         className="modal export-modal"
         role="dialog"
@@ -157,6 +181,12 @@ export function ExportWizard({
               </>
             )}
           </p>
+          <p className="panel-hint">
+            About {formatBytes(estimatedBytes)} before compression.
+            {estimatedBytes >= SIZE_WARN_BYTES
+              ? ' That is large enough to be awkward to host — consider splitting the scene.'
+              : ''}
+          </p>
           {summary.missing.length > 0 && (
             <p className="panel-hint error">
               Missing from the library: {summary.missing.join(', ')}. These will render as
@@ -204,10 +234,4 @@ export function ExportWizard({
       </div>
     </div>
   );
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }

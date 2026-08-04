@@ -23,6 +23,8 @@ export interface ExportFile {
 
 export interface ExportPlan {
   files: ExportFile[];
+  /** Total uncompressed size. The zip will be smaller; this is what the browser has to hold. */
+  totalBytes: number;
   /** Assets referenced by the scene and therefore shipped. */
   usedAssetIds: string[];
   /** Assets in the library the scene never mentions, and which are therefore left out. */
@@ -30,6 +32,17 @@ export interface ExportPlan {
   /** Anything the author should know: a missing asset, an unsupported feature. */
   warnings: string[];
 }
+
+/**
+ * Sizes worth saying something about, uncompressed.
+ *
+ * The soft warning is where a build stops being pleasant to host — most static hosts and most
+ * people's patience run out somewhere around here. The hard one is where the *export itself* is
+ * at risk: everything is assembled in browser memory before the zip is written, and a tab that
+ * runs out of memory mid-export gives no useful error at all.
+ */
+export const SIZE_WARN_BYTES = 150 * 1024 * 1024;
+export const SIZE_DANGER_BYTES = 400 * 1024 * 1024;
 
 /** The Draco decoder, copied beside the models it decodes. */
 const DRACO_FILES = ['draco_decoder.js', 'draco_decoder.wasm', 'draco_wasm_wrapper.js'];
@@ -65,7 +78,10 @@ export function slugify(name: string): string {
  * the entire manifest would mean a scene with one hut carrying every tree, rock and goblin the
  * editor has ever known about.
  */
-export function collectUsedAssets(scene: Scene, manifest: AssetManifest): {
+export function collectUsedAssets(
+  scene: Scene,
+  manifest: AssetManifest,
+): {
   used: AssetManifestEntry[];
   usedIds: string[];
   missing: string[];
@@ -78,7 +94,11 @@ export function collectUsedAssets(scene: Scene, manifest: AssetManifest): {
   // Audio is referenced from `audioConfig` rather than placed, so walking `objects` would miss
   // every sound the game makes.
   const { music, sfx } = scene.audioConfig;
-  for (const track of [music.menuTrackAssetId, music.exploreTrackAssetId, music.combatTrackAssetId]) {
+  for (const track of [
+    music.menuTrackAssetId,
+    music.exploreTrackAssetId,
+    music.combatTrackAssetId,
+  ]) {
     if (track) wanted.add(track);
   }
   for (const binding of sfx) wanted.add(binding.assetId);
@@ -151,14 +171,14 @@ ${options.includeSource ? 'scene.source.json    The same scene, indented for rea
 The scene places ${plan.objectCount} object${plan.objectCount === 1 ? '' : 's'}.
 
 ${
-    options.mode === 'game'
-      ? 'Press Play on the home screen. WASD moves, Shift sprints, C crouches, Space jumps, click\nfires, R reloads, Q swaps weapon, V changes camera, Escape pauses.'
-      : ''
-  }
+  options.mode === 'game'
+    ? 'Press Play on the home screen. WASD moves, Shift sprints, C crouches, Space jumps, click\nfires, R reloads, Q swaps weapon, V changes camera, Escape pauses.'
+    : ''
+}
 
 ${
-    options.mode === 'game'
-      ? `## Serving it correctly
+  options.mode === 'game'
+    ? `## Serving it correctly
 
 Two notes about WebAssembly, because getting either wrong fails quietly.
 
@@ -172,13 +192,33 @@ browsers refuse to compile one served with the wrong content type. \`npx serve\`
 \`.wasm\` is served as \`application/wasm\` — the symptom is a world where every model is a plain
 grey box.
 `
-      : `## What this export does not include
+    : `## What this export does not include
 
 This is a **static export**: it renders the world. Behaviours, physics, menus, the HUD and sound
 are not started here — that is the other export mode, not a limitation of the runtime, and the same
 \`engine/runtime.js\` contains all of it.
 `
-  }
+}
+## Troubleshooting
+
+**A blank page, and a CORS error in the console.** You opened \`index.html\` from disk. Browsers
+refuse to load ES modules over \`file://\`. Serve the folder — see above.
+
+**Every model is a plain grey box.** The Draco decoder failed to load. It is
+\`assets/draco/draco_decoder.wasm\`, and browsers refuse to compile a WebAssembly module served
+with the wrong content type. Configure your host to send \`.wasm\` as \`application/wasm\`.
+
+**404s for everything under \`assets/\`.** The folder was served from the wrong root. Every path in
+this export is relative to \`index.html\`, so serve the folder that contains it, not its parent.
+
+**Nothing loads and the console mentions CORS on your own files.** Some hosts serve a bare
+directory without the right headers. Any ordinary static host works; \`npx serve\` and
+\`python3 -m http.server\` both do.
+
+**The game shows its menu and then does nothing.** Only applies to a game export: the physics
+engine failed to start. It is bundled inside \`engine/runtime.js\` rather than fetched separately,
+so this is almost always a browser without WebAssembly enabled.
+
 ## Assets
 
 Everything under \`assets/\` is compressed output. \`manifest.json\` maps every \`assetId\` in
@@ -255,6 +295,13 @@ Third-party licences for what the runtime bundles are listed in CREDITS.md.
 `;
 }
 
+/** Bytes in the units a person reads. Shared by the export plan and the wizard. */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
@@ -290,7 +337,9 @@ export async function buildExport(input: BuildExportInput): Promise<ExportPlan> 
   const { used, usedIds, missing } = collectUsedAssets(scene, manifest);
 
   for (const id of missing) {
-    warnings.push(`asset "${id}" is referenced by the scene but not in the manifest — it will be a placeholder`);
+    warnings.push(
+      `asset "${id}" is referenced by the scene but not in the manifest — it will be a placeholder`,
+    );
   }
 
   const files: ExportFile[] = [
@@ -356,5 +405,22 @@ export async function buildExport(input: BuildExportInput): Promise<ExportPlan> 
     .map((asset) => asset.id)
     .filter((id) => !usedIds.includes(id));
 
-  return { files, usedAssetIds: usedIds, skippedAssetIds, warnings };
+  const totalBytes = files.reduce(
+    (sum, file) => sum + (file.bytes ? file.bytes.byteLength : new Blob([file.text ?? '']).size),
+    0,
+  );
+
+  if (totalBytes >= SIZE_DANGER_BYTES) {
+    warnings.push(
+      `this export is ${formatBytes(totalBytes)} before compression, which may exhaust the ` +
+        `browser's memory while the archive is written. Consider splitting the scene.`,
+    );
+  } else if (totalBytes >= SIZE_WARN_BYTES) {
+    warnings.push(
+      `this export is ${formatBytes(totalBytes)} before compression. Most static hosts and most ` +
+        `players' patience run out well before that.`,
+    );
+  }
+
+  return { files, totalBytes, usedAssetIds: usedIds, skippedAssetIds, warnings };
 }

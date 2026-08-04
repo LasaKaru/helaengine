@@ -4,6 +4,9 @@ import {
   buildExport,
   collectUsedAssets,
   DEFAULT_EXPORT_OPTIONS,
+  formatBytes,
+  SIZE_DANGER_BYTES,
+  SIZE_WARN_BYTES,
   slugify,
   type ExportPlan,
 } from './bundle';
@@ -399,15 +402,77 @@ describe('credits and licence', () => {
   });
 
   it('credits the physics engine only when it ships', async () => {
-    expect(textOf(await plan(scene(), { ...DEFAULT_EXPORT_OPTIONS, mode: 'game' }), 'CREDITS.md'))
-      .toContain('Rapier');
-    expect(textOf(await plan(scene(), { ...DEFAULT_EXPORT_OPTIONS, mode: 'static' }), 'CREDITS.md'))
-      .not.toContain('Rapier');
+    expect(
+      textOf(await plan(scene(), { ...DEFAULT_EXPORT_OPTIONS, mode: 'game' }), 'CREDITS.md'),
+    ).toContain('Rapier');
+    expect(
+      textOf(await plan(scene(), { ...DEFAULT_EXPORT_OPTIONS, mode: 'static' }), 'CREDITS.md'),
+    ).not.toContain('Rapier');
   });
 
   it('leaves the author their own licence to choose', async () => {
     const text = textOf(await plan(), 'LICENSE.md');
     expect(text).toContain('<your name here>');
     expect(text).toContain('MIT');
+  });
+});
+
+describe('size budgeting', () => {
+  it('reports what the export weighs, uncompressed', async () => {
+    const result = await plan();
+    const summed = result.files.reduce(
+      (sum, file) => sum + (file.bytes ? file.bytes.byteLength : new Blob([file.text ?? '']).size),
+      0,
+    );
+
+    expect(result.totalBytes).toBe(summed);
+    expect(result.totalBytes).toBeGreaterThan(0);
+  });
+
+  it('says nothing about size when there is nothing to say', async () => {
+    const result = await plan();
+    expect(result.warnings.some((warning) => warning.includes('before compression'))).toBe(false);
+  });
+
+  it('warns past the soft budget and escalates past the hard one', async () => {
+    // Sized by the asset reader rather than by building a real scene: what is under test is the
+    // threshold, and a 200 MB fixture on disk would be a poor way to check a comparison.
+    const big = async (bytes: number): Promise<ExportPlan> =>
+      buildExport({
+        scene: scene(),
+        manifest,
+        options: DEFAULT_EXPORT_OPTIONS,
+        runtimeSource: '',
+        readAsset: async () => new Uint8Array(bytes),
+      });
+
+    const warned = (await big(Math.ceil(SIZE_WARN_BYTES / 2) + 1)).warnings.join(' ');
+    expect(warned).toContain('before compression');
+    expect(warned).not.toContain('memory');
+
+    const dangerous = (await big(Math.ceil(SIZE_DANGER_BYTES / 2) + 1)).warnings.join(' ');
+    expect(dangerous).toContain("browser's memory");
+  });
+
+  it('formats bytes the way a person reads them', () => {
+    expect(formatBytes(512)).toBe('512 B');
+    expect(formatBytes(2048)).toBe('2 KB');
+    expect(formatBytes(3 * 1024 * 1024)).toBe('3.0 MB');
+  });
+});
+
+describe('troubleshooting docs', () => {
+  it('documents the failures that actually happen, and only those', async () => {
+    const text = textOf(await plan(), 'README.md');
+
+    expect(text).toContain('Troubleshooting');
+    // The two silent ones: modules refused over file://, and a Draco decoder served as the wrong
+    // content type — which turns every model into a grey box with nothing in the console about it.
+    expect(text).toContain('file://');
+    expect(text).toContain('application/wasm');
+    expect(text).toContain('draco_decoder.wasm');
+    // And not the failure that cannot happen: rapier3d-compat inlines its WASM as base64, so a
+    // game export has no physics `.wasm` for a host to mis-serve.
+    expect(text).not.toContain('rapier_wasm');
   });
 });

@@ -4,7 +4,7 @@ import { Grid, OrbitControls } from '@react-three/drei';
 import { useEditorStore } from '../store/editorStore';
 import { useSceneStore } from '../store/sceneStore';
 import type { AssetResolver, LoadedScene, SceneLoader } from '@helaengine/engine';
-import { setCamera, setLoadedScene, setRenderer } from '../devApi';
+import { setCamera, setCameraPoseHandler, setLoadedScene, setRenderer } from '../devApi';
 import { useProjectStore } from '../store/projectStore';
 import { EngineBridge } from './EngineBridge';
 import { MarqueeOverlay } from './Marquee';
@@ -21,15 +21,29 @@ import { TransformGizmo } from './TransformGizmo';
 function CameraReporter(): null {
   const camera = useThree((state) => state.camera);
   const gl = useThree((state) => state.gl);
+  const controls = useThree((state) => state.controls) as {
+    target: { set(x: number, y: number, z: number): void };
+    update(): void;
+  } | null;
 
   useEffect(() => {
     setCamera(camera);
     setRenderer(gl);
+    setCameraPoseHandler((position, target) => {
+      camera.position.set(position[0], position[1], position[2]);
+      // The orbit target has to move too, or the next frame swings the camera back to whatever it
+      // was looking at before.
+      controls?.target.set(target[0], target[1], target[2]);
+      camera.lookAt(target[0], target[1], target[2]);
+      camera.updateProjectionMatrix();
+      controls?.update();
+    });
     return () => {
       setCamera(null);
       setRenderer(null);
+      setCameraPoseHandler(null);
     };
-  }, [camera, gl]);
+  }, [camera, gl, controls]);
 
   return null;
 }

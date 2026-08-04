@@ -29,6 +29,14 @@ export interface DevApi {
    * a behaviour has moved. A test that aims at a chasing enemy has to ask the scene graph.
    */
   viewportObjectPosition(objectId: string): { x: number; y: number; z: number } | null;
+  /**
+   * Puts the edit camera exactly somewhere.
+   *
+   * The visual-regression suite reads an export's own camera pose and applies it here, so the
+   * comparison is of what is *in* the world rather than of two cameras that happen to be
+   * configured differently.
+   */
+  setCameraPose(position: [number, number, number], target: [number, number, number]): boolean;
   /** Whether a transform gizmo is currently attached in the scene. */
   hasGizmo(): boolean;
   /** World height of the live terrain at a world X/Z — proves a sculpt reached the geometry. */
@@ -197,6 +205,16 @@ export function setGameRuntime(runtime: GameRuntime | null): void {
   currentGame = runtime;
 }
 
+let cameraPoseHandler:
+  ((position: [number, number, number], target: [number, number, number]) => void) | null = null;
+
+/** Registered by the viewport, which owns the camera the editor draws with. */
+export function setCameraPoseHandler(
+  handler: ((position: [number, number, number], target: [number, number, number]) => void) | null,
+): void {
+  cameraPoseHandler = handler;
+}
+
 let currentAudio: AudioSystem | null = null;
 
 /** Records the running audio system, so tests can read what it decided to play. */
@@ -312,6 +330,12 @@ export function exposeDevApi(library: AssetLibrary): void {
 
     viewportObjectWorldX: (objectId) =>
       currentLoadedScene?.objects.get(objectId)?.getWorldPosition(new Vector3()).x ?? null,
+
+    setCameraPose: (position, target) => {
+      if (!cameraPoseHandler) return false;
+      cameraPoseHandler(position, target);
+      return true;
+    },
 
     hasGizmo: () =>
       currentLoadedScene?.threeScene.getObjectByName('gizmo-proxy') !== undefined ||

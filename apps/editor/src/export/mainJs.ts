@@ -54,6 +54,26 @@ const report = await loader.preload(scene);
 if (report.failed.length > 0) console.warn('[helaengine] some assets failed', report.failed);
 viewport.setScene(scene);
 viewport.frameScene();
+
+/**
+ * A small handle on the running export.
+ *
+ * Not test scaffolding — it is here because an export is meant to be *yours*, and the first thing
+ * anybody hand-editing one needs is a way to poke at it from the console. It is also what lets the
+ * editor's visual-regression suite point its own camera exactly where this one is, so "the export
+ * renders what the editor renders" is a claim about the world rather than about camera defaults.
+ */
+window.helaengineExport = {
+  scene,
+  loader,
+  viewport,
+  camera: viewport.camera,
+  cameraPose: () => ({
+    position: viewport.camera.position.toArray(),
+    target: viewport.controls.target.toArray(),
+    fov: viewport.camera.fov,
+  }),
+};
 `;
 
 const GAME_MAIN = `import {
@@ -255,6 +275,27 @@ viewport.onFrame((delta) => {
 
   input.endFrame();
 });
+
+/**
+ * A small handle on the running export.
+ *
+ * Not test scaffolding — it is here because an export is meant to be *yours*, and the first thing
+ * anybody hand-editing one needs is a way to poke at it from the console. It is also what lets the
+ * editor's visual-regression suite point its own camera exactly where this one is, so "the export
+ * renders what the editor renders" is a claim about the world rather than about camera defaults.
+ */
+window.helaengineExport = {
+  scene,
+  loader,
+  game,
+  viewport,
+  camera: viewport.camera,
+  cameraPose: () => ({
+    position: viewport.camera.position.toArray(),
+    target: viewport.controls.target.toArray(),
+    fov: viewport.camera.fov,
+  }),
+};
 `;
 
 /**
