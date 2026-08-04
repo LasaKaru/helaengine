@@ -125,10 +125,19 @@ export class ShareStore {
     if (this.get(id) === null) return null;
 
     const folder = join(this.#root, id);
-    const target = join(folder, normalize(path === '' || path === '/' ? 'index.html' : path));
+    const relative = normalize(path === '' || path === '/' ? 'index.html' : path).replace(
+      /^\/+/,
+      '',
+    );
+    const target = join(folder, relative);
     if (!target.startsWith(folder)) return null;
+
     // The metadata and the report are the service's, not the build's, so they are not served.
-    if (target.includes('/.hela-')) return null;
+    // Matched on each *segment* rather than on the whole path: the first version tested
+    // `target.includes('/.hela-')`, which is also true of every file in a store whose root
+    // directory happens to be called `.hela-shared` — the default. It served nothing at all, and
+    // no unit test noticed because they all used temp directories without the leading dot.
+    if (relative.split('/').some((segment) => segment.startsWith('.hela-'))) return null;
 
     return existsSync(target) ? target : null;
   }

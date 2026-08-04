@@ -198,6 +198,21 @@ describe('who can see what', () => {
     }
   });
 
+  it('serves a build from a store whose own directory starts with a dot', () => {
+    // The default storage directory is `.hela-shared`, and a guard written as
+    // `path.includes('/.hela-')` is true of *every* file underneath it. The service served nothing
+    // at all, and every test here missed it by using a temp directory without the leading dot.
+    const dotted = new ShareStore({
+      root: join(mkdtempSync(join(tmpdir(), 'x-')), '.hela-shared'),
+    });
+    const published = dotted.publish(build());
+
+    expect(dotted.fileFor(published.id, '/')).not.toBeNull();
+    expect(dotted.fileFor(published.id, '/index.html')).not.toBeNull();
+    // And the metadata is still not served, which is what the guard was for.
+    expect(dotted.fileFor(published.id, '/.hela-meta.json')).toBeNull();
+  });
+
   it('refuses an id that is not the shape this service mints', async () => {
     // Ids are used as path segments, so anything not matching is not looked up at all.
     expect((await fetch(`${origin}/play/..%2f..%2fetc/index.html`)).status).toBe(404);
