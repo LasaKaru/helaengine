@@ -2644,7 +2644,9 @@ test.describe('export', () => {
     // an archive that is only readable by its own author.
     const extractedTo = testInfo.outputPath('extracted');
     await mkdir(extractedTo, { recursive: true });
-    execFileSync('unzip', ['-q', zipPath, '-d', extractedTo]);
+    // `-o` matters: without it, an extraction into a folder that already holds these files stops to
+    // ask, gets EOF on stdin, and fails with a prompt where the reason should be.
+    execFileSync('unzip', ['-q', '-o', zipPath, '-d', extractedTo]);
 
     const root = join(extractedTo, 'export-check');
     for (const file of ['index.html', 'main.js', 'scene.json', 'engine/runtime.js', 'README.md']) {
@@ -2807,7 +2809,9 @@ test.describe('game export', () => {
     await download.saveAs(zipPath);
     const extractedTo = testInfo.outputPath('game');
     await mkdir(extractedTo, { recursive: true });
-    execFileSync('unzip', ['-q', zipPath, '-d', extractedTo]);
+    // `-o` matters: without it, an extraction into a folder that already holds these files stops to
+    // ask, gets EOF on stdin, and fails with a prompt where the reason should be.
+    execFileSync('unzip', ['-q', '-o', zipPath, '-d', extractedTo]);
 
     const root = join(extractedTo, 'playable');
     for (const file of ['index.html', 'main.js', 'scene.json', 'CREDITS.md', 'LICENSE.md']) {
@@ -2885,7 +2889,9 @@ test.describe('game export', () => {
     await download.saveAs(zipPath);
     const extractedTo = testInfo.outputPath('readable');
     await mkdir(extractedTo, { recursive: true });
-    execFileSync('unzip', ['-q', zipPath, '-d', extractedTo]);
+    // `-o` matters: without it, an extraction into a folder that already holds these files stops to
+    // ask, gets EOF on stdin, and fails with a prompt where the reason should be.
+    execFileSync('unzip', ['-q', '-o', zipPath, '-d', extractedTo]);
 
     const main = readFileSync(join(extractedTo, 'readable', 'main.js'), 'utf8');
     expect(main).toContain('export function describeLevel');
