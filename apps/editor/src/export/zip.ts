@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import type { ExportFile, ExportPlan } from './bundle';
+import type { ExportFile, ExportPlan } from '@helaengine/export';
 
 /**
  * Packs an export plan into a zip, under a single top-level folder.

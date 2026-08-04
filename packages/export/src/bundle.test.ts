@@ -9,7 +9,7 @@ import {
   SIZE_WARN_BYTES,
   slugify,
   type ExportPlan,
-} from './bundle';
+} from './bundle.js';
 
 const manifest: AssetManifest = parseAssetManifest({
   version: 1,

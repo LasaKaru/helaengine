@@ -64,6 +64,12 @@ viewport.frameScene();
  * renders what the editor renders" is a claim about the world rather than about camera defaults.
  */
 window.helaengineExport = {
+  // A static export draws the world and stops, so it has no physics, no player and no menu. The
+  // smoke harness reads this and skips the checks that would be meaningless rather than failing a
+  // build for not doing something it was never asked to do.
+  mode: 'static',
+  sceneReady: true,
+  ready: true,
   scene,
   loader,
   viewport,
@@ -73,6 +79,7 @@ window.helaengineExport = {
     target: viewport.controls.target.toArray(),
     fov: viewport.camera.fov,
   }),
+  assetsFailed: report.failed.map((failure) => failure.assetId),
 };
 `;
 
@@ -120,10 +127,37 @@ viewport.setScene(scene);
 viewport.start();
 
 // Models first, then the world is rebuilt with them in it — see the note in the static export.
-await loader.preload(scene);
+const report = await loader.preload(scene);
+if (report.failed.length > 0) console.warn('[helaengine] some assets failed', report.failed);
 const loaded = viewport.setScene(scene);
 
+/**
+ * A small handle on the running export, published in stages.
+ *
+ * Not test scaffolding — an export is meant to be *yours*, and the first thing anybody hand-editing
+ * one wants is something to poke at from the console. Each field becomes true at the moment the
+ * thing it describes actually happened, so a build that dies halfway still says how far it got:
+ * "the scene loaded but physics did not" is a diagnosis, and a blank page is not.
+ */
+window.helaengineExport = {
+  mode: 'game',
+  sceneReady: true,
+  physicsReady: false,
+  ready: false,
+  scene,
+  loader,
+  viewport,
+  camera: viewport.camera,
+  cameraPose: () => ({
+    position: viewport.camera.position.toArray(),
+    target: viewport.controls.target.toArray(),
+    fov: viewport.camera.fov,
+  }),
+  assetsFailed: report.failed.map((failure) => failure.assetId),
+};
+
 const physics = await PhysicsWorld.create({ gravity: scene.player.gravity });
+window.helaengineExport.physicsReady = true;
 const [spawnX, spawnY, spawnZ] = scene.player.spawn;
 const ground = loaded.terrainField ? loaded.terrainField.sampleHeight(spawnX, spawnZ) : 0;
 const spawn = new THREE.Vector3(spawnX, Math.max(spawnY, ground + 0.5), spawnZ);
@@ -276,26 +310,16 @@ viewport.onFrame((delta) => {
   input.endFrame();
 });
 
-/**
- * A small handle on the running export.
- *
- * Not test scaffolding — it is here because an export is meant to be *yours*, and the first thing
- * anybody hand-editing one needs is a way to poke at it from the console. It is also what lets the
- * editor's visual-regression suite point its own camera exactly where this one is, so "the export
- * renders what the editor renders" is a claim about the world rather than about camera defaults.
- */
-window.helaengineExport = {
-  scene,
-  loader,
+// The last stage of the handle above: the loop is running, so there is now a player to ask about.
+// This is what the pre-delivery smoke test reads. Deliberately *state* rather than a verdict — a
+// build that could grade itself is a build that could grade itself wrong.
+Object.assign(window.helaengineExport, {
+  ready: true,
   game,
-  viewport,
-  camera: viewport.camera,
-  cameraPose: () => ({
-    position: viewport.camera.position.toArray(),
-    target: viewport.controls.target.toArray(),
-    fov: viewport.camera.fov,
-  }),
-};
+  playerPosition: () => [player.position.x, player.position.y, player.position.z],
+  playerHealth: () => game.playerHealth(),
+  screen: () => shell.screen,
+});
 `;
 
 /**

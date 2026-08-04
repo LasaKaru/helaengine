@@ -7,7 +7,8 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 23 — exports are playable games, checked in three browsers. A working editor, behaviours, physics, enemies, trigger
+**Status:** Sprint 24 — exports are playable games, checked in three browsers and played by a robot
+before anyone can have them. A working editor, behaviours, physics, enemies, trigger
 volumes, a measured performance baseline, first/third/top-down cameras with one input layer covering
 keyboard, touch and gamepad, a schema-driven menu/HUD shell, and now combat: a weapon catalogue in
 the document, hitscan firing, ammo and reloading, pickups, player damage and respawn — plus secrets
@@ -86,7 +87,10 @@ Requires Node 20+ and pnpm 10+. Thumbnail rendering needs a Chromium that Playwr
 ```
 packages/schema        The scene + asset schema, in Zod. The contract everything else agrees on.
 packages/engine        Vanilla Three.js runtime. No React, no store, no DOM assumptions in the loader.
+packages/export        Scene + manifest in, runnable folder out. Pure functions, so it runs in Node too.
+packages/templates     The five starter worlds. Shared so the editor offers what the gate tests.
 tools/asset-pipeline   Ingest: raw GLBs in, compressed GLBs + thumbnails + manifest out.
+tools/smoke            Plays a build before a human can. Deterministic checks, exit code as verdict.
 raw-assets/            Hand-authored .glb sources. The artefacts under version control.
 apps/demo              Framework-free harness rendering a scene document. Proves the engine stands alone.
 apps/editor            The editor: React + react-three-fiber shell around the engine.
@@ -448,6 +452,45 @@ server-side delay and 16 KB chunks rather than Playwright's CDP emulation, which
 finds its GL driver by running a GLX-based helper; with no display there is no driver, and every
 canvas is dead with `FEATURE_FAILURE_WEBGL_EXHAUSTED_DRIVERS` in the console. Chromium carries
 SwiftShader and WebKit brings its own software path, so neither notices.
+
+## The pre-delivery gate
+
+Rendering correctly is not the same as working. `tools/smoke` builds a real export into a private
+staging folder, serves it, opens it in a browser and _plays_ it — then says whether it may be
+handed to anybody.
+
+```bash
+pnpm smoke path/to/export            # exit 0 releasable, exit 1 blocked
+pnpm smoke path/to/export --json=report.json
+pnpm smoke:test                      # the whole gate: 5 good builds, 3 broken ones
+```
+
+It is not part of `pnpm test` — it stages eight real exports and drives a browser through each, so
+it belongs with the e2e suites rather than the unit ones, and it has its own CI workflow.
+
+Seven checks, in order, because each is only meaningful if the ones above it passed: the page loads
+without throwing, every asset request resolves, the engine reports the scene ready within a timeout,
+Rapier's WebAssembly initialises, synthetic held input actually moves the player, health does not
+fall while standing still, and the heap does not run away. They are **scripted assertions about
+observable state**, deliberately — not "an AI plays it and judges". A validator whose verdict you
+cannot predict is one nobody acts on.
+
+Two things the report refuses to blur. A **skipped** check is not a soft pass: it means something
+above it failed and this could not be run, and a build with one is not releasable — "nothing failed"
+is not the same claim as "it works". A **not-applicable** check is different and is fine: a static
+export has no player to move, and failing it for that would be failing it for doing what it was
+asked.
+
+The export helps by publishing itself in stages — `sceneReady` goes up the moment the world is
+built, before physics is even attempted, so a build that dies during physics init reports _where_
+it died instead of looking like a scene that never loaded. That is also why the debug handle is
+state rather than a verdict: a build that could grade itself could grade itself wrong.
+
+Eight builds are tested on every run: the five starter templates, which must pass, and three
+deliberately broken ones, which must each fail **on their own check** — a spawn off the edge of the
+terrain (`player-moves`, "fell out of the world"), a model missing from the folder
+(`assets-resolve`), and a corrupted inlined WebAssembly payload (`physics-initialises`). A gate
+nobody has watched fail is a gate nobody should trust.
 
 ## Where this is going
 

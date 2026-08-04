@@ -1,5 +1,5 @@
 import type { AssetManifest, AssetManifestEntry, Scene } from '@helaengine/schema';
-import { mainJs, type CodeStyle, type ExportMode } from './mainJs';
+import { mainJs, type CodeStyle, type ExportMode } from './mainJs.js';
 
 export interface ExportOptions {
   /** Used for the folder name inside the zip and the zip filename. */

@@ -8,7 +8,7 @@ import {
   slugify,
   SIZE_WARN_BYTES,
   type ExportOptions,
-} from '../export/bundle';
+} from '@helaengine/export';
 import { runExport } from '../export/runExport';
 
 type Phase = 'idle' | 'working' | 'done' | 'error';

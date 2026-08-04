@@ -230,13 +230,18 @@ Export/Deploy requested
 
 Define a concrete, scripted checklist (this is NOT "AI plays the game and judges it" — that's unreliable; make it deterministic checks):
 
-- [ ] Page loads with zero uncaught JS console errors
-- [ ] All asset network requests resolve (no 404s on GLB/texture/audio files) — catches broken asset references from schema issues
-- [ ] Engine reports "scene loaded" event within a timeout (catches infinite-load/hang states)
-- [ ] Automated input simulation: send synthetic WASD + mouse-look input for N seconds, verify the player object's position actually changes (catches "player spawns stuck/falls through world" bugs — the most common export-breaking issue)
-- [ ] Player health doesn't unexpectedly hit zero within the first few seconds of idle simulation (catches misconfigured damage triggers at spawn)
-- [ ] Verify WASM (Rapier) actually initializes (catches the MIME-type/hosting issue flagged in SPRINT.md Sprint 14)
-- [ ] Memory doesn't spike unboundedly over a short simulated play window (cheap leak catch, not a full profiling pass)
+- [x] Page loads with zero uncaught JS console errors — `page-loads`
+- [x] All asset network requests resolve (no 404s on GLB/texture/audio files) — `assets-resolve`
+- [x] Engine reports "scene loaded" event within a timeout (catches infinite-load/hang states) — `scene-loaded`
+- [x] Automated input simulation: send synthetic WASD + mouse-look input for N seconds, verify the player object's position actually changes — `player-moves`, which also reports falling out of the world separately from failing to move at all, because they need different repairs
+- [x] Player health doesn't unexpectedly hit zero within the first few seconds of idle simulation — `player-survives-idle`, measured against the scene's declared maximum rather than a reading taken after the first frame
+- [x] Verify WASM (Rapier) actually initializes — `physics-initialises`
+- [x] Memory doesn't spike unboundedly over a short simulated play window — `memory-stable`
+
+Implemented in `tools/smoke`, with the check ids above as a **closed Zod vocabulary** so Sprint 25's
+repair mapping can be exhaustive. Two outcomes beyond pass and fail, kept apart deliberately:
+`skipped` (an earlier check failed, so this could not run — never a soft pass, and a build carrying
+one is not releasable) and `not-applicable` (a static export has no player to move).
 
 ### Step 3 detail — the AI auto-repair loop
 
@@ -328,10 +333,10 @@ _(Runs after renumbered Phase 3 Export System, Sprints 21-23)_
 
 **Sprint 24 — Headless Smoke Test Harness**
 
-- [ ] Build the Playwright-based sandboxed test runner: loads a staged (non-public) export build, captures console errors/network failures
-- [ ] Implement the scripted checklist from Section 4 Step 2 (asset load verification, scene-loaded event timeout, synthetic input simulation checking player movement, early-death check, WASM init check, short memory-spike check)
-- [ ] Wire this as a required step in the export/deploy pipeline (extends Sprint 20's export worker — build now writes to a private staging path first, not directly to public download/deploy)
-- **DoD:** Running the smoke test harness against 5 known-good template scenes passes cleanly, and against 3 deliberately-broken test scenes (e.g., player spawn inside terrain, missing asset reference, broken WASM path) correctly fails with specific, identifiable error output per case.
+- [x] Build the Playwright-based sandboxed test runner: loads a staged (non-public) export build, captures console errors/network failures
+- [x] Implement the scripted checklist from Section 4 Step 2 (asset load verification, scene-loaded event timeout, synthetic input simulation checking player movement, early-death check, WASM init check, short memory-spike check)
+- [x] Wire this as a required step in the export/deploy pipeline — **partly**: there is no export worker or deploy to extend yet, so what exists is the gate itself plus a CI workflow that runs it on every change to the engine, exporter, templates or asset pipeline. Gating the download button is Sprint 26; a server doing it is Sprint 28.
+- **DoD:** Running the smoke test harness against 5 known-good template scenes passes cleanly, and against 3 deliberately-broken test scenes (e.g., player spawn inside terrain, missing asset reference, broken WASM path) correctly fails with specific, identifiable error output per case. **Met** — and the first full run found the Village Outpost's spawn point inside its own hut.
 
 **Sprint 25 — AI Diagnosis + Auto-Repair Loop**
 

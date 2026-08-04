@@ -1,7 +1,7 @@
 import type { AssetManifest, Scene } from '@helaengine/schema';
 import { ASSET_BASE_URL } from '../engine/assetLibrary';
-import { buildExport, slugify, type ExportOptions, type ExportPlan } from './bundle';
-import type { ExportMode } from './mainJs';
+import { buildExport, slugify, type ExportOptions, type ExportPlan } from '@helaengine/export';
+import type { ExportMode } from '@helaengine/export';
 import { downloadZip, zipExport } from './zip';
 
 /**

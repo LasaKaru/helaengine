@@ -1,0 +1,62 @@
+name: Pre-delivery smoke test
+
+# The gate. Every build is played by a robot before anybody is allowed to have it, and this is that
+# robot running against the five starter worlds plus three deliberately broken ones.
+#
+# Triggered by anything that changes what an export *is* or what it does when opened. A change to
+# the engine ships inside every export; a change to the templates changes the worlds under test;
+# a change to the exporter changes the folder itself.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'packages/engine/**'
+      - 'packages/export/**'
+      - 'packages/schema/**'
+      - 'packages/templates/**'
+      - 'tools/smoke/**'
+      - 'tools/asset-pipeline/**'
+      - '.github/workflows/smoke.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Play every build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @helaengine/smoke exec playwright install --with-deps chromium
+
+      # The harness stages *real* exports, so it needs the two things a real export is made of:
+      # the asset library (generated output, never committed) and the engine's runtime bundles.
+      - name: Build asset library
+        run: pnpm ingest-assets
+        env:
+          SKIP_THUMBNAILS: '1'
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Smoke test every template and every deliberate breakage
+        run: pnpm --filter @helaengine/smoke smoke:test

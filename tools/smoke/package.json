@@ -1,0 +1,25 @@
+{
+  "name": "@helaengine/smoke",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Plays every build before a human can. Deterministic scripted checks, not a judgement.",
+  "scripts": {
+    "smoke": "tsx src/cli.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "smoke:test": "vitest run --testTimeout=600000 --hookTimeout=900000"
+  },
+  "dependencies": {
+    "@helaengine/export": "workspace:*",
+    "@helaengine/schema": "workspace:*",
+    "@helaengine/templates": "workspace:*",
+    "playwright": "^1.62.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

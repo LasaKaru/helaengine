@@ -20,7 +20,9 @@
     "ingest-assets": "pnpm --filter @helaengine/asset-pipeline ingest",
     "editor": "pnpm --filter @helaengine/editor dev",
     "e2e": "pnpm --filter @helaengine/editor e2e",
-    "bench": "node tools/benchmark/run.mjs"
+    "bench": "node tools/benchmark/run.mjs",
+    "smoke": "pnpm --filter @helaengine/smoke smoke",
+    "smoke:test": "pnpm --filter @helaengine/smoke smoke:test"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

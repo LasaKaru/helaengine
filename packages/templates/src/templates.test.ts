@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SceneSchema } from '@helaengine/schema';
 import { CheckpointParamsSchema } from '@helaengine/engine';
-import { TEMPLATES, buildStressScene, templateById } from './templates';
+import { TEMPLATES, buildStressScene, templateById } from './index.js';
 
 describe('templates', () => {
   it('every template produces a document the schema accepts', () => {

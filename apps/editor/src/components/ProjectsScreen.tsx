@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useProjectStore } from '../store/projectStore';
-import { TEMPLATES } from '../templates';
+import { TEMPLATES } from '@helaengine/templates';
 
 function formatWhen(timestamp: number): string {
   const minutes = Math.round((Date.now() - timestamp) / 60_000);

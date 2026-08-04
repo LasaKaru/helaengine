@@ -4,7 +4,7 @@
 
 **Sprint length:** 2 weeks. **Total:** 26 sprints to public beta (~13 months) + Phase 7 GA (2 sprints, ~2 months).
 
-**Progress:** Sprints 1–23 complete. **Phase 3 (Export) is done**, and with it the product's core promise: build a world visually, get real runnable code, verified in three browsers by a suite that exports it, serves it and compares the pixels. Next is **Phase 3B (Pre-Delivery Validation & Hosted Play, Sprints 24–27)**. Phases 1 (Editor MVP), 2 (Behaviours, Physics, AI) and 2B (Gameplay Runtime & UI) done — 2B was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
+**Progress:** Sprints 1–24 complete. Phase 3 (Export) is done — build a world visually, get real runnable code, verified in three browsers by a suite that exports it, serves it and compares the pixels — and **Phase 3B (Pre-Delivery Validation & Hosted Play, Sprints 24–27) has begun**: every build is now played by a robot before anybody can have it, which found a starter template whose player spawned inside a building on the very first run. Phases 1 (Editor MVP), 2 (Behaviours, Physics, AI) and 2B (Gameplay Runtime & UI) done — 2B was inserted ahead of the export system because exporting a world with no menus, HUD, combat or sound would be shipping a viewer rather than a game. Everything from the old Sprint 13 onward has been renumbered accordingly; see `GAMEPLAY-RUNTIME-AND-QA-PLAN.md`. Checkboxes below are ticked as each sprint lands — this file is the live backlog, not a snapshot of the original plan.
 
 ---
 
@@ -638,18 +638,35 @@ The qualification is **Edge**. It is wired up (`PW_EDGE=1`) but not run, and tha
 
 **Tasks:**
 
-- [ ] Playwright-based sandbox runner: loads a staged, non-public export and captures console errors and failed network requests
-- [ ] Implement the scripted checklist — deliberately deterministic checks, **not** "an AI plays it and judges":
-  - page loads with zero uncaught JS errors
-  - every asset request resolves (no 404s on GLB, texture or audio)
-  - the engine reports "scene loaded" within a timeout (catches hangs)
-  - synthetic WASD and look input for N seconds actually moves the player (catches spawning stuck or falling through the world — the most common export-breaking bug)
-  - player health does not hit zero while idle (catches damage triggers misplaced at spawn)
-  - Rapier's WASM actually initialises (catches the MIME-type hosting problem flagged in Sprint 23)
-  - memory does not climb without bound over a short window
-- [ ] Wire it as a required step: the export worker writes to a private staging path first, never straight to a download or a public deploy
+- [x] Playwright-based sandbox runner: loads a staged, non-public export and captures console errors and failed network requests
+- [x] Implement the scripted checklist — deliberately deterministic checks, **not** "an AI plays it and judges":
+  - [x] page loads with zero uncaught JS errors
+  - [x] every asset request resolves (no 404s on GLB, texture or audio)
+  - [x] the engine reports "scene loaded" within a timeout (catches hangs)
+  - [x] synthetic WASD and look input for N seconds actually moves the player (catches spawning stuck or falling through the world — the most common export-breaking bug)
+  - [x] player health does not hit zero while idle (catches damage triggers misplaced at spawn)
+  - [x] Rapier's WASM actually initialises (catches the MIME-type hosting problem flagged in Sprint 23)
+  - [x] memory does not climb without bound over a short window
+- [x] Wire it as a required step: the export worker writes to a private staging path first, never straight to a download or a public deploy — **partly**; there is no export worker yet, see the scope note below
+- [x] **Added:** the exporter and the starter templates are now packages (`@helaengine/export`, `@helaengine/templates`) rather than editor internals, because a gate that cannot build what it tests is not a gate; and the export publishes its state in stages so a build that dies halfway says where
+
+**Tech notes:**
+
+- **The harness stages real exports.** It calls the same `buildExport` the Export button calls, with the same asset library and the same engine bundle, then serves the folder over HTTP with the content types a real host would use. Testing a hand-assembled approximation of an export would test the approximation — and the failures worth catching (a decoder that did not ship, a path that only works in the editor) live exactly in the gap between the two. That is what forced `packages/export`: the exporter had been sitting inside a React app, and the first thing this sprint needed was to call it from Node.
+- **The export publishes itself in stages.** `sceneReady` goes up the moment the world is built, before physics is even attempted; `physicsReady` after Rapier compiles; `ready` when the loop is running. A build that dies during physics init therefore reports _where_ it died rather than looking identical to a scene that never loaded — which is the difference between "it is broken" and "it is broken here", and the whole reason a per-check report beats a pass/fail.
+- **`skipped` and `not-applicable` are different outcomes and the schema keeps them apart.** A skip means an earlier check failed and this one could not run — never a soft pass, and a build with one is not releasable, because "nothing failed" is not the same claim as "it works". Not-applicable means the question is meaningless for this build: a static export has no player to move, and failing it for that would be failing it for doing exactly what it was asked.
+- The check ids are a **closed vocabulary** in Zod, for the same reason behaviours and trigger actions are. Sprint 25 maps a failed check to a repair strategy, and that mapping has to be exhaustive — a `switch` that forgets an arm is a compile error, where a free-form string would mean a failure nobody wrote a repair for quietly becoming a failure nobody notices.
+- Idle health is measured _before_ the movement test but reported after it. Walking into a hazard and being damaged at spawn produce the same health number afterwards, and only one of them is a bug. It is compared against the scene's declared maximum rather than a reading taken a moment earlier, because a damage volume on the spawn does its work in the first frame and two readings taken after it would agree perfectly about a player who is already hurt.
 
 **Definition of Done:** Five known-good templates pass cleanly; three deliberately broken scenes (spawn inside terrain, missing asset reference, broken WASM path) each fail with specific, identifiable output.
+
+**Met — and it found something on its first full run.** The **Village Outpost's player spawned inside its own hut.** The hut stands at the origin; the schema's default spawn is `[0, 0, 0]`; the character controller came up wedged in a static collider and moved 0.00 m under two seconds of held input. That template has been in the repo since Sprint 6, is offered on the projects screen, and has been opened, exported, screenshotted and pixel-compared in three browsers — and every one of those tests was satisfied, because a player stuck in a wall renders perfectly. Nothing found it until something tried to _walk_. The fix is a spawn point in front of the hut, and a `player` field on the template builder so a scene can say where its player starts rather than inheriting the origin by accident.
+
+The rest: all five templates pass, and each of the three deliberate breakages fails on its own check — a spawn off the edge of the terrain on `player-moves` ("the player fell out of the world … the spawn point is probably inside or under the terrain", with the spawn and the ending position as evidence), a model deleted from the folder on `assets-resolve`, and a corrupted inlined WebAssembly payload on `physics-initialises`. Two further cases are asserted because they are the ways a gate quietly stops being one: a static export reports `not-applicable` rather than failing for having no player, and a build whose `scene.json` is missing reports `skipped` for everything downstream rather than a clean sheet.
+
+**Scope, stated plainly.** The task says "wire it as a required step: the export worker writes to a private staging path first". There is no export worker — export runs in the browser, and there is no server at all until Sprint 28. What exists is the gate itself and a CI workflow that runs it on every change to the engine, exporter, templates or asset pipeline. The staging path is real (the harness builds into a temporary folder and serves it on an ephemeral loopback port, never anywhere reachable), but the thing being gated is CI rather than a download button. Gating the button is Sprint 26; a server doing it is Sprint 28. Calling that "wired as a required step in the deploy pipeline" today would be describing a pipeline that does not exist yet.
+
+One more honest limit: this runs in **Chromium only**. The export QA suite covers three browsers for rendering, and adding two more browsers here would triple a two-minute gate to catch a class of bug — a scene that plays in one engine and not another — that has not been seen once. Worth revisiting the day it is.
 
 ---
 

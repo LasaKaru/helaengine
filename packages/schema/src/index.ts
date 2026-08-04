@@ -14,3 +14,4 @@ export * from './object.js';
 export * from './scene.js';
 export * from './migrations.js';
 export * from './asset.js';
+export * from './smoke.js';

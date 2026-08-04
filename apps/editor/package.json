@@ -15,7 +15,9 @@
   },
   "dependencies": {
     "@helaengine/engine": "workspace:*",
+    "@helaengine/export": "workspace:*",
     "@helaengine/schema": "workspace:*",
+    "@helaengine/templates": "workspace:*",
     "@react-three/drei": "^9.120.4",
     "@react-three/fiber": "^8.17.10",
     "colyseus.js": "0.15.26",

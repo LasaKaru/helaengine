@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { SceneObjectSchema, type Scene } from '@helaengine/schema';
 import { createEmptyScene } from '../store/sceneStore';
-import { templateById } from '../templates';
+import { templateById } from '@helaengine/templates';
 import { db } from './db';
 import {
   deleteProject,

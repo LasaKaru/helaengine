@@ -10,7 +10,7 @@ import {
   saveProject,
   type ProjectSummary,
 } from '../storage/projects';
-import { templateById } from '../templates';
+import { templateById } from '@helaengine/templates';
 import { useSceneStore } from './sceneStore';
 
 export type Screen = 'projects' | 'editor';

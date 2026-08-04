@@ -47,23 +47,33 @@ function seeded(seed: number): () => number {
   };
 }
 
-function buildScene(
-  name: string,
-  placements: Placement[],
-  terrain: Partial<Scene['terrain']> = {},
-  inventory: Partial<Scene['inventory']> = {},
-  unlockables: Scene['unlockables'] = [],
-  audioConfig: AudioConfigInput = {},
-): Scene {
+interface SceneExtras {
+  terrain?: Partial<Scene['terrain']>;
+  inventory?: Partial<Scene['inventory']>;
+  unlockables?: Scene['unlockables'];
+  audioConfig?: AudioConfigInput;
+  /**
+   * Where the player starts.
+   *
+   * Worth an explicit field rather than the schema's `[0, 0, 0]` default, because the origin is
+   * also where a level designer naturally puts the centrepiece. The Village Outpost put its hut
+   * there, and the player spawned inside it, wedged in its collider and unable to walk out — a bug
+   * that survived every test this repo had until something actually tried to move.
+   */
+  player?: Partial<Scene['player']>;
+}
+
+function buildScene(name: string, placements: Placement[], extras: SceneExtras = {}): Scene {
   counter = 0;
   return SceneSchema.parse({
     sceneId: `scene_${Math.random().toString(36).slice(2, 10)}`,
     version: CURRENT_SCENE_VERSION,
     name,
-    terrain,
-    inventory,
-    unlockables,
-    audioConfig,
+    terrain: extras.terrain ?? {},
+    inventory: extras.inventory ?? {},
+    unlockables: extras.unlockables ?? [],
+    audioConfig: extras.audioConfig ?? {},
+    player: extras.player ?? {},
     objects: placements.map((placement) => ({
       id: objectId(),
       assetId: placement.assetId,
@@ -147,7 +157,7 @@ export const TEMPLATES: SceneTemplate[] = [
       }
 
       return buildScene('Forest Clearing', placements, {
-        ...sculptedTerrain((field) => {
+        terrain: sculptedTerrain((field) => {
           // A gentle rise on one side, so the clearing is not a perfectly level disc.
           field.sculpt(-34, -28, 'raise', { radius: 40, strength: 0.55 });
           field.sculpt(38, 30, 'raise', { radius: 30, strength: 0.3 });
@@ -199,7 +209,11 @@ export const TEMPLATES: SceneTemplate[] = [
       }
 
       return buildScene('Village Outpost', placements, {
-        ...sculptedTerrain((field) => {
+        // In front of the hut rather than inside it. The hut stands at the origin, which is also
+        // where the schema's default spawn is, so the player used to start wedged in its collider
+        // with nowhere to walk — found by the pre-delivery smoke test, not by anybody reading this.
+        player: { spawn: [0, 0, 9] },
+        terrain: sculptedTerrain((field) => {
           field.sculpt(30, -30, 'raise', { radius: 34, strength: 0.5 });
           field.sculpt(-40, 20, 'raise', { radius: 28, strength: 0.35 });
           // Level the ground the hut stands on, so the buildings are not perched on a slope.
@@ -329,15 +343,13 @@ export const TEMPLATES: SceneTemplate[] = [
         });
       }
 
-      return buildScene(
-        'Skirmish',
-        placements,
-        sculptedTerrain((field) => {
+      return buildScene('Skirmish', placements, {
+        terrain: sculptedTerrain((field) => {
           // Flat where the fight happens: a first playable should not also be a hill climb.
           field.sculpt(0, -12, 'flatten', { radius: 30, strength: 1 });
           field.sculpt(34, 20, 'raise', { radius: 26, strength: 0.4 });
         }),
-        {
+        inventory: {
           weapons: [
             {
               id: 'weapon_0001',
@@ -368,7 +380,7 @@ export const TEMPLATES: SceneTemplate[] = [
           // and the rifle is behind a secret.
           startingWeaponIds: [],
         },
-        [
+        unlockables: [
           {
             id: 'secret_0001',
             label: 'Rifle cache',
@@ -392,7 +404,7 @@ export const TEMPLATES: SceneTemplate[] = [
             once: true,
           },
         ],
-        {
+        audioConfig: {
           music: {
             menuTrackAssetId: 'audio_music_menu',
             exploreTrackAssetId: 'audio_music_explore',
@@ -415,7 +427,7 @@ export const TEMPLATES: SceneTemplate[] = [
             { event: 'enemyDied', assetId: 'audio_sfx_death', positional: true, volume: 0.8 },
           ],
         },
-      );
+      });
     },
   },
   {
@@ -494,7 +506,7 @@ export function buildStressScene(): Scene {
   }
 
   return buildScene('Stress Test', placements, {
-    ...sculptedTerrain((field) => {
+    terrain: sculptedTerrain((field) => {
       field.sculpt(-40, -30, 'raise', { radius: 40, strength: 0.5 });
       field.sculpt(35, 34, 'raise', { radius: 36, strength: 0.4 });
       field.sculpt(0, 0, 'smooth', { radius: 70, strength: 0.5 });
