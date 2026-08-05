@@ -36,6 +36,10 @@ pnpm editor          # -> http://localhost:5174   the editor
 pnpm demo            # -> http://localhost:5173   framework-free runtime harness
 ```
 
+**On Windows?** There is a step-by-step guide at
+[`docs/RUNNING-ON-WINDOWS.md`](docs/RUNNING-ON-WINDOWS.md), including the PowerShell equivalents of
+the environment variables above and the two scripts in this repository that are Linux-only.
+
 `ingest-assets` has to run first: the compressed GLBs, thumbnails and `manifest.json` are generated
 output and are not committed. Both apps serve the same `generated/assets/` directory rather than
 keeping private copies.
