@@ -7,6 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { roleAtLeast, type Role } from '@helaengine/schema';
 import { createPool, migrate, reset, type Db } from './db.js';
 import { LocalAssetStorage } from './assets.js';
+import { hashToken } from './auth.js';
 import { createApiServer } from './server.js';
 
 /**
@@ -116,6 +117,19 @@ async function signup(
     personalOrganizationId: created.body.personalOrganizationId,
   };
 }
+
+describe('session tokens', () => {
+  it('hashes to the digest the collaboration server expects', () => {
+    // `apps/collab/src/store.ts` restates this hash rather than importing it, so that the
+    // collaboration server does not depend on this package's module graph to authenticate a
+    // socket. The same literal is asserted there. If these two ever disagree, every collaborative
+    // session silently stops authenticating — so they are pinned from both sides rather than
+    // trusted to stay in step.
+    expect(hashToken('a-known-session-token')).toBe(
+      '639a1fbb1598acc02453eff9ca25eaa6972bf8da2b7956cb2d0e8efd7fce9784',
+    );
+  });
+});
 
 describe('signing up', () => {
   it('creates a personal workspace, owned by the new user', async () => {

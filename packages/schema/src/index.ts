@@ -18,3 +18,4 @@ export * from './smoke.js';
 export * from './repair.js';
 export * from './share.js';
 export * from './account.js';
+export * from './collab.js';

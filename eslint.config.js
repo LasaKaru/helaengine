@@ -131,6 +131,7 @@ export default tseslint.config(
       'apps/api/src/migrate-cli.ts',
       'apps/share/src/index.ts',
       'apps/realtime/src/index.ts',
+      'apps/collab/src/index.ts',
     ],
     rules: {
       'no-console': 'off',
