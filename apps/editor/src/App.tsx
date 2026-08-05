@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { initPhysics } from '@helaengine/engine';
 import { loadAssetLibrary, type AssetLibrary } from './engine/assetLibrary';
 import { useEditorStore } from './store/editorStore';
@@ -12,6 +12,7 @@ import { ShortcutsModal } from './components/ShortcutsModal';
 import { useShortcuts } from './useShortcuts';
 import { useAutosave } from './useAutosave';
 import { useProjectStore } from './store/projectStore';
+import { useUploadedAssets } from './storage/useUploadedAssets';
 import { TopBar } from './components/TopBar';
 import { Viewport } from './components/Viewport';
 
@@ -27,12 +28,35 @@ export function App(): React.JSX.Element {
   useShortcuts();
   useAutosave(screen === 'editor');
 
+  const library = state.status === 'ready' ? state.library : null;
+  const uploads = useUploadedAssets(library);
+
+  /**
+   * The curated library plus this organisation's own, as one manifest.
+   *
+   * Merged here rather than inside `loadAssetLibrary` because uploads arrive *after* boot — a new
+   * one appears the moment it finishes processing, and the inspector, the top bar and the library
+   * panel all have to see it without a reload.
+   *
+   * Keyed by id, with the upload winning, because the *resolver* already works that way — `add`
+   * overwrites. Concatenating instead would let the two disagree: the engine would draw an
+   * organisation's model while the inspector read the curated entry's bounds and the panel showed
+   * two cards with the same name. An id can only mean one asset.
+   */
+  const manifest = useMemo(() => {
+    if (!library) return null;
+    if (uploads.entries.length === 0) return library.manifest;
+
+    const byId = new Map(library.manifest.assets.map((asset) => [asset.id, asset]));
+    for (const entry of uploads.entries) byId.set(entry.id, entry);
+    return { ...library.manifest, assets: [...byId.values()] };
+  }, [library, uploads.entries]);
+
   useEffect(() => {
     const controller = new AbortController();
 
     loadAssetLibrary(controller.signal)
       .then((library) => {
-        exposeDevApi(library);
         setState({ status: 'ready', library });
       })
       .catch((error: unknown) => {
@@ -45,6 +69,17 @@ export function App(): React.JSX.Element {
 
     return () => controller.abort();
   }, []);
+
+  /**
+   * Re-published whenever the manifest grows.
+   *
+   * The dev API closes over the library it was handed, so publishing once at boot would leave
+   * `assetIds()` answering with the curated list forever — and the e2e suite asking whether an
+   * upload is placeable would get "no" from a stale closure while the panel showed the card.
+   */
+  useEffect(() => {
+    if (library && manifest) exposeDevApi({ ...library, manifest });
+  }, [library, manifest]);
 
   // Rapier is WebAssembly and has to be instantiated before anything can be simulated. Starting
   // that here, once, is the sprint plan's "handle it at bootstrap" — by the time somebody presses
@@ -90,11 +125,11 @@ export function App(): React.JSX.Element {
 
   return (
     <div className="editor">
-      <TopBar manifest={state.library.manifest} />
+      <TopBar manifest={manifest ?? state.library.manifest} />
       <div className="workspace">
-        <AssetLibraryPanel manifest={state.library.manifest} />
+        <AssetLibraryPanel manifest={manifest ?? state.library.manifest} uploads={uploads} />
         <Viewport loader={state.library.loader} resolver={state.library.resolver} />
-        <InspectorPanel manifest={state.library.manifest} />
+        <InspectorPanel manifest={manifest ?? state.library.manifest} />
       </div>
       <DragChip />
       <ShortcutsModal />

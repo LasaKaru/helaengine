@@ -805,16 +805,145 @@ body,
 }
 
 /* The left rail splits its height between the asset library and the scene tree, each scrolling
-   independently, so neither can push the other around. */
+   independently, so neither can push the other around.
+
+   Flex rather than a fixed grid template, because "My Assets" is only there for a signed-in
+   account. A two-row grid with a third child gives that child an implicit row the rail then clips,
+   which is how the section ended up underneath the scene tree — visible, and not clickable. */
 .rail-left {
-  display: grid;
-  grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 
-.rail-left .panel-assets,
-.rail-left .panel-tree {
+.rail-left .panel-assets {
+  flex: 3 1 0;
+  min-height: 0;
   overflow-y: auto;
+}
+
+.rail-left .panel-tree {
+  flex: 2 1 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Its natural height, capped: a long list of uploads must not squeeze the library it feeds. */
+.rail-left .panel-uploads {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 34%;
+  overflow-y: auto;
+}
+
+/* ---- My Assets (Sprint 30) ---- */
+
+.upload-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.upload-controls label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.upload-controls select {
+  color: inherit;
+  font: inherit;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 6px;
+}
+
+.upload-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  margin-top: 8px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-dim);
+  background: var(--panel-raised);
+  /* Dashed, because that is what every operating system's file drop target looks like and this is
+     not the place to be original. */
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+
+.upload-drop.over {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.upload-drop p {
+  margin: 0;
+}
+
+.upload-error {
+  margin: 8px 0 0;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--warn);
+  background: var(--panel-raised);
+  border: 1px solid var(--warn);
+  border-radius: 6px;
+}
+
+.upload-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.upload-list li {
+  display: grid;
+  /* Name and status on one line, the failure reason wrapping underneath it rather than pushing the
+     Delete button off the edge of a 260px rail. */
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.upload-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upload-status {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.upload-status.status-ready {
+  color: var(--accent);
+}
+
+.upload-status.status-failed {
+  color: var(--warn);
+}
+
+.upload-failure {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: var(--warn);
 }
 
 /* In a nested row the indent squeezes the label; let the asset id give up space first. */

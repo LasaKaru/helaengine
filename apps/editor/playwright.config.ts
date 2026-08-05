@@ -120,6 +120,9 @@ export default defineConfig({
         API_PORT: '3100',
         DATABASE_URL:
           process.env['TEST_DATABASE_URL'] ?? 'postgres://hela@127.0.0.1:5433/helaengine_e2e',
+        // Uploaded assets (Sprint 30) land on disk. A directory per run keeps one run's models out
+        // of the next one's storage, the same bargain `SHARE_ROOT` makes below.
+        ASSET_ROOT: process.env['ASSET_ROOT'] ?? '.hela-assets-e2e',
       },
     },
     {

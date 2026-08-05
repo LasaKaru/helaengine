@@ -25,6 +25,7 @@ export default tseslint.config(
       // Builds published to the local share service. Whole exports — minified engine bundles and
       // third-party decoders — which are lint targets only in the sense that a zip is.
       '**/.hela-shared*/**',
+      '**/.hela-assets*/**',
     ],
   },
   js.configs.recommended,

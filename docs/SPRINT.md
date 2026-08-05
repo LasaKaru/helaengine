@@ -889,16 +889,33 @@ Sprint 26 taught this lesson twice in one afternoon — the logic was right and 
 
 **Tasks:**
 
-- [ ] Provision R2 (or S3) bucket(s): structure `/global-assets/...` (your curated library) and `/orgs/{orgId}/assets/...` (customer-uploaded)
-- [ ] Build `Asset` Prisma model + `POST /assets/upload-url` endpoint issuing a short-lived signed upload URL (direct browser-to-storage upload, not proxied through your API, to avoid unnecessary server load)
-- [ ] Move the Sprint 2 ingest script (`gltf-transform` compression + thumbnail generation) into a BullMQ background job, triggered after a signed upload completes (via a client-confirms-upload callback endpoint, or storage-event webhook if your provider supports it)
-- [ ] Build custom asset upload UI (gated by plan tier per DEVELOPMENT-PLAN.md — free tier may not get this): drag a `.glb` file, upload, see processing status, appears in a private "My Assets" library section once done
-- [ ] Set up CDN (Cloudflare) in front of the asset bucket; use immutable/versioned asset URLs (e.g., content-hash in path) so cache headers can be aggressive (`max-age=31536000, immutable`)
-- [ ] Update the editor's Asset Library panel to fetch the manifest from the API (`GET /assets?category=...`) instead of the static local `manifest.json` from Sprint 2, blending global + org-private assets in the same UI
+- [x] Storage laid out as the plan describes — a curated library with no owner and `/orgs/{orgId}/assets/...` per customer. **Local files, not R2 or S3**, behind an `AssetStorage` interface; see the tech notes for why that is a deployment decision rather than a shortcut
+- [x] An `assets` table (`003_assets.sql`, hand-written SQL — no Prisma, for the reasons in `db.ts`) + `POST /orgs/:id/assets` issuing a short-lived **signed upload URL**. The bytes go straight to `PUT /uploads/:orgId/:assetId?expires=…&signature=…`, which runs **before** authentication because the signature is the authorisation — the same shape a presigned S3 URL has
+- [ ] **Not done: the ingest job.** There is no BullMQ and no queue. `completeUpload` validates and stores synchronously; the `pending → ready | failed` state is in the row, so the UI and the API are already shaped for a worker, but no `gltf-transform` compression or thumbnail generation runs on an upload
+- [x] Custom asset upload UI: a drop zone and a file picker in a **"My Assets"** section of the library panel, with per-asset status and the failure reason shown next to the asset it is about. **Not gated by plan tier** — no billing exists yet (Sprint 32)
+- [x] Content-hash paths (`orgs/{id}/assets/{sha256}.glb`) served with `cache-control: public, max-age=31536000, immutable`. **No Cloudflare in front of it**; the route is the origin a CDN would sit on, and it is deliberately unauthenticated for that reason
+- [x] The Asset Library panel blends global and org-private assets. The **curated** manifest is still the static `manifest.json` from Sprint 2 — uploads are merged into it in the editor, keyed by id so an upload shadows a curated asset rather than sitting beside it
+- [x] **Added:** a CORS preflight for `PUT`, found by driving a browser; a 413 for an oversize body, refused while it is still arriving; `glTF` magic-byte validation, because a `.glb` extension is a claim and the bytes are a fact; and `TooLarge` in `roles.ts`
 
-**Deliverables:** Cloud asset storage, custom upload pipeline, CDN delivery.
+**Tech notes:**
+
+- **The upload ticket is an HMAC, not a row.** A signature over `{org}:{assetId}:{expiresAt}` with a server-held secret, good for five minutes. The alternative — a row per pending upload — is a database write for every ticket including the ones nobody spends, plus a cleanup job for the rest. It is `createHmac` rather than a hash of `secret + payload` because SHA-256 is a Merkle–Damgård construction, and a secret-prefixed digest can be extended by somebody holding one valid signature and no secret at all.
+- **The organisation is inside the signature.** Not merely a path segment: if it were, one valid ticket would be a write into every tenant. There is a test that swaps it and watches the upload be refused.
+- **One table, not two.** Curated assets are rows with a null `organization_id`. "What can I place" is then one query with one `where` clause rather than a union — and a union is the shape that drifts the day somebody adds a column to one side. It costs two partial unique indexes, because SQL treats nulls as distinct.
+- **`GET /assets/*` is unauthenticated on purpose.** A CDN holds no session. The protection is that the path contains a content hash nobody can guess, which is the same bargain the share service makes for an unlisted build, and it is what lets the cache header be `immutable` — different bytes can never land on the same URL.
+- **An uploaded asset's `glbPath` is absolute.** It lives at the API, not in the export's asset folder, so the editor writes a full URL and the engine's `joinUrl` passes it through untouched. No loader change; one e2e test that asserts the URL rather than trusting it, because `./assets/http://…` 404s silently.
+
+**Deliverables:** Per-organisation asset storage, a signed-upload pipeline, immutable content-addressed URLs, and a "My Assets" section in the editor.
 
 **Definition of Done:** A user uploads a custom `.glb`, sees a processing indicator, and within seconds it's compressed, thumbnailed, and appears in their private asset library, placeable in scenes exactly like a built-in asset.
+
+**Partially met, and the gap is the middle of that sentence.** A browser signs up, drops a `.glb` on the panel, watches the row go from "Processing…" to "Ready", and places it in the world — where `viewportObjects()` reports `isModel: true`, meaning the engine fetched and drew the customer's own GLB rather than falling back to a placeholder box. Deleting it removes it from the account, not just from the tab. That much is driven in Chromium and asserted, not clicked once by hand.
+
+What is **not** true: nothing is _compressed_ or _thumbnailed_. The upload is validated and stored as sent. Sprint 2's `gltf-transform` pipeline exists and runs on the curated library, but wiring it to an upload means a queue and a worker process, and there is neither. The `pending → ready | failed` column and the status UI are the seam a worker plugs into — the row already means "not ready yet" and the panel already draws it that way — but calling it done would be describing a state machine as if it were a pipeline.
+
+And the three named products are absent, each a deployment decision rather than missing code: **no R2 or S3** (`LocalAssetStorage` implements a two-method `AssetStorage` interface; swapping it is the SDK's `putObject` and the provider's own presigned URL), **no BullMQ**, and **no Cloudflare**. The content-addressed immutable path is built and tested precisely so that putting a CDN in front of it later needs no invalidation strategy and no code change.
+
+One real bug, found the way the useful ones always are — by driving a browser rather than reading the diff. `model/gltf-binary` is not a CORS-safelisted content type, so the upload is preflighted, and `access-control-allow-methods` did not list `PUT`. Every server-side test passed; the feature was "Failed to fetch" with the row stuck on "Processing…" forever. That is the third time in four sprints that the seam between two working halves was the thing that was broken.
 
 ---
 

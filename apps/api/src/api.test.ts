@@ -1,7 +1,12 @@
 import type { Server } from 'node:http';
+import { createHmac } from 'node:crypto';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { roleAtLeast, type Role } from '@helaengine/schema';
 import { createPool, migrate, reset, type Db } from './db.js';
+import { LocalAssetStorage } from './assets.js';
 import { createApiServer } from './server.js';
 
 /**
@@ -19,15 +24,29 @@ const DATABASE_URL =
 let db: Db;
 let server: Server;
 let origin: string;
+let assetRoot: string;
 const invites: Array<{ email: string; token: string }> = [];
+
+/**
+ * A fixed upload secret, so a test can forge a ticket and watch it be refused.
+ *
+ * The server generates one per process when none is given, which is the right default — a restart
+ * invalidating every outstanding ticket is cheap and safe. It just makes "here is a signature you
+ * did not issue" impossible to write from the outside.
+ */
+const UPLOAD_SECRET = 'a-test-upload-secret';
 
 beforeAll(async () => {
   db = createPool(DATABASE_URL);
   await reset(db);
   await migrate(db);
 
+  assetRoot = mkdtempSync(join(tmpdir(), 'hela-assets-test-'));
+
   server = createApiServer({
     db,
+    storage: new LocalAssetStorage(assetRoot),
+    uploadSecret: UPLOAD_SECRET,
     // Captured rather than logged, so a test can read the token the way a person would read their
     // inbox — without the test knowing anything about how invites are stored.
     sendInvite: (invite) => invites.push({ email: invite.email, token: invite.token }),
@@ -39,13 +58,14 @@ beforeAll(async () => {
 afterAll(async () => {
   await new Promise<void>((done) => server.close(() => done()));
   await db.end();
+  rmSync(assetRoot, { recursive: true, force: true });
 });
 
 beforeEach(async () => {
   // Truncated rather than dropped: each test starts from nothing, and rebuilding the schema per
   // test would make the suite slow enough that somebody stops running it.
   await db.query(
-    'truncate sessions, invites, scene_versions, projects, memberships, organizations, users cascade',
+    'truncate sessions, invites, scene_versions, projects, memberships, organizations, users, assets cascade',
   );
   invites.length = 0;
 });
@@ -623,5 +643,447 @@ describe('projects and cloud save', () => {
       token: stranger.token,
     });
     expect(peek.status).toBe(404);
+  });
+});
+
+/**
+ * Sprint 30 — assets that belong to somebody.
+ *
+ * Two things are being checked here that a unit test could not reach. The first is the upload
+ * *path*: a ticket issued by one route, spent against another that runs before authentication, with
+ * the signature as the only thing standing between a stranger and somebody else's storage. The
+ * second is the boundary between the curated library and a customer's own — one table, one query,
+ * and a `where` clause that is the entire tenant isolation for assets.
+ */
+describe('assets', () => {
+  async function workspace(): Promise<{
+    token: string;
+    organizationId: string;
+    userId: string;
+  }> {
+    const owner = await signup(`uploader-${Math.random().toString(36).slice(2)}@example.com`);
+    return {
+      token: owner.token,
+      organizationId: owner.personalOrganizationId,
+      userId: owner.userId,
+    };
+  }
+
+  /** Bytes that start the way a binary glTF starts: magic, version 2, and a length. */
+  function glb(payload = 'hela'): Uint8Array<ArrayBuffer> {
+    const body = Buffer.from(payload, 'utf8');
+    const bytes = new Uint8Array(12 + body.byteLength);
+    const view = new DataView(bytes.buffer);
+
+    bytes.set(Buffer.from('glTF', 'ascii'), 0);
+    view.setUint32(4, 2, true);
+    view.setUint32(8, bytes.byteLength, true);
+    bytes.set(body, 12);
+    return bytes;
+  }
+
+  interface UploadGrant {
+    asset: { id: string; assetId: string; status: string };
+    upload: { url: string; maxBytes: number; ticket: { expiresAt: number; signature: string } };
+  }
+
+  async function requestUpload(
+    token: string,
+    organizationId: string,
+    body: Record<string, unknown>,
+  ): Promise<Response<UploadGrant & { error?: string }>> {
+    return call<UploadGrant & { error?: string }>('POST', `/orgs/${organizationId}/assets`, {
+      token,
+      body,
+    });
+  }
+
+  /** Sends raw bytes to a presigned URL. No session header — the ticket is the authorisation. */
+  async function put(
+    url: string,
+    bytes: Uint8Array<ArrayBuffer>,
+  ): Promise<{ status: number; body: { asset?: { status: string; failure: string | null } } }> {
+    const response = await fetch(`${origin}${url}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'model/gltf-binary' },
+      // Wrapped in a Blob because `fetch`'s body type does not include a bare `Uint8Array` — the
+      // bytes on the wire are identical either way.
+      body: new Blob([bytes]),
+    });
+    const text = await response.text();
+    return { status: response.status, body: text ? JSON.parse(text) : {} };
+  }
+
+  it('takes an upload through pending to ready, and serves the bytes back', async () => {
+    const { token, organizationId } = await workspace();
+
+    const granted = await requestUpload(token, organizationId, {
+      assetId: 'my_statue',
+      name: 'Stone Statue',
+      category: 'props',
+    });
+    expect(granted.status).toBe(201);
+    // Pending immediately, so the panel has a row to draw a spinner against rather than nothing
+    // until the bytes land.
+    expect(granted.body.asset.status).toBe('pending');
+    expect(granted.body.upload.url).toContain('signature=');
+
+    const bytes = glb('a statue');
+    const sent = await put(granted.body.upload.url, bytes);
+    expect(sent.status).toBe(200);
+    expect(sent.body.asset?.status).toBe('ready');
+
+    const listed = await call<{
+      assets: Array<{ assetId: string; status: string; glbPath: string; sizeBytes: number }>;
+    }>('GET', `/orgs/${organizationId}/assets`, { token });
+    const mine = listed.body.assets.find((asset) => asset.assetId === 'my_statue');
+    expect(mine?.status).toBe('ready');
+    expect(mine?.sizeBytes).toBe(bytes.byteLength);
+
+    // The path is content-addressed, and the bytes come back byte-for-byte.
+    expect(mine?.glbPath).toMatch(new RegExp(`^orgs/${organizationId}/assets/[0-9a-f]{32}\\.glb$`));
+    const fetched = await fetch(`${origin}/assets/${mine!.glbPath}`);
+    expect(fetched.status).toBe(200);
+    expect(fetched.headers.get('content-type')).toBe('model/gltf-binary');
+    // Forever, because a different upload can never land on this URL — that is what makes the
+    // header safe and what would let a CDN in front of this need no invalidation.
+    expect(fetched.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
+    expect(new Uint8Array(await fetched.arrayBuffer())).toEqual(bytes);
+  });
+
+  it('serves the bytes without a session, because a CDN has none', async () => {
+    const { token, organizationId } = await workspace();
+    const granted = await requestUpload(token, organizationId, { assetId: 'public_rock' });
+    await put(granted.body.upload.url, glb('rock'));
+
+    const listed = await call<{ assets: Array<{ assetId: string; glbPath: string }> }>(
+      'GET',
+      `/orgs/${organizationId}/assets`,
+      { token },
+    );
+    const path = listed.body.assets.find((a) => a.assetId === 'public_rock')!.glbPath;
+
+    // Deliberately no authorization header. The protection is that the hash in the path is not
+    // guessable — the same bargain the share service makes for an unlisted build, stated in the
+    // route's own comment and worth a test so it stays a decision rather than an accident.
+    const anonymous = await fetch(`${origin}/assets/${path}`);
+    expect(anonymous.status).toBe(200);
+  });
+
+  it('answers the preflight a browser sends before an upload', async () => {
+    // Found by driving a browser, not by reading the code. `model/gltf-binary` is not a
+    // CORS-safelisted content type, so the upload is preflighted — and an `allow-methods` without
+    // PUT turns the whole feature into "Failed to fetch" with the row stuck on "Processing…",
+    // while every server-side test passes. The same shape of bug as Sprint 27's missing preflight.
+    const preflight = await fetch(`${origin}/uploads/x/y`, {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'http://127.0.0.1:5174',
+        'access-control-request-method': 'PUT',
+        'access-control-request-headers': 'content-type',
+      },
+    });
+
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get('access-control-allow-methods')).toContain('PUT');
+    expect(preflight.headers.get('access-control-allow-headers')).toContain('content-type');
+  });
+
+  it('refuses a file that is not a binary glTF, and says which file', async () => {
+    const { token, organizationId } = await workspace();
+    const granted = await requestUpload(token, organizationId, { assetId: 'not_a_model' });
+
+    // A PNG renamed to .glb. The extension is a claim the uploader makes; the magic bytes are a
+    // fact about the file.
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const sent = await put(granted.body.upload.url, png);
+
+    expect(sent.status).toBe(422);
+    expect(sent.body.asset?.status).toBe('failed');
+    expect(sent.body.asset?.failure).toContain('binary glTF');
+
+    // Recorded, not discarded: the panel shows this sentence next to the asset, and a refresh must
+    // not turn a failure into a row that is silently missing.
+    const listed = await call<{ assets: Array<{ assetId: string; failure: string | null }> }>(
+      'GET',
+      `/orgs/${organizationId}/assets`,
+      { token },
+    );
+    expect(listed.body.assets.find((a) => a.assetId === 'not_a_model')?.failure).toContain(
+      'binary glTF',
+    );
+  });
+
+  it('refuses an empty file', async () => {
+    const { token, organizationId } = await workspace();
+    const granted = await requestUpload(token, organizationId, { assetId: 'nothing_at_all' });
+
+    const sent = await put(granted.body.upload.url, new Uint8Array(0));
+    expect(sent.status).toBe(422);
+    expect(sent.body.asset?.failure).toContain('empty');
+  });
+
+  it('refuses a forged signature', async () => {
+    const { token, organizationId } = await workspace();
+    const granted = await requestUpload(token, organizationId, { assetId: 'stolen_model' });
+
+    const forged = granted.body.upload.url.replace(
+      /signature=[0-9a-f]+/,
+      `signature=${'f'.repeat(64)}`,
+    );
+    const sent = await put(forged, glb());
+    expect(sent.status).toBe(403);
+
+    // And a signature of the wrong *length*, which is the case that would throw out of
+    // `timingSafeEqual` rather than compare false if the length were not checked first.
+    const short = granted.body.upload.url.replace(/signature=[0-9a-f]+/, 'signature=ab');
+    expect((await put(short, glb())).status).toBe(403);
+
+    const stillPending = await call<{ assets: Array<{ assetId: string; status: string }> }>(
+      'GET',
+      `/orgs/${organizationId}/assets`,
+      { token },
+    );
+    expect(stillPending.body.assets.find((a) => a.assetId === 'stolen_model')?.status).toBe(
+      'pending',
+    );
+  });
+
+  it('refuses an expired ticket, even a correctly signed one', async () => {
+    const { token, organizationId } = await workspace();
+    // The row has to exist, or a 404 from `completeUpload` would pass this test for the wrong
+    // reason — the point is that the ticket is refused before the row is ever looked at.
+    expect((await requestUpload(token, organizationId, { assetId: 'too_late' })).status).toBe(201);
+
+    // Signed with the real secret, for a moment that has passed. Changing `expires` alone would
+    // break the signature, so the ticket is re-signed for the earlier time — which is exactly what
+    // somebody replaying a ticket they found in a log cannot do.
+    const expiresAt = Date.now() - 1000;
+    const signature = createHmac('sha256', UPLOAD_SECRET)
+      .update(`${organizationId}:too_late:${expiresAt}`)
+      .digest('hex');
+
+    const sent = await put(
+      `/uploads/${organizationId}/too_late?expires=${expiresAt}&signature=${signature}`,
+      glb(),
+    );
+    expect(sent.status).toBe(403);
+  });
+
+  it('will not let a ticket for one organisation write into another', async () => {
+    const mine = await workspace();
+    const stranger = await workspace();
+
+    const granted = await requestUpload(mine.token, mine.organizationId, { assetId: 'my_model' });
+
+    // The organisation is inside the signature, so swapping it in the path invalidates the ticket.
+    // If it were only a path segment, one valid ticket would be a write into every tenant.
+    const crossed = granted.body.upload.url.replace(mine.organizationId, stranger.organizationId);
+    expect((await put(crossed, glb())).status).toBe(403);
+  });
+
+  it('keeps one organisation out of another organisation library', async () => {
+    const mine = await workspace();
+    const stranger = await workspace();
+
+    const granted = await requestUpload(mine.token, mine.organizationId, {
+      assetId: 'secret_boss',
+    });
+    await put(granted.body.upload.url, glb('a boss'));
+
+    // Reading somebody else's library needs membership in it, and an organisation id in a URL is
+    // not membership.
+    const peek = await call('GET', `/orgs/${mine.organizationId}/assets`, {
+      token: stranger.token,
+    });
+    expect(peek.status).toBe(404);
+
+    // And their own library does not contain it either — the isolation is in the query, not only
+    // in the route guard.
+    const theirs = await call<{ assets: Array<{ assetId: string }> }>(
+      'GET',
+      `/orgs/${stranger.organizationId}/assets`,
+      { token: stranger.token },
+    );
+    expect(theirs.body.assets.map((a) => a.assetId)).not.toContain('secret_boss');
+  });
+
+  it('shows the curated library to everyone and pending rows to nobody else', async () => {
+    const mine = await workspace();
+    const stranger = await workspace();
+
+    // A curated asset: no organisation, so it belongs to the product rather than to a customer.
+    await db.query(
+      `insert into assets (organization_id, asset_id, name, category, glb_path, status)
+       values (null, 'tree_pine_01', 'Pine Tree', 'trees', 'models/tree_pine_01.glb', 'ready')`,
+    );
+
+    const granted = await requestUpload(mine.token, mine.organizationId, { assetId: 'wip_model' });
+    expect(granted.status).toBe(201);
+
+    const forMe = await call<{ assets: Array<{ assetId: string; organizationId: string | null }> }>(
+      'GET',
+      `/orgs/${mine.organizationId}/assets`,
+      { token: mine.token },
+    );
+    // Both kinds in one list, which is the point of one table: the library panel gets a single
+    // answer to "what can I place" rather than merging two.
+    expect(forMe.body.assets.map((a) => a.assetId)).toEqual(['tree_pine_01', 'wip_model']);
+    expect(forMe.body.assets[0]!.organizationId).toBeNull();
+
+    const forThem = await call<{ assets: Array<{ assetId: string }> }>(
+      'GET',
+      `/orgs/${stranger.organizationId}/assets`,
+      { token: stranger.token },
+    );
+    // The curated one, and not a half-uploaded asset belonging to somebody else.
+    expect(forThem.body.assets.map((a) => a.assetId)).toEqual(['tree_pine_01']);
+  });
+
+  it('filters by category, using the same closed vocabulary the manifest does', async () => {
+    const { token, organizationId } = await workspace();
+
+    await put(
+      (await requestUpload(token, organizationId, { assetId: 'oak_one', category: 'trees' })).body
+        .upload.url,
+      glb('oak'),
+    );
+    await put(
+      (await requestUpload(token, organizationId, { assetId: 'crate_one', category: 'props' })).body
+        .upload.url,
+      glb('crate'),
+    );
+
+    const trees = await call<{ assets: Array<{ assetId: string }> }>(
+      'GET',
+      `/orgs/${organizationId}/assets?category=trees`,
+      { token },
+    );
+    expect(trees.body.assets.map((a) => a.assetId)).toEqual(['oak_one']);
+
+    // A category the schema does not know is refused at the door rather than stored. An asset in
+    // an unknown category is a card the panel can draw and no filter can ever reach.
+    const invented = await requestUpload(token, organizationId, {
+      assetId: 'weird_one',
+      category: 'spaceships',
+    });
+    expect(invented.status).toBe(400);
+    expect(invented.body.error).toContain('category');
+  });
+
+  it('holds an asset id to the shape the curated library uses', async () => {
+    const { token, organizationId } = await workspace();
+
+    // The id becomes a storage key and goes into every scene that places the asset. "My Model.glb"
+    // as an id is a path traversal waiting to be discovered.
+    for (const assetId of ['My Model', '../escape', 'ab', 'x'.repeat(61), '']) {
+      const refused = await requestUpload(token, organizationId, { assetId });
+      expect(refused.status, `expected "${assetId}" to be refused`).toBe(400);
+    }
+  });
+
+  it('lets an upload be retried without leaving the first attempt behind', async () => {
+    const { token, organizationId } = await workspace();
+
+    const first = await requestUpload(token, organizationId, { assetId: 'retry_me' });
+    expect((await put(first.body.upload.url, new Uint8Array([1, 2, 3]))).status).toBe(422);
+
+    // The same id again. It reuses the row rather than colliding with it — otherwise a failed
+    // upload would make that name unusable forever.
+    const second = await requestUpload(token, organizationId, {
+      assetId: 'retry_me',
+      name: 'Second Go',
+    });
+    expect(second.status).toBe(201);
+    expect(second.body.asset.status).toBe('pending');
+    expect((await put(second.body.upload.url, glb('this time'))).status).toBe(200);
+
+    const listed = await call<{
+      assets: Array<{ assetId: string; status: string; name: string; failure: string | null }>;
+    }>('GET', `/orgs/${organizationId}/assets`, { token });
+    const rows = listed.body.assets.filter((a) => a.assetId === 'retry_me');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.status).toBe('ready');
+    expect(rows[0]!.name).toBe('Second Go');
+    // The old reason is cleared, not left to be shown beside a working asset.
+    expect(rows[0]!.failure).toBeNull();
+  });
+
+  it('needs editor to upload, and viewer to look', async () => {
+    const owner = await signup('asset-owner@example.com');
+    const viewer = await signup('asset-viewer@example.com');
+
+    const org = await call<{ organization: { id: string } }>('POST', '/orgs', {
+      token: owner.token,
+      body: { name: 'Studio' },
+    });
+    const organizationId = org.body.organization.id;
+
+    await call('POST', `/orgs/${organizationId}/invites`, {
+      token: owner.token,
+      body: { email: 'asset-viewer@example.com', role: 'viewer' },
+    });
+    await call('POST', '/invites/accept', {
+      token: viewer.token,
+      body: { token: invites.at(-1)!.token },
+    });
+
+    // A viewer can see the library — they have to, to open a scene that places these assets.
+    expect(
+      (await call('GET', `/orgs/${organizationId}/assets`, { token: viewer.token })).status,
+    ).toBe(200);
+
+    // But uploading is making something, which is what editor is for.
+    const refused = await requestUpload(viewer.token, organizationId, { assetId: 'sneaky_model' });
+    expect(refused.status).toBe(403);
+  });
+
+  it('deletes an asset, and refuses to delete somebody else', async () => {
+    const mine = await workspace();
+    const stranger = await workspace();
+
+    await put(
+      (await requestUpload(mine.token, mine.organizationId, { assetId: 'doomed_model' })).body
+        .upload.url,
+      glb('doomed'),
+    );
+
+    // A stranger asking to delete it gets the answer they would get for an organisation that does
+    // not exist, which is also the answer that tells them nothing.
+    expect(
+      (
+        await call('DELETE', `/orgs/${mine.organizationId}/assets/doomed_model`, {
+          token: stranger.token,
+        })
+      ).status,
+    ).toBe(404);
+
+    expect(
+      (
+        await call('DELETE', `/orgs/${mine.organizationId}/assets/doomed_model`, {
+          token: mine.token,
+        })
+      ).status,
+    ).toBe(204);
+
+    const listed = await call<{ assets: Array<{ assetId: string }> }>(
+      'GET',
+      `/orgs/${mine.organizationId}/assets`,
+      { token: mine.token },
+    );
+    expect(listed.body.assets.map((a) => a.assetId)).not.toContain('doomed_model');
+  });
+
+  it('refuses a file past the size limit while it is still arriving', async () => {
+    const { token, organizationId } = await workspace();
+    const granted = await requestUpload(token, organizationId, { assetId: 'enormous_model' });
+
+    const tooBig = new Uint8Array(granted.body.upload.maxBytes + 1024);
+    tooBig.set(Buffer.from('glTF', 'ascii'));
+
+    // 413 rather than a 500 from an unhandled throw: the client shows this to somebody who picked
+    // the wrong file, and "the API failed to handle this request" is not that sentence.
+    const sent = await put(granted.body.upload.url, tooBig);
+    expect(sent.status).toBe(413);
   });
 });

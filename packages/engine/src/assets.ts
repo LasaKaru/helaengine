@@ -26,6 +26,18 @@ export class ManifestAssetResolver implements AssetResolver {
     return this.#entries.get(assetId);
   }
 
+  /**
+   * Adds an entry the manifest did not have.
+   *
+   * For assets that arrive after the manifest was read — a customer's own upload, in the editor.
+   * They are the same kind of thing an ingested asset is, with a `glbPath` that happens to be
+   * absolute, so extending the map is the whole of the support they need. An export writes them
+   * into its own manifest, so nothing downstream ever calls this.
+   */
+  add(entry: AssetManifestEntry): void {
+    this.#entries.set(entry.id, entry);
+  }
+
   has(assetId: Id): boolean {
     return this.#entries.has(assetId);
   }

@@ -38,7 +38,9 @@ export function AccountBar(): React.JSX.Element | null {
     setError('');
     try {
       const found =
-        mode === 'up' ? await signUp({ email, password, displayName }) : await signIn({ email, password });
+        mode === 'up'
+          ? await signUp({ email, password, displayName })
+          : await signIn({ email, password });
       setWho(found);
       setPassword('');
       await refreshProjects();

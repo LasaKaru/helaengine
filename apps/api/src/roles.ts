@@ -22,6 +22,11 @@ export class NotFound extends Error {
   readonly status = 404;
 }
 
+/** A body the server refused before reading all of it — an upload past the size limit. */
+export class TooLarge extends Error {
+  readonly status = 413;
+}
+
 /** The role this user holds in this organisation, or null if they are not a member. */
 export async function roleIn(db: Db, organizationId: string, userId: string): Promise<Role | null> {
   const found = await db.query<{ role: Role }>(

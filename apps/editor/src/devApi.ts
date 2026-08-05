@@ -6,7 +6,7 @@ import type {
   LoadedScene,
   PlayerController,
 } from '@helaengine/engine';
-import { SceneObjectSchema, type Vec3 } from '@helaengine/schema';
+import { SceneObjectSchema, type AssetManifestEntry, type Vec3 } from '@helaengine/schema';
 import type { AssetLibrary } from './engine/assetLibrary';
 import { useEditorStore } from './store/editorStore';
 import { nextObjectId, useSceneStore } from './store/sceneStore';
@@ -14,6 +14,14 @@ import { nextObjectId, useSceneStore } from './store/sceneStore';
 export interface DevApi {
   store: typeof useSceneStore;
   assetIds(): string[];
+  /**
+   * One manifest entry, whole.
+   *
+   * `assetIds` answers "is it offered"; this answers "offered as *what*", which is the question an
+   * uploaded asset raises — its `glbPath` is an absolute URL at the API rather than a path inside
+   * the export's asset folder, and that difference is invisible until something tries to fetch it.
+   */
+  assetEntry(assetId: string): AssetManifestEntry | null;
   addObject(assetId: string, position?: Vec3, rotationY?: number): string;
   clear(): void;
   /** Object ids currently instantiated in the Three.js scene, not merely present in the store. */
@@ -321,6 +329,8 @@ export function exposeDevApi(library: AssetLibrary): void {
     store: useSceneStore,
 
     assetIds: () => library.manifest.assets.map((asset) => asset.id),
+
+    assetEntry: (assetId) => library.manifest.assets.find((asset) => asset.id === assetId) ?? null,
 
     addObject(assetId, position = [0, 0, 0], rotationY = 0) {
       const state = useSceneStore.getState();

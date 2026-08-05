@@ -8,6 +8,7 @@ import {
   type CloudSession,
   type VersionSummary,
 } from './cloudProjects';
+import { CloudAssets } from './cloudAssets';
 
 /**
  * One project store, two places it can live.
@@ -23,6 +24,7 @@ import {
 
 let session: CloudSession | null = null;
 let cloud: CloudProjects | null = null;
+let assets: CloudAssets | null = null;
 
 /**
  * The version each open project is based on.
@@ -36,17 +38,49 @@ const versions = new Map<string, number>();
 
 export type { ProjectSummary };
 
+/**
+ * Who wants to know when the account changes.
+ *
+ * Sign-in happens inside one component's local state, but it changes what the *whole* editor is
+ * talking to. Rather than lift that state into a store that only one panel reads, anything that
+ * cares subscribes here — which is exactly what `useSyncExternalStore` was added for.
+ */
+const listeners = new Set<() => void>();
+
+export function subscribeToSession(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
 export function signIn(next: CloudSession): void {
   session = next;
   cloud = new CloudProjects(next);
+  assets = new CloudAssets(next);
   versions.clear();
+  for (const listener of listeners) listener();
 }
 
 export function signOut(): void {
   session = null;
   cloud = null;
+  assets = null;
   versions.clear();
+  for (const listener of listeners) listener();
 }
+
+/**
+ * The uploaded-asset client, or null when nobody is signed in.
+ *
+ * Returned rather than wrapped in six pass-through functions the way projects are: there is no
+ * local equivalent to dispatch to. A browser database cannot hold an asset the *engine* can load,
+ * because the loader fetches a URL — so "my assets" is a cloud feature or it is nothing, and
+ * pretending otherwise would mean an offline path that silently drops uploads.
+ */
+export function cloudAssets(): CloudAssets | null {
+  return assets;
+}
+
+export type { CloudAssets };
 
 export function currentSession(): CloudSession | null {
   return session;

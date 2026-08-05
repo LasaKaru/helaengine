@@ -1,7 +1,7 @@
 # @helaengine/api
 
-Accounts, organisations, memberships and role-gated access — the platform every later backend
-feature builds on.
+Accounts, organisations, memberships, role-gated access, cloud project storage and per-organisation
+asset uploads — the platform every later backend feature builds on.
 
 ```bash
 createdb helaengine                                    # or point DATABASE_URL somewhere
@@ -48,3 +48,36 @@ link, because pretending mail is being sent would be worse than saying it is not
 - **Nobody may invite above their own rank.** Without it, an admin promotes a friend to owner and
   the privilege ladder has a rung going upwards.
 - **An invite is addressed.** Intercepting the link does not make you the person it was for.
+
+## Asset uploads
+
+An organisation's own `.glb` files, alongside the curated library.
+
+```
+POST   /orgs/:id/assets          -> { asset, upload: { url, ticket, maxBytes } }
+PUT    /uploads/:orgId/:assetId?expires=…&signature=…   (the bytes)
+GET    /orgs/:id/assets[?category=…]
+DELETE /orgs/:id/assets/:assetId
+GET    /assets/*                 (the bytes back, unauthenticated, immutable)
+```
+
+**Two requests, not one.** The first asks permission and gets a five-minute HMAC-signed URL; the
+second sends the bytes to it and never touches the authenticated path. That is what keeps a 25 MB
+file from travelling through the API twice, and it is the same shape a presigned S3 URL has — which
+is what makes moving to one a change to `uploadUrl()` rather than to the uploader.
+
+`PUT /uploads/...` is deliberately routed **before** authentication: the signature _is_ the
+authorisation. The organisation id is inside the signature rather than merely in the path, so one
+valid ticket is not a write into every tenant.
+
+`GET /assets/*` is deliberately **unauthenticated**: it is the origin a CDN would sit in front of,
+and a CDN holds no session. The protection is that the path contains a content hash nobody can
+guess. Because the path is content-addressed, the same bytes always get the same URL and different
+bytes always get a different one — which is what makes `max-age=31536000, immutable` safe and what
+would let a CDN in front of this need no invalidation strategy.
+
+**No R2, no S3, no CDN, and no ingest worker.** `LocalAssetStorage` writes files to `ASSET_ROOT`
+behind a two-method `AssetStorage` interface. Uploads are validated (non-empty, under 25 MB, and
+starting with the four `glTF` magic bytes) and stored as sent — nothing is compressed or
+thumbnailed. The `status` column already means `pending -> ready | failed`, so a worker plugs into a
+state machine that exists rather than one that has to be invented; it just does not exist yet.

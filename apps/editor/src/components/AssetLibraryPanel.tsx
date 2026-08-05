@@ -1,7 +1,13 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { Grid, type CellComponentProps } from 'react-window';
-import type { AssetManifest, AssetManifestEntry } from '@helaengine/schema';
+import {
+  AssetCategorySchema,
+  type AssetCategory,
+  type AssetManifest,
+  type AssetManifestEntry,
+} from '@helaengine/schema';
 import { ASSET_BASE_URL } from '../engine/assetLibrary';
+import type { UploadedAssets } from '../storage/useUploadedAssets';
 import { useEditorStore } from '../store/editorStore';
 import { SceneTree } from './SceneTree';
 
@@ -36,6 +42,19 @@ function matches(asset: AssetManifestEntry, query: string): boolean {
   );
 }
 
+/**
+ * Where a thumbnail actually lives.
+ *
+ * Ingested assets carry a path relative to the manifest; an uploaded one carries an absolute URL at
+ * the API, because it is not in the export's asset folder and never will be. Prefixing the second
+ * kind would produce `./assets/http://…`, which is the same class of bug the engine's `joinUrl`
+ * exists to avoid for models.
+ */
+function thumbnailUrl(path: string): string {
+  if (/^(?:[a-z]+:)?\/\//i.test(path) || path.startsWith('/')) return path;
+  return `${ASSET_BASE_URL}${path}`;
+}
+
 interface AssetCardProps {
   asset: AssetManifestEntry;
 }
@@ -59,7 +78,7 @@ function AssetCard({ asset }: AssetCardProps): React.JSX.Element {
       }}
     >
       {asset.thumbnailPath ? (
-        <img src={`${ASSET_BASE_URL}${asset.thumbnailPath}`} alt="" draggable={false} />
+        <img src={thumbnailUrl(asset.thumbnailPath)} alt="" draggable={false} />
       ) : (
         // Thumbnails are generated output and may be absent (CI skips that stage). The asset's
         // own colour is a better placeholder than a broken-image icon.
@@ -91,6 +110,134 @@ function GridCell({
   );
 }
 
+/** Categories an upload can be filed under. Audio is not a thing you drag into the world. */
+const UPLOAD_CATEGORIES = AssetCategorySchema.options.filter(
+  (category) => category !== 'audio' && category !== 'logic',
+);
+
+const STATUS_TEXT: Record<'pending' | 'ready' | 'failed', string> = {
+  pending: 'Processing…',
+  ready: 'Ready',
+  failed: 'Failed',
+};
+
+/**
+ * Assets this organisation uploaded, and the way to add another.
+ *
+ * Separate from the grid above rather than mixed into it, even though a ready upload also appears
+ * as a card there. The two answer different questions: the grid answers "what can I place", where
+ * an asset's origin is irrelevant, and this answers "what did I upload and did it work", where the
+ * origin is the entire point — including for the ones that are still processing or that failed,
+ * which have no card at all.
+ */
+function MyAssets({ uploads }: { uploads: UploadedAssets }): React.JSX.Element | null {
+  const [category, setCategory] = useState<AssetCategory>('props');
+  const [over, setOver] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  // Nothing to offer when nobody is signed in. A disabled drop zone with "sign in to upload" would
+  // be an advertisement in the middle of a tool that works fine without an account.
+  if (!uploads.available) return null;
+
+  const mine = uploads.all.filter((asset) => asset.organizationId !== null);
+
+  return (
+    <section className="panel panel-uploads" aria-label="My assets">
+      <h2>My Assets</h2>
+
+      <div className="upload-controls">
+        <label>
+          Category
+          <select
+            value={category}
+            aria-label="Upload category"
+            onChange={(event) => setCategory(event.target.value as AssetCategory)}
+          >
+            {UPLOAD_CATEGORIES.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div
+        className={`upload-drop${over ? ' over' : ''}`}
+        data-testid="upload-drop"
+        onDragOver={(event) => {
+          event.preventDefault();
+          setOver(true);
+        }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(event) => {
+          event.preventDefault();
+          setOver(false);
+          if (event.dataTransfer.files.length > 0) {
+            void uploads.upload(event.dataTransfer.files, category);
+          }
+        }}
+      >
+        <p>{uploads.busy ? 'Uploading…' : 'Drop a .glb here'}</p>
+        <button type="button" disabled={uploads.busy} onClick={() => fileRef.current?.click()}>
+          Choose a file
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".glb,model/gltf-binary"
+          multiple
+          hidden
+          aria-label="Upload a model"
+          onChange={(event) => {
+            const files = event.target.files;
+            if (files && files.length > 0) void uploads.upload(files, category);
+            // Cleared so choosing the same file twice fires a second change event. Without this,
+            // re-uploading after a failure appears to do nothing.
+            event.target.value = '';
+          }}
+        />
+      </div>
+
+      {uploads.error !== null && (
+        <p className="upload-error" role="alert">
+          {uploads.error}{' '}
+          <button type="button" onClick={uploads.dismissError}>
+            Dismiss
+          </button>
+        </p>
+      )}
+
+      {mine.length === 0 ? (
+        <p className="panel-hint">
+          Nothing uploaded yet. Your models stay private to your account.
+        </p>
+      ) : (
+        <ul className="upload-list">
+          {mine.map((asset) => (
+            <li key={asset.id} data-asset-id={asset.assetId} data-status={asset.status}>
+              <span className="upload-name">{asset.name}</span>
+              <span className={`upload-status status-${asset.status}`}>
+                {STATUS_TEXT[asset.status]}
+              </span>
+              {/* The reason, next to the asset it is about. "Processing failed" with the cause
+                  somewhere else is how a fixable file becomes a support ticket. */}
+              {asset.failure !== null && <span className="upload-failure">{asset.failure}</span>}
+              <button
+                type="button"
+                aria-label={`Delete ${asset.name}`}
+                onClick={() => void uploads.remove(asset.assetId)}
+              >
+                Delete
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 /**
  * The asset library. Search, category filter, and a virtualized grid of draggable cards.
  *
@@ -99,7 +246,14 @@ function GridCell({
  * position, drag handlers and selection already wired through it is far more disruptive than
  * starting with it.
  */
-export function AssetLibraryPanel({ manifest }: { manifest: AssetManifest }): React.JSX.Element {
+export function AssetLibraryPanel({
+  manifest,
+  uploads,
+}: {
+  manifest: AssetManifest;
+  /** Absent in tests and anywhere the panel is rendered without an account behind it. */
+  uploads?: UploadedAssets;
+}): React.JSX.Element {
   const search = useEditorStore((state) => state.assetSearch);
   const setSearch = useEditorStore((state) => state.setAssetSearch);
   const category = useEditorStore((state) => state.assetCategory);
@@ -200,6 +354,8 @@ export function AssetLibraryPanel({ manifest }: { manifest: AssetManifest }): Re
           {visible.length} of {placeable.length} · drag onto the terrain to place
         </p>
       </section>
+
+      {uploads && <MyAssets uploads={uploads} />}
 
       {/*
         The scene tree lives beside the asset library rather than under the inspector. When the two

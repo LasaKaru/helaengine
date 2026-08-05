@@ -20,3 +20,6 @@ tools/benchmark/stress.png
 
 # Builds published to the local share service.
 .hela-shared*/
+
+# Assets uploaded to the local platform API (Sprint 30).
+.hela-assets*/

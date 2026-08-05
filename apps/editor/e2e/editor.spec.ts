@@ -3,6 +3,7 @@ import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { extname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 
 /**
@@ -3152,5 +3153,155 @@ test.describe('cloud save', () => {
     await expect(history).toContainText('v1');
 
     await second.close();
+  });
+});
+
+/**
+ * Sprint 30 — a customer's own asset, from a file picker to a mesh in the world.
+ *
+ * The chain here has four links and only the middle two have unit tests: the browser sends bytes to
+ * a presigned URL, the API content-addresses them, the editor turns the row into a manifest entry
+ * with an **absolute** `glbPath`, and the engine's loader fetches it from a different origin than
+ * every other asset in the scene. That last link is the one worth a browser — a path that is right
+ * in a unit test and wrong by one `./assets/` prefix in practice looks identical until something
+ * tries to draw it.
+ */
+test.describe('uploaded assets', () => {
+  function newEmail(): string {
+    return `upload-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}@example.com`;
+  }
+
+  test('an uploaded .glb becomes placeable, and the engine loads it', async ({ page }) => {
+    test.setTimeout(240_000);
+
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Create an account' }).click();
+    await page.getByLabel('Display name').fill('Upload Person');
+    await page.getByLabel('Email').fill(newEmail());
+    await page.getByLabel('Password').fill('a-long-enough-password');
+    await page.getByRole('button', { name: 'Create account' }).click();
+    await expect(page.getByText('Signed in as')).toBeVisible({ timeout: 30_000 });
+
+    await page.getByRole('button', { name: /Forest clearing/ }).click();
+    await expect(page.getByRole('banner')).toBeVisible();
+    await page.waitForFunction(() => window.helaengine !== undefined);
+
+    const myAssets = page.getByRole('region', { name: 'My assets' });
+    await expect(myAssets).toBeVisible();
+    await expect(myAssets).toContainText('Nothing uploaded yet');
+
+    // A real GLB from the ingest pipeline's output — the same bytes the curated library ships, so a
+    // failure here is about the upload path rather than about a hand-made fixture. Renamed on the
+    // way in, because the asset id is derived from the filename and reusing a curated one would
+    // make this test about shadowing instead (which the next test is about).
+    const bytes = readFileSync(
+      fileURLToPath(
+        new URL('../../../generated/assets/models/enemy_goblin_01.glb', import.meta.url),
+      ),
+    );
+    await page
+      .getByLabel('Upload a model')
+      .setInputFiles({ name: 'boss_ogre_01.glb', mimeType: 'model/gltf-binary', buffer: bytes });
+
+    // Ready, not merely accepted. `pending` is what the row looks like between the two requests.
+    await expect(myAssets.locator('[data-status="ready"]')).toHaveCount(1, { timeout: 60_000 });
+
+    // And it is in the library the editor places from.
+    await expect
+      .poll(async () => page.evaluate(() => window.helaengine!.assetIds()), { timeout: 30_000 })
+      .toContain('boss_ogre_01');
+
+    // The path the loader will fetch is absolute, at the API rather than in this origin's asset
+    // folder. Getting this wrong produces `./assets/http://…`, which 404s silently.
+    const entry = await page.evaluate(() => window.helaengine!.assetEntry('boss_ogre_01'));
+    expect(entry?.glbPath).toMatch(
+      /^http:\/\/127\.0\.0\.1:3100\/assets\/orgs\/[0-9a-f-]+\/assets\/[0-9a-f]{32}\.glb$/,
+    );
+
+    // Placed, and *drawn from the GLB*. `isModel` is false for a placeholder box, which is exactly
+    // what a scene shows when a model URL 404s — so this is the assertion that a stranger's file is
+    // now an asset, rather than the assertion that a card exists.
+    const objectId = await page.evaluate(() =>
+      window.helaengine!.addObject('boss_ogre_01', [6, 0, 6]),
+    );
+
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(
+            (id) =>
+              window.helaengine!.viewportObjects().find((object) => object.id === id)?.isModel,
+            objectId,
+          ),
+        { timeout: 60_000 },
+      )
+      .toBe(true);
+
+    // Deleting removes it from the account rather than from this tab.
+    await myAssets.getByRole('button', { name: /^Delete/ }).click();
+    await expect(myAssets).toContainText('Nothing uploaded yet', { timeout: 30_000 });
+
+    // A reload lands on the projects screen, so the project is reopened before the panel exists
+    // again. Worth the extra clicks: the claim is that the *server* forgot it, not this tab.
+    await page.reload();
+    await page
+      .getByRole('button', { name: /Forest Clearing/ })
+      .first()
+      .click();
+    await expect(page.getByRole('banner')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('region', { name: 'My assets' })).toContainText(
+      'Nothing uploaded yet',
+      { timeout: 60_000 },
+    );
+  });
+
+  test('an upload that reuses a curated id replaces it, rather than sitting beside it', async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
+
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Create an account' }).click();
+    await page.getByLabel('Display name').fill('Shadow Person');
+    await page.getByLabel('Email').fill(newEmail());
+    await page.getByLabel('Password').fill('a-long-enough-password');
+    await page.getByRole('button', { name: 'Create account' }).click();
+    await expect(page.getByText('Signed in as')).toBeVisible({ timeout: 30_000 });
+
+    await page.getByRole('button', { name: /Forest clearing/ }).click();
+    await expect(page.getByRole('banner')).toBeVisible();
+    await page.waitForFunction(() => window.helaengine !== undefined);
+
+    const before = await page.evaluate(() => window.helaengine!.assetIds().length);
+
+    // Deliberately the id of a curated asset. The resolver overwrites by id, so if the manifest
+    // merely appended, the engine would draw this model while the inspector read the curated
+    // entry's bounds and the panel offered two identically named cards.
+    const bytes = readFileSync(
+      fileURLToPath(
+        new URL('../../../generated/assets/models/enemy_goblin_01.glb', import.meta.url),
+      ),
+    );
+    await page
+      .getByLabel('Upload a model')
+      .setInputFiles({ name: 'tree_pine_01.glb', mimeType: 'model/gltf-binary', buffer: bytes });
+
+    const myAssets = page.getByRole('region', { name: 'My assets' });
+    await expect(myAssets.locator('[data-status="ready"]')).toHaveCount(1, { timeout: 60_000 });
+
+    // One entry, not two, and it is the uploaded one.
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(
+            () => window.helaengine!.assetIds().filter((id) => id === 'tree_pine_01').length,
+          ),
+        { timeout: 30_000 },
+      )
+      .toBe(1);
+
+    expect(await page.evaluate(() => window.helaengine!.assetIds().length)).toBe(before);
+    const entry = await page.evaluate(() => window.helaengine!.assetEntry('tree_pine_01'));
+    expect(entry?.glbPath).toContain('127.0.0.1:3100/assets/orgs/');
   });
 });
