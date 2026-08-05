@@ -988,6 +988,68 @@ Also not done: **sculpting is not in the two-browser test**. The document-level 
 
 ---
 
+### Interlude — the `.hela` project file
+
+**Not a numbered sprint.** Asked for between Sprints 31 and 32: a save format of this product's own,
+the way Unity has `.unity` and Godot has `.tscn`, plus getting a project onto a disk, into Drive, and
+into git.
+
+**Goal:** One file that is the whole project, so it can be kept anywhere.
+
+**Tasks:**
+
+- [x] `packages/hela-file` — a zip container holding `hela.json`, `scene.json`, an optional
+      thumbnail, the custom `.glb` files the scene places, and the UI media the shell references
+- [x] Local save and open: File System Access API where it exists (a real Save As with a retained
+      handle, so the next save writes the same file), download + file input where it does not
+- [x] Drag a `.hela` onto the projects screen, or pick one; **Ctrl+Shift+S** saves to file
+- [x] Custom models and UI media survive the round trip — the UI blobs go back into IndexedDB, the
+      models become blob-backed session assets
+- [ ] **Google Drive: not done, deliberately.** Needs a Google Cloud project and a verified OAuth
+      consent screen
+- [ ] **GitHub integration: not done, deliberately.** Needs a registered GitHub App
+
+**Tech notes:**
+
+- **A container, not a renamed `scene.json`.** The obvious version — write the document out with a
+  new extension — works perfectly until somebody uses an asset they uploaded, at which point the
+  recipient opens a level full of missing models. Curated assets are _not_ embedded: they ship with
+  every install, and copying a tree into every file that places one would make a 40 KB level weigh
+  megabytes.
+- **Built to be committed.** Canonical JSON with sorted keys, entries stored rather than deflated,
+  and fixed zip entry dates — so two saves of an unchanged project are byte-identical and git sees a
+  delta rather than a whole new blob. Asserted in a test, because a claim about determinism that
+  nobody checks stops being true within a month.
+- **The version is the container's own**, separate from `SceneSchema`'s. They change for different
+  reasons, and a file from a newer build is refused rather than opened — opening it would silently
+  drop entries this build does not know to carry, and the next save would write that loss to disk.
+
+**Definition of Done:** A project can be saved to the user's own computer as a `.hela` file, moved
+somewhere else, and opened again with its scene and its custom content intact.
+
+**Met.** A browser builds a `.hela` through the same code path the Save-to-file button uses, and a
+second browser context — sharing no IndexedDB and no localStorage — opens it and gets the level in
+its viewport, then keeps it after a reload. A PNG renamed to `.hela` is refused with a sentence
+rather than a stack trace.
+
+Three things are honestly outside it:
+
+- **The native file dialog is not driven.** Playwright cannot operate an OS file picker, so the e2e
+  carries the bytes between contexts rather than clicking through Save As. The container, the build
+  and the import are covered; the dialog wiring is not.
+- **Imported custom models last for the session.** They come back as blob URLs, so the level draws
+  immediately — but a blob URL dies with the tab, and after a reload those models are placeholders
+  until they are uploaded to an account under My Assets. The editor says so on import rather than
+  leaving it to be discovered. Making them permanent means a second, local kind of asset library
+  with its own storage limits and its own export path, which is a feature rather than an import
+  detail.
+- **No Drive and no GitHub.** Both need OAuth credentials this repository cannot provision, and a
+  stub would be pretending. What the format delivers instead is a file that a synced folder already
+  backs up and that `git add` already accepts — which is why the diffability work above was worth
+  doing rather than a nicety.
+
+---
+
 ### Sprint 32 — Export Job Orchestration at Scale
 
 **Goal:** Move export bundling (Sprints 21-23) from a client-side operation to a server-side background job, for large projects and to enforce plan quotas.

@@ -3677,3 +3677,112 @@ test.describe('real-time collaboration', () => {
     await secondContext.close();
   });
 });
+
+/**
+ * The `.hela` project file.
+ *
+ * The claim is portability: one file holds a whole project, and opening it somewhere else gives you
+ * the project back. That is only testable end to end — the container has its own unit tests, but
+ * "the editor wrote a file that the editor can open" is a statement about the wiring between three
+ * layers, and every previous sprint has found its bug in exactly that gap.
+ *
+ * Headless Chromium has `showSaveFilePicker`, but a native file dialog is one of the handful of
+ * things Playwright cannot drive. So the *bytes* are the subject: the editor builds them through
+ * its own code path, the test carries them to a fresh context, and the editor opens them there.
+ * What is not covered is the dialog itself, which is stated in docs/SPRINT.md rather than implied.
+ */
+test.describe('project files', () => {
+  // Top-level describe, so it does not inherit the editor suite's navigation.
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.waitForFunction(() => window.helaengine !== undefined);
+  });
+
+  test('a project saved as .hela opens again in a browser that has never seen it', async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
+
+    await page.getByRole('button', { name: /Empty field/ }).click();
+    await expect(page.getByRole('banner')).toBeVisible();
+    await page.evaluate(() => {
+      window.helaengine!.store.getState().setName('Portable Level');
+      window.helaengine!.addObject('building_hut_01', [2, 0, 3]);
+      window.helaengine!.addObject('tree_pine_01', [6, 0, 1]);
+    });
+
+    // Built through the editor's own path — the same function the Save-to-file button calls — so
+    // this is the real container rather than one the test assembled.
+    const bytes = await page.evaluate(async () => {
+      const built = await window.helaengine!.buildProjectFile();
+      return Array.from(built);
+    });
+
+    expect(bytes.length).toBeGreaterThan(0);
+    // `PK\x03\x04`: it really is a container, not a JSON blob with a new extension.
+    expect(bytes.slice(0, 4)).toEqual([0x50, 0x4b, 0x03, 0x04]);
+
+    // A context sharing no IndexedDB and no localStorage with the first — the closest thing to
+    // handing the file to somebody else that a test can arrange.
+    const stranger = await page.context().browser()!.newContext();
+    const theirPage = await stranger.newPage();
+    await theirPage.goto('/');
+    await theirPage.waitForFunction(() => window.helaengine !== undefined);
+
+    await expect(theirPage.getByRole('region', { name: 'Open a project file' })).toBeVisible();
+    await expect(theirPage.getByText('Nothing saved yet')).toBeVisible();
+
+    await theirPage.evaluate(async (payload) => {
+      await window.helaengine!.importProjectFile(new Uint8Array(payload));
+    }, bytes);
+
+    // The project opened, under the name it was saved with.
+    await expect(theirPage.getByRole('banner')).toBeVisible({ timeout: 30_000 });
+    await expect(theirPage.getByLabel('Project name')).toHaveValue('Portable Level');
+
+    // And the world is really there, drawn — not merely a document that parsed.
+    await expect
+      .poll(async () => theirPage.evaluate(() => window.helaengine!.viewportObjectIds().length), {
+        timeout: 30_000,
+      })
+      .toBe(2);
+
+    expect(
+      await theirPage.evaluate(() =>
+        window.helaengine!.store.getState().scene.objects.map((object) => object.assetId),
+      ),
+    ).toEqual(['building_hut_01', 'tree_pine_01']);
+
+    // It became a project of theirs, so it is there after a reload rather than living in the tab.
+    await theirPage.getByRole('button', { name: 'Projects' }).click();
+    await theirPage.reload();
+    await theirPage.waitForFunction(() => window.helaengine !== undefined);
+    await expect(theirPage.getByRole('button', { name: /Portable Level/ })).toBeVisible({
+      timeout: 30_000,
+    });
+
+    await stranger.close();
+  });
+
+  test('refuses a file it did not write, with a sentence rather than a stack trace', async ({
+    page,
+  }) => {
+    // Imported straight from the projects screen, where the drop zone is. Going into the editor
+    // and back first would race `goHome`, which clears the error slot as it lands — and the test
+    // would then be about scheduling rather than about the refusal.
+    await expect(page.getByRole('heading', { name: 'Open a file' })).toBeVisible();
+
+    // A PNG renamed to .hela — the likeliest way somebody gets this wrong.
+    await page.evaluate(async () => {
+      const notAProject = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+      await window.helaengine!.importProjectFile(notAProject);
+    });
+
+    // Opening a file is the one moment the editor is handed something it did not write, so the
+    // refusal has to be readable. A console error would leave the user with a screen that did
+    // nothing and no idea why.
+    await expect(page.getByRole('alert')).toContainText(/not a HelaEngine project/i, {
+      timeout: 15_000,
+    });
+  });
+});

@@ -37,6 +37,11 @@ export function TopBar({ manifest }: { manifest?: AssetManifest } = {}): React.J
   const saveState = useProjectStore((state) => state.saveState);
   const dirty = useProjectStore((state) => state.dirty);
   const save = useProjectStore((state) => state.save);
+  const saveToFile = useProjectStore((state) => state.saveToFile);
+  const saveFileAs = useProjectStore((state) => state.saveFileAs);
+  const fileName = useProjectStore((state) => state.fileName);
+  const fileNotice = useProjectStore((state) => state.fileNotice);
+  const dismissFileNotice = useProjectStore((state) => state.dismissFileNotice);
   const goHome = useProjectStore((state) => state.goHome);
 
   return (
@@ -66,6 +71,15 @@ export function TopBar({ manifest }: { manifest?: AssetManifest } = {}): React.J
         {saveLabel(saveState, dirty)}
       </div>
 
+      {fileNotice !== null && (
+        <p className="file-notice" role="status">
+          {fileNotice}{' '}
+          <button type="button" onClick={dismissFileNotice}>
+            Got it
+          </button>
+        </p>
+      )}
+
       {peers.length > 0 && <Collaborators peers={peers} />}
 
       <div className="topbar-actions">
@@ -83,6 +97,32 @@ export function TopBar({ manifest }: { manifest?: AssetManifest } = {}): React.J
         >
           Save
         </button>
+        {/*
+          Two buttons rather than one with a dropdown. "Save to file" is the one people press
+          repeatedly once they have chosen a location; burying it a click deep behind a menu is how
+          a feature ends up unused. The label carries the filename so it is obvious *which* file is
+          about to be written — and says "Save as" when there is nothing bound yet.
+        */}
+        <button
+          type="button"
+          onClick={() => void saveToFile()}
+          disabled={saveState.status === 'saving'}
+          title={
+            fileName ? `Write ${fileName} on your computer` : 'Save a .hela file to your computer'
+          }
+        >
+          {fileName ? `Save ${fileName}` : 'Save to file…'}
+        </button>
+        {fileName && (
+          <button
+            type="button"
+            onClick={() => void saveFileAs()}
+            disabled={saveState.status === 'saving'}
+            title="Save a .hela file somewhere else"
+          >
+            Save as…
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setShowingHistory(true)}

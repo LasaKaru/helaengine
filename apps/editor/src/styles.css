@@ -1741,3 +1741,46 @@ body,
     0 0 0 2px var(--panel),
     0 0 0 3px currentColor;
 }
+
+/* ---- Project files (.hela) ---- */
+
+.file-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px;
+  text-align: center;
+  color: var(--text-dim);
+  background: var(--panel);
+  /* Dashed, because that is what every operating system's drop target looks like. */
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+.file-drop.over {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.file-drop p {
+  margin: 0;
+  max-width: 62ch;
+}
+
+.file-drop code {
+  padding: 1px 5px;
+  font-size: 12px;
+  background: var(--panel-raised);
+  border-radius: 4px;
+}
+
+.file-notice {
+  margin: 0 10px;
+  padding: 5px 9px;
+  font-size: 12px;
+  color: var(--warn);
+  background: var(--panel-raised);
+  border: 1px solid var(--warn);
+  border-radius: 6px;
+}

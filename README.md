@@ -75,6 +75,15 @@ operations, so Ctrl+Z never takes back a colleague's work. Terrain is the except
 about it — a heightmap is one blob, so two simultaneous sculpts end with the later one winning. See
 `apps/collab/README.md`.
 
+A project can also live as a file. **Save to file** writes a `.hela` — one zip holding the scene,
+its thumbnail, the custom models it places and the UI media it references — and the projects screen
+opens one back, by picker or by dropping it. In Chromium the editor keeps the file handle, so the
+next save writes the same file; Firefox and Safari fall back to a download. The container is written
+to be committed: canonical JSON, stored uncompressed, fixed entry dates, so an unchanged project
+saves byte-identically and git sees a delta. There is no Drive or GitHub integration — both need
+OAuth credentials this repository cannot provision — but a `.hela` in a synced folder is backed up
+already, and `git add MyLevel.hela` works today. See `packages/hela-file/README.md`.
+
 Signed in, the asset rail also grows a **My Assets** section: drop a `.glb` on it and it uploads to
 your organisation, appears in the library beside the curated assets, and can be placed exactly like
 one. Uploads are private to the organisation, validated by their bytes rather than their extension,

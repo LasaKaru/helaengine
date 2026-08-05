@@ -17,6 +17,7 @@
     "@helaengine/collab": "workspace:*",
     "@helaengine/engine": "workspace:*",
     "@helaengine/export": "workspace:*",
+    "@helaengine/hela-file": "workspace:*",
     "@helaengine/repair": "workspace:*",
     "@helaengine/schema": "workspace:*",
     "@helaengine/templates": "workspace:*",

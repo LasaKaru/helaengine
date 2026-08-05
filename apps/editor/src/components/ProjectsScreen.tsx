@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useProjectStore } from '../store/projectStore';
+import { isHelaFilename } from '../storage/localFile';
 import { TEMPLATES } from '@helaengine/templates';
 import { AccountBar } from './AccountBar';
 
@@ -18,6 +19,9 @@ export function ProjectsScreen(): React.JSX.Element {
   const loadError = useProjectStore((state) => state.loadError);
   const refreshProjects = useProjectStore((state) => state.refreshProjects);
   const createFromTemplate = useProjectStore((state) => state.createFromTemplate);
+  const openFromFile = useProjectStore((state) => state.openFromFile);
+  const importFile = useProjectStore((state) => state.importFile);
+  const [dragging, setDragging] = useState(false);
   const open = useProjectStore((state) => state.open);
   const remove = useProjectStore((state) => state.remove);
   const duplicate = useProjectStore((state) => state.duplicate);
@@ -71,6 +75,40 @@ export function ProjectsScreen(): React.JSX.Element {
               <span className="template-description">{template.description}</span>
             </button>
           ))}
+        </div>
+      </section>
+
+      <section aria-label="Open a project file">
+        <h2>Open a file</h2>
+        <div
+          className={`file-drop${dragging ? ' over' : ''}`}
+          data-testid="project-file-drop"
+          onDragOver={(event) => {
+            event.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(event) => {
+            event.preventDefault();
+            setDragging(false);
+            const file = Array.from(event.dataTransfer.files).find((candidate) =>
+              isHelaFilename(candidate.name),
+            );
+            // Silently ignoring a dropped PNG is friendlier than an error: the drop zone is on a
+            // screen people are dragging things around on, and not every drop is an attempt.
+            if (file) void run(async () => importFile(new Uint8Array(await file.arrayBuffer())));
+          }}
+        >
+          <p>
+            Drop a <code>.hela</code> project here
+          </p>
+          <button type="button" disabled={busy} onClick={() => void run(() => openFromFile())}>
+            Choose a file…
+          </button>
+          <p className="panel-hint">
+            A <code>.hela</code> file is the whole project in one file — scene, custom models and
+            all. Keep it anywhere: a folder that syncs, a shared drive, a git repository.
+          </p>
         </div>
       </section>
 

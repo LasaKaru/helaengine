@@ -10,6 +10,8 @@ import { SceneObjectSchema, type AssetManifestEntry, type Vec3 } from '@helaengi
 import type { AssetLibrary } from './engine/assetLibrary';
 import { collabPeers, collabStatus, currentSession } from './collab/current';
 import { useEditorStore } from './store/editorStore';
+import { useProjectStore } from './store/projectStore';
+import { buildHelaFile } from './storage/helaFile';
 import { nextObjectId, useSceneStore } from './store/sceneStore';
 
 export interface DevApi {
@@ -60,6 +62,17 @@ export interface DevApi {
     peers: Array<{ userId: string; displayName: string; selection: string[]; editing: boolean }>;
     canUndo: boolean;
   } | null;
+  /**
+   * The bytes of a `.hela` file for the open project.
+   *
+   * Exposed because a native save dialog is one of the handful of browser APIs a headless run
+   * cannot drive. The container itself is what matters and this is the same function the Save-to-
+   * file button calls, so a test carrying these bytes to another context is exercising the real
+   * path rather than a parallel one.
+   */
+  buildProjectFile(): Promise<Uint8Array>;
+  /** Opens `.hela` bytes as a new project, exactly as a drop on the projects screen would. */
+  importProjectFile(bytes: Uint8Array): Promise<void>;
   /** World height of the live terrain at a world X/Z — proves a sculpt reached the geometry. */
   terrainHeightAt(x: number, z: number): number | null;
   /** Client-space coordinates of an object, for driving precise clicks in tests. */
@@ -344,6 +357,10 @@ export function exposeDevApi(library: AssetLibrary): void {
     assetIds: () => library.manifest.assets.map((asset) => asset.id),
 
     assetEntry: (assetId) => library.manifest.assets.find((asset) => asset.id === assetId) ?? null,
+
+    buildProjectFile: () => buildHelaFile({ scene: useSceneStore.getState().scene }),
+
+    importProjectFile: (bytes) => useProjectStore.getState().importFile(bytes),
 
     collab: () => {
       const session = currentSession();

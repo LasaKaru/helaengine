@@ -93,6 +93,17 @@ export class CloudAssets {
     throw new Error(parsed.error ?? `The upload failed (${sent.status}).`);
   }
 
+  /**
+   * The absolute URL a stored path is served from.
+   *
+   * One definition, used both to build manifest entries and to fetch bytes back when a project is
+   * written to a `.hela` file. Two call sites concatenating the same strings is how one of them
+   * ends up with a double slash nobody notices until a model fails to load.
+   */
+  assetUrl(storedPath: string): string {
+    return `${this.#session.origin}/assets/${storedPath}`;
+  }
+
   async remove(assetId: string): Promise<void> {
     await this.#call('DELETE', `/orgs/${this.#session.organizationId}/assets/${assetId}`);
   }
@@ -117,10 +128,8 @@ export class CloudAssets {
       // added on the server before it is added here degrades to "props" instead of vanishing.
       category: category.success ? category.data : 'props',
       tags: ['uploaded'],
-      glbPath: `${this.#session.origin}/assets/${asset.glbPath}`,
-      ...(asset.thumbnailPath
-        ? { thumbnailPath: `${this.#session.origin}/assets/${asset.thumbnailPath}` }
-        : {}),
+      glbPath: this.assetUrl(asset.glbPath),
+      ...(asset.thumbnailPath ? { thumbnailPath: this.assetUrl(asset.thumbnailPath) } : {}),
       defaultScale: [1, 1, 1],
       colliderType: 'box',
       ...(asset.polyCount === null ? {} : { polyCount: asset.polyCount }),

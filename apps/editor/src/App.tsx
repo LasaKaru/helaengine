@@ -16,6 +16,7 @@ import { useCollab } from './collab/useCollab';
 import { usePublishPresence } from './collab/usePublishPresence';
 import { currentSession as cloudSession, isCloud } from './storage/backend';
 import { useUploadedAssets } from './storage/useUploadedAssets';
+import { useImportedAssets } from './storage/useImportedAssets';
 import { TopBar } from './components/TopBar';
 import { Viewport } from './components/Viewport';
 
@@ -57,6 +58,7 @@ export function App(): React.JSX.Element {
 
   const library = state.status === 'ready' ? state.library : null;
   const uploads = useUploadedAssets(library);
+  const imported = useImportedAssets(library);
 
   /**
    * The curated library plus this organisation's own, as one manifest.
@@ -72,12 +74,16 @@ export function App(): React.JSX.Element {
    */
   const manifest = useMemo(() => {
     if (!library) return null;
-    if (uploads.entries.length === 0) return library.manifest;
+    if (uploads.entries.length === 0 && imported.length === 0) return library.manifest;
 
     const byId = new Map(library.manifest.assets.map((asset) => [asset.id, asset]));
     for (const entry of uploads.entries) byId.set(entry.id, entry);
+    // Imported last: a project opened from a file brought its own copy of the model, and that copy
+    // is the one that scene was built against. An account asset sharing the id may be a different
+    // model entirely.
+    for (const entry of imported) byId.set(entry.id, entry);
     return { ...library.manifest, assets: [...byId.values()] };
-  }, [library, uploads.entries]);
+  }, [library, uploads.entries, imported]);
 
   useEffect(() => {
     const controller = new AbortController();

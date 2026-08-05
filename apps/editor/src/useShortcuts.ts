@@ -84,7 +84,11 @@ export function useShortcuts(options: ShortcutOptions = {}): void {
       if (modifier && event.key.toLowerCase() === 's') {
         // The browser's own save dialog is never what someone wants here.
         event.preventDefault();
-        void useProjectStore.getState().save();
+        // Ctrl+Shift+S writes a `.hela` to disk, which is what every desktop editor means by it.
+        // Plain Ctrl+S stays the in-browser save, because that is the one that has to work for
+        // somebody who has never opened a file dialog.
+        if (event.shiftKey) void useProjectStore.getState().saveToFile();
+        else void useProjectStore.getState().save();
         return;
       }
 

@@ -1,4 +1,13 @@
 import { create } from 'zustand';
+import { buildHelaFile, importHelaFile } from '../storage/helaFile';
+import {
+  openFile as openLocalFile,
+  PickerCancelled,
+  saveAs,
+  writeTo,
+  type HelaFileHandle,
+} from '../storage/localFile';
+import { registerImportedAssets } from '../storage/importedAssets';
 import { devtools } from 'zustand/middleware';
 import type { Scene } from '@helaengine/schema';
 import {
@@ -42,9 +51,90 @@ export interface ProjectState {
   duplicate(id: string): Promise<void>;
   goHome(): Promise<void>;
   markDirty(): void;
+
+  /**
+   * Writes the open project to the user's own disk as a `.hela` file.
+   *
+   * `saveAs` always asks where; `saveToFile` writes back to the file the user last chose, and falls
+   * back to asking when there is nothing to write back to. That is the split every desktop
+   * application has, and the reason a file handle is worth holding at all.
+   */
+  saveToFile(): Promise<void>;
+  saveFileAs(): Promise<void>;
+  /** Opens a `.hela` from disk as a new project. */
+  openFromFile(): Promise<void>;
+  /** Opens bytes that arrived some other way — dropped on the window, most likely. */
+  importFile(bytes: Uint8Array): Promise<void>;
+  /** The file this project is bound to, for the "Save to file" label. */
+  fileName: string | null;
+  /** Something the last import wants the user to know. Cleared when acknowledged. */
+  fileNotice: string | null;
+  dismissFileNotice(): void;
 }
 
 let captureThumbnail: ThumbnailCapture | null = null;
+
+/**
+ * The file the open project is bound to.
+ *
+ * Module-level rather than in the store because a `FileSystemFileHandle` is a live browser object,
+ * not serialisable state — putting one in a store that devtools serialises is how a handle becomes
+ * a `{}` that silently fails to write.
+ */
+let fileHandle: HelaFileHandle | null = null;
+
+/**
+ * Writes the open project to disk.
+ *
+ * Shared by "Save to file" and "Save as" because the only difference between them is whether the
+ * user is asked, and duplicating the build-and-write around that one branch is how the two end up
+ * embedding different things.
+ */
+async function writeProjectFile(
+  get: () => ProjectState,
+  set: (partial: Partial<ProjectState>, replace?: false, action?: string) => void,
+  options: { ask: boolean },
+): Promise<void> {
+  const scene = useSceneStore.getState().scene;
+  set({ saveState: { status: 'saving' } }, false, 'file/saving');
+
+  try {
+    const bytes = await buildHelaFile({ scene, thumbnail: captureThumbnail?.() ?? undefined });
+
+    if (!options.ask && fileHandle) {
+      await writeTo(fileHandle, bytes);
+    } else {
+      const handle = await saveAs(bytes, scene.name);
+      // Null on a browser with no picker, where the bytes went to the downloads folder and there
+      // is nothing to write back to. Recorded honestly so the button keeps saying "Save as".
+      fileHandle = handle;
+    }
+
+    set(
+      {
+        saveState: { status: 'saved', at: Date.now() },
+        fileName: fileHandle?.name ?? null,
+      },
+      false,
+      'file/saved',
+    );
+  } catch (error) {
+    if (error instanceof PickerCancelled) {
+      set({ saveState: { status: 'idle' } }, false, 'file/cancelled');
+      return;
+    }
+    set(
+      {
+        saveState: {
+          status: 'error',
+          message: error instanceof Error ? error.message : String(error),
+        },
+      },
+      false,
+      'file/saveFailed',
+    );
+  }
+}
 
 export const useProjectStore = create<ProjectState>()(
   devtools(
@@ -55,6 +145,8 @@ export const useProjectStore = create<ProjectState>()(
       saveState: { status: 'idle' },
       dirty: false,
       loadError: null,
+      fileName: null,
+      fileNotice: null,
 
       setCaptureThumbnail: (capture) => {
         captureThumbnail = capture;
@@ -168,6 +260,70 @@ export const useProjectStore = create<ProjectState>()(
       markDirty: () => {
         if (!get().dirty) set({ dirty: true }, false, 'project/dirty');
       },
+
+      saveFileAs: async () => {
+        await writeProjectFile(get, set, { ask: true });
+      },
+
+      saveToFile: async () => {
+        await writeProjectFile(get, set, { ask: false });
+      },
+
+      openFromFile: async () => {
+        try {
+          const { bytes, handle } = await openLocalFile();
+          fileHandle = handle;
+          await get().importFile(bytes);
+        } catch (error) {
+          // Dismissing the dialog is not a failure and must not put an error on screen.
+          if (error instanceof PickerCancelled) return;
+          set(
+            { loadError: error instanceof Error ? error.message : String(error) },
+            false,
+            'file/openFailed',
+          );
+        }
+      },
+
+      importFile: async (bytes) => {
+        try {
+          const imported = await importHelaFile(bytes);
+
+          // Created as a project rather than opened in place: an imported file is somebody's work
+          // arriving, and dropping it over whatever was on screen would be an edit nobody asked
+          // for. It gets its own entry in the list and its own id.
+          const id = await createProject(imported.name, imported.scene);
+          useSceneStore.getState().setScene(imported.scene);
+
+          if (imported.thumbnail) {
+            await saveProject({ id, scene: imported.scene, thumbnail: imported.thumbnail });
+          }
+
+          set(
+            {
+              projectId: id,
+              screen: 'editor',
+              dirty: false,
+              loadError: null,
+              saveState: { status: 'idle' },
+              fileName: null,
+              fileNotice: imported.notes[0] ?? null,
+            },
+            false,
+            'file/imported',
+          );
+          registerImportedAssets(imported.restoredAssets);
+          await get().refreshProjects();
+        } catch (error) {
+          set(
+            { loadError: error instanceof Error ? error.message : String(error) },
+            false,
+            'file/importFailed',
+          );
+        }
+      },
+
+      dismissFileNotice: () => set({ fileNotice: null }, false, 'file/noticeDismissed'),
     }),
     { name: 'helaengine/projects' },
   ),
