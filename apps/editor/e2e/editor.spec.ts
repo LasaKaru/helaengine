@@ -16,6 +16,26 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { readSpans, render, select, timeline } from '@helaengine/trace/timeline';
 
 /**
+ * Waits for the *editor* to be open, which `getByRole('banner')` does not do.
+ *
+ * This is the bug behind a whole family of flaky tests, carried as "unexplained" since Sprint 31.
+ * The projects screen renders its own `<header>`, and a `<header>` is `role="banner"` — so a wait
+ * for the banner right after clicking a template was satisfied by the screen the test was trying to
+ * leave. It returned immediately, and every `evaluate` edit that followed raced the asynchronous
+ * project creation: win the race and the test passes, lose it and `setScene` replaces the document
+ * the edit went into. Under a full suite's load the race is lost often enough to fail two or three
+ * tests a run, each with a different and misleading symptom — a missing object, an empty save
+ * state, a `uiConfig` full of defaults.
+ *
+ * The editor's own top bar is unambiguous: it renders only when a project is open, after the
+ * document has been adopted.
+ */
+async function editorOpen(page: Page, timeout = 10_000): Promise<void> {
+  await expect(page.locator('header.topbar')).toBeVisible({ timeout });
+  await expect(page.getByLabel('Project name')).toBeVisible({ timeout });
+}
+
+/**
  * Opens a fresh project in the editor.
  *
  * The app starts on the projects screen, so anything testing the editor has to get there first.
@@ -34,7 +54,7 @@ async function openEditor(page: Page, template = /Empty field/): Promise<void> {
   );
   await page.reload();
   await page.getByRole('button', { name: template }).click();
-  await expect(page.getByRole('banner')).toBeVisible();
+  await editorOpen(page);
   await page.waitForFunction(() => window.helaengine !== undefined);
 }
 
@@ -655,7 +675,7 @@ test.describe('projects and local save', () => {
   test('a template opens a populated scene in the editor', async ({ page }) => {
     await page.getByRole('button', { name: /Village outpost/ }).click();
 
-    await expect(page.getByRole('banner')).toBeVisible();
+    await editorOpen(page);
     await expect(page.getByLabel('Project name')).toHaveValue('Village Outpost');
     await expect
       .poll(async () => page.evaluate(() => window.helaengine!.viewportObjectIds().length))
@@ -668,7 +688,7 @@ test.describe('projects and local save', () => {
 
   test('edits survive a full page reload', async ({ page }) => {
     await page.getByRole('button', { name: /Empty field/ }).click();
-    await expect(page.getByRole('banner')).toBeVisible();
+    await editorOpen(page);
 
     await page.evaluate(() => {
       window.helaengine!.store.getState().setName('Persisted Scene');
@@ -692,7 +712,7 @@ test.describe('projects and local save', () => {
 
   test('a sculpted terrain survives a reload', async ({ page }) => {
     await page.getByRole('button', { name: /Empty field/ }).click();
-    await expect(page.getByRole('banner')).toBeVisible();
+    await editorOpen(page);
 
     await page.getByRole('button', { name: 'Sculpt' }).click();
     const box = (await page.locator('canvas').boundingBox())!;
@@ -722,7 +742,7 @@ test.describe('projects and local save', () => {
 
   test('the projects list shows a thumbnail after saving', async ({ page }) => {
     await page.getByRole('button', { name: /Forest clearing/ }).click();
-    await expect(page.getByRole('banner')).toBeVisible();
+    await editorOpen(page);
     await page.waitForTimeout(1500);
 
     await saveAndSettle(page);
@@ -748,7 +768,7 @@ test.describe('projects and local save', () => {
     await page.getByRole('button', { name: /Empty field/ }).click();
     // Creating from a template is async — editing before it lands would be edits to the outgoing
     // document, which the template then replaces.
-    await expect(page.getByRole('banner')).toBeVisible();
+    await editorOpen(page);
     const saveState = page.getByRole('status', { name: 'Save state' });
     await page.evaluate(() => window.helaengine!.addObject('rock_boulder_01'));
     // Waited on before leaving, so the edit has demonstrably reached the store. `goHome` saves
@@ -885,7 +905,7 @@ test.describe('behaviours', () => {
       .getByRole('button', { name: /Untitled scene/ })
       .first()
       .click();
-    await expect(page.getByRole('banner')).toBeVisible();
+    await editorOpen(page);
 
     expect(
       await page.evaluate(() => window.helaengine!.store.getState().scene.objects[0]!.behaviors[0]),
@@ -1741,7 +1761,7 @@ test.describe('game UI authoring', () => {
       .getByRole('button', { name: /Untitled scene/ })
       .first()
       .click();
-    await expect(page.getByRole('banner')).toBeVisible();
+    await editorOpen(page);
 
     /**
      * Polled, not read once.
@@ -2245,7 +2265,7 @@ test.describe('checkpoints', () => {
       .getByRole('button', { name: /Skirmish/ })
       .first()
       .click();
-    await expect(page.getByRole('banner')).toBeVisible();
+    await editorOpen(page);
 
     await page.getByRole('button', { name: 'Walk' }).click();
     await page.waitForFunction(() => window.helaengine!.playerPosition() !== null, undefined, {
@@ -2459,7 +2479,7 @@ test.describe('co-op', () => {
     );
     await page.reload();
     await page.getByRole('button', { name: /Empty field/ }).click();
-    await expect(page.getByRole('banner')).toBeVisible();
+    await editorOpen(page);
     await page.waitForFunction(() => window.helaengine !== undefined);
 
     // Both contexts must agree on the scene id, or the server refuses the second join — which is
@@ -3153,7 +3173,7 @@ test.describe('cloud save', () => {
 
     // Built and saved in the first browser.
     await page.getByRole('button', { name: /Forest clearing/ }).click();
-    await expect(page.getByRole('banner')).toBeVisible();
+    await editorOpen(page);
     await page.waitForFunction(() => window.helaengine !== undefined);
 
     await page.evaluate(() => window.helaengine!.addObject('rock_boulder_01', [4, 0, 4]));
@@ -3181,7 +3201,7 @@ test.describe('cloud save', () => {
       .getByRole('button', { name: /Forest Clearing/ })
       .first()
       .click();
-    await expect(theirPage.getByRole('banner')).toBeVisible({ timeout: 30_000 });
+    await editorOpen(theirPage, 30_000);
     await theirPage.waitForFunction(() => window.helaengine !== undefined);
 
     await expect
@@ -3232,7 +3252,7 @@ test.describe('uploaded assets', () => {
     await expect(page.getByText('Signed in as')).toBeVisible({ timeout: 30_000 });
 
     await page.getByRole('button', { name: /Forest clearing/ }).click();
-    await expect(page.getByRole('banner')).toBeVisible();
+    await editorOpen(page);
     await page.waitForFunction(() => window.helaengine !== undefined);
 
     const myAssets = page.getByRole('region', { name: 'My assets' });
@@ -3297,7 +3317,7 @@ test.describe('uploaded assets', () => {
       .getByRole('button', { name: /Forest Clearing/ })
       .first()
       .click();
-    await expect(page.getByRole('banner')).toBeVisible({ timeout: 30_000 });
+    await editorOpen(page, 30_000);
     await expect(page.getByRole('region', { name: 'My assets' })).toContainText(
       'Nothing uploaded yet',
       { timeout: 60_000 },
@@ -3318,7 +3338,7 @@ test.describe('uploaded assets', () => {
     await expect(page.getByText('Signed in as')).toBeVisible({ timeout: 30_000 });
 
     await page.getByRole('button', { name: /Forest clearing/ }).click();
-    await expect(page.getByRole('banner')).toBeVisible();
+    await editorOpen(page);
     await page.waitForFunction(() => window.helaengine !== undefined);
 
     const before = await page.evaluate(() => window.helaengine!.assetIds().length);
@@ -3388,7 +3408,7 @@ test.describe('real-time collaboration', () => {
     await expect(page.getByText('Signed in as')).toBeVisible({ timeout: 30_000 });
 
     await page.getByRole('button', { name: projectName }).first().click();
-    await expect(page.getByRole('banner')).toBeVisible({ timeout: 30_000 });
+    await editorOpen(page, 30_000);
     await page.waitForFunction(() => window.helaengine !== undefined);
     // Connected, not merely mounted: every assertion below is about the room.
     await expect
@@ -3414,7 +3434,7 @@ test.describe('real-time collaboration', () => {
     await expect(page.getByText('Signed in as')).toBeVisible({ timeout: 30_000 });
 
     await page.getByRole('button', { name: /Forest clearing/ }).click();
-    await expect(page.getByRole('banner')).toBeVisible();
+    await editorOpen(page);
     await page.waitForFunction(() => window.helaengine !== undefined);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('status', { name: 'Save state' })).toContainText(/Saved/i, {
@@ -3522,7 +3542,7 @@ test.describe('real-time collaboration', () => {
     await expect(page.getByText('Signed in as')).toBeVisible({ timeout: 30_000 });
 
     await page.getByRole('button', { name: /Forest clearing/ }).click();
-    await expect(page.getByRole('banner')).toBeVisible();
+    await editorOpen(page);
     await page.waitForFunction(() => window.helaengine !== undefined);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('status', { name: 'Save state' })).toContainText(/Saved/i, {
@@ -3585,7 +3605,7 @@ test.describe('real-time collaboration', () => {
     await expect(page.getByText('Signed in as')).toBeVisible({ timeout: 30_000 });
 
     await page.getByRole('button', { name: /Forest clearing/ }).click();
-    await expect(page.getByRole('banner')).toBeVisible();
+    await editorOpen(page);
     await page.waitForFunction(() => window.helaengine !== undefined);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('status', { name: 'Save state' })).toContainText(/Saved/i, {
@@ -3641,7 +3661,7 @@ test.describe('real-time collaboration', () => {
     await expect(page.getByText('Signed in as')).toBeVisible({ timeout: 30_000 });
 
     await page.getByRole('button', { name: /Forest clearing/ }).click();
-    await expect(page.getByRole('banner')).toBeVisible();
+    await editorOpen(page);
     await page.waitForFunction(() => window.helaengine !== undefined);
 
     const [mine, theirs] = await page.evaluate(() => [
@@ -3731,7 +3751,7 @@ test.describe('project files', () => {
     test.setTimeout(240_000);
 
     await page.getByRole('button', { name: /Empty field/ }).click();
-    await expect(page.getByRole('banner')).toBeVisible();
+    await editorOpen(page);
     await page.evaluate(() => {
       window.helaengine!.store.getState().setName('Portable Level');
       window.helaengine!.addObject('building_hut_01', [2, 0, 3]);
@@ -3764,7 +3784,7 @@ test.describe('project files', () => {
     }, bytes);
 
     // The project opened, under the name it was saved with.
-    await expect(theirPage.getByRole('banner')).toBeVisible({ timeout: 30_000 });
+    await editorOpen(theirPage, 30_000);
     await expect(theirPage.getByLabel('Project name')).toHaveValue('Portable Level');
 
     // And the world is really there, drawn — not merely a document that parsed.
@@ -3836,7 +3856,7 @@ test.describe('server-side export', () => {
 
     // A cloud project, saved — the server builds a *version*, so there has to be one.
     await page.getByRole('button', { name: /Forest clearing/ }).click();
-    await expect(page.getByRole('banner')).toBeVisible();
+    await editorOpen(page);
     await page.waitForFunction(() => window.helaengine !== undefined);
     await saveAndSettle(page);
 
@@ -3917,7 +3937,7 @@ test.describe('following one export end to end', () => {
     await expect(page.getByText('Signed in as')).toBeVisible({ timeout: 30_000 });
 
     await page.getByRole('button', { name: /Forest clearing/ }).click();
-    await expect(page.getByRole('banner')).toBeVisible();
+    await editorOpen(page);
     await page.waitForFunction(() => window.helaengine !== undefined);
     await saveAndSettle(page);
 
