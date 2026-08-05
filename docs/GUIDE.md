@@ -334,10 +334,10 @@ schema-validated auto-repair loop, and whatever was changed is disclosed. Detail
 
 **Sprint 33: Observability + SRE basics**
 
-- [ ] OpenTelemetry instrumentation across API + workers; Grafana dashboards (latency, error rate, queue depth)
-- [ ] Sentry on both editor client and API
-- [ ] Structured logging + correlation IDs across request → job → export lifecycle
-- **DoD:** You can trace a single export request from HTTP call → queue → worker → S3 upload → user notification, end to end, in one dashboard.
+- [x] OpenTelemetry across the API and the worker, **hand-instrumented rather than auto** — spans named after the product (`export.build`) rather than after the runtime (`pg.query`). Dashboard JSON and alert rules in `ops/`, **never loaded into a running Grafana** — there is no account and no container runtime here
+- [x] A React error boundary per panel plus the two crashes React never sees (`onerror`, `unhandledrejection`), reporting to a **hand-written Sentry-compatible endpoint**. Silent unless `VITE_SENTRY_DSN` is set; **no Sentry account** was involved
+- [x] Structured JSON logs and correlation ids the whole way: browser header → API → **BullMQ payload** (a queue has no headers) → worker → storage → the job row
+- **DoD: met locally, not in Grafana.** `pnpm trace <correlation-id>` prints the whole path with a duration on every stage, and an end-to-end test drives a real browser and asserts it. The words "in one dashboard" are the part not met: the panels are reviewed configuration, unrendered. See `docs/SPRINT.md`.
 
 **Sprint 34: Security & compliance pass**
 

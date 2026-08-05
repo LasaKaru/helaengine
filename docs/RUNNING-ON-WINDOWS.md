@@ -268,6 +268,29 @@ pnpm --filter @helaengine/realtime start
 
 Runs on port 2567. Needed only by exported games whose scene enables co-op.
 
+### Seeing what the servers are doing
+
+Nothing is recorded unless you ask for it. To follow a request across the API and the worker on
+your own machine, start both with a trace file — the same one, or they cannot be joined:
+
+```powershell
+$env:HELA_TRACE_FILE = "$PWD\.hela-traces\spans.ndjson"
+pnpm api
+# in another window, with the same variable set
+pnpm --filter @helaengine/export-worker start
+```
+
+Then export something and follow it:
+
+```powershell
+pnpm trace                        # the last twenty requests
+pnpm trace hela_9f3c1a2b4d5e6f70  # one of them, in full
+```
+
+The id is on every response as the `x-correlation-id` header, on the editor's crash screen, and
+under a failed export. `http://localhost:3000/metrics` is the same numbers in Prometheus format.
+`docs/RUNBOOK.md` explains what to do with any of it.
+
 ---
 
 ## Ports, in one place

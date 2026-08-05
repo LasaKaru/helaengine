@@ -13,6 +13,7 @@ import { createServer } from 'node:http';
 import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { readSpans, render, select, timeline } from '@helaengine/trace/timeline';
 
 /**
  * Opens a fresh project in the editor.
@@ -3867,5 +3868,79 @@ test.describe('server-side export', () => {
       objects: unknown[];
     };
     expect(built.objects.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * Sprint 33 — the definition of done, as a test.
+ *
+ * "Pick any single export request from the last hour and trace its complete path — HTTP call, queue
+ * entry, worker processing, storage upload — in one view using its correlation id, with timing at
+ * each stage." In production that view is Grafana Tempo, which cannot be part of a test suite. So
+ * the services write the same spans to a file, and this reads them with the *same code*
+ * `pnpm trace` runs — which means the claim is checked rather than described.
+ */
+test.describe('following one export end to end', () => {
+  test('a correlation id from the browser reaches the worker’s storage write', async ({ page }) => {
+    test.setTimeout(300_000);
+
+    const tracePath = process.env['HELA_TRACE_FILE'];
+    test.skip(
+      tracePath === undefined,
+      'HELA_TRACE_FILE is set by playwright.config.ts; skipped when the suite runs without it',
+    );
+
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Create an account' }).click();
+    await page.getByLabel('Display name').fill('Trace Person');
+    await page.getByLabel('Email').fill(`trace-${Date.now().toString(36)}@example.com`);
+    await page.getByLabel('Password').fill('a-long-enough-password');
+    await page.getByRole('button', { name: 'Create account' }).click();
+    await expect(page.getByText('Signed in as')).toBeVisible({ timeout: 30_000 });
+
+    await page.getByRole('button', { name: /Forest clearing/ }).click();
+    await expect(page.getByRole('banner')).toBeVisible();
+    await page.waitForFunction(() => window.helaengine !== undefined);
+    await saveAndSettle(page);
+
+    // The id is read from the response header rather than invented by the test: this is exactly
+    // what a user's browser has, and what a support conversation would start from.
+    const requested = page.waitForResponse(
+      (response) => response.url().includes('/exports') && response.request().method() === 'POST',
+    );
+
+    await page.getByRole('button', { name: 'Export' }).click();
+    const serverExport = page.getByRole('region', { name: 'Build on the server' });
+    await serverExport.getByRole('button', { name: 'Build on the server' }).click();
+
+    const correlationId = (await requested).headers()['x-correlation-id'] ?? '';
+    expect(correlationId).toMatch(/^hela_[0-9a-f]{16}$/);
+
+    await expect(serverExport.getByTestId('export-ready')).toBeVisible({ timeout: 180_000 });
+
+    const spans = select(readSpans(tracePath!), correlationId);
+    const view = render(timeline(spans));
+
+    // One trace, two processes. Without the carrier on the job payload this is two unrelated
+    // traces that happen to be about the same build.
+    expect(new Set(spans.map((span) => span.traceId)).size).toBe(1);
+    expect(new Set(spans.map((span) => span.service))).toEqual(
+      new Set(['helaengine-api', 'helaengine-export-worker']),
+    );
+
+    // Every stage the definition of done names, in one view.
+    expect(view).toContain('POST /projects/:project/exports'); // the HTTP call
+    expect(view).toContain('export.enqueue'); // the queue entry
+    expect(view).toContain('export.job'); // worker processing
+    expect(view).toContain('export.build');
+    expect(view).toContain('export.store'); // the storage write
+    expect(view).toContain(`correlation ${correlationId}`);
+
+    // And with a duration on each, which is the part that makes it useful rather than merely
+    // complete: "where did the ninety seconds go" is the question people actually arrive with.
+    for (const span of spans) expect(span.durationMs).toBeGreaterThan(0);
+
+    // Nothing failed, and the view says so by not marking anything.
+    expect(view).not.toContain('span(s) failed');
   });
 });

@@ -7,8 +7,9 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 32 — the platform has accounts, cloud save, per-organisation asset uploads,
-real-time collaborative editing and server-side export.
+**Status:** Sprint 33 — the platform has accounts, cloud save, per-organisation asset uploads,
+real-time collaborative editing, server-side export, and now traces, metrics and structured logs
+tying one user action together across every service that touches it.
 Exports are playable games, checked in three browsers, played before anyone can have them, automatically repaired where a fix
 exists, refused with a reason where one does not, and shareable as a link rather than a zip; a
 project now belongs to a user in an organisation with role-gated access, and is saved to a server
@@ -16,7 +17,9 @@ with a version for every save; and an organisation can upload its own `.glb` fil
 the library beside the curated ones and are placeable exactly like them; and two people can edit one
 project at once, seeing each other's selections and changes as they happen; and a large project can
 be built on a server rather than in the tab, with a progress bar and a download link that expires.
-A working editor,
+Any single export can be followed from the browser's request through the queue to the worker's
+storage write with one id — `pnpm trace <correlation-id>` — and a panel that crashes now shows the
+user a screen saying their work is safe rather than a white page. A working editor,
 behaviours, physics, enemies, trigger volumes, a measured performance baseline, first/third/top-down cameras with one input layer covering
 keyboard, touch and gamepad, a schema-driven menu/HUD shell, and now combat: a weapon catalogue in
 the document, hitscan firing, ammo and reloading, pickups, player damage and respawn — plus secrets
@@ -132,15 +135,22 @@ packages/engine        Vanilla Three.js runtime. No React, no store, no DOM assu
 packages/export        Scene + manifest in, runnable folder out. Pure functions, so it runs in Node too.
 packages/repair        Turns a failed play-test into a narrow, schema-validated patch. Proposes; never executes.
 packages/templates     The five starter worlds. Shared so the editor offers what the gate tests.
+packages/collab        Maps a scene onto a Yjs document. One definition of how a scene replicates.
+packages/hela-file     The .hela project container: a scene, its custom assets, and a manifest.
+packages/telemetry     Traces, metrics, correlation ids, structured logs. What every service says about itself.
 apps/share             Hosts validated builds behind a link. Refuses anything that did not pass.
 tools/asset-pipeline   Ingest: raw GLBs in, compressed GLBs + thumbnails + manifest out.
 tools/smoke            Plays a build before a human can. Deterministic checks, exit code as verdict.
+tools/trace            `pnpm trace <id>` — one request, every service that touched it, with timings.
 raw-assets/            Hand-authored .glb sources. The artefacts under version control.
 apps/demo              Framework-free harness rendering a scene document. Proves the engine stands alone.
 apps/editor            The editor: React + react-three-fiber shell around the engine.
 apps/realtime          Colyseus co-op server. Runs the engine's own physics, in Node.
 apps/api               Accounts, orgs, memberships, role gating. Postgres + hand-written SQL.
-docs/                  GUIDE, DEVELOPMENT-PLAN, SPRINT, ASSET-CONVENTIONS — the plan of record.
+apps/collab            The room server two editors meet in. Authenticates the socket, persists the room.
+apps/export-worker     Builds exports off the tab, on a BullMQ queue. Its own process, on purpose.
+ops/                   Grafana dashboard and Prometheus alert rules. Reviewed, not yet rendered.
+docs/                  GUIDE, DEVELOPMENT-PLAN, SPRINT, RUNBOOK, ASSET-CONVENTIONS — the plan of record.
 ```
 
 ## The two rules that shape the codebase

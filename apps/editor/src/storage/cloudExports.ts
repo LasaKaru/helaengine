@@ -1,5 +1,6 @@
 import { isTerminal, type ExportJob, type PlanTier } from '@helaengine/schema';
 import { NotSignedIn, type CloudSession } from './cloudProjects';
+import { rememberCorrelationId } from '../telemetry/report';
 
 /**
  * Asking the server to build an export, and watching it happen.
@@ -117,6 +118,9 @@ export class CloudExports {
           authorization: `Bearer ${this.#session.token}`,
         },
       });
+      // Kept so a crash report, or a support conversation, can name the last thing this tab asked
+      // the server to do. See `telemetry/report.ts`.
+      rememberCorrelationId(response);
     } catch {
       throw new Error(`Could not reach the API at ${this.#session.origin}.`);
     }

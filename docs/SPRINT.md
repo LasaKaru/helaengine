@@ -1102,16 +1102,48 @@ Also found, and less interesting but more likely to have bitten somebody: the do
 
 **Tasks:**
 
-- [ ] Instrument the NestJS API and Export Worker with OpenTelemetry (traces + metrics); set up Grafana Cloud (managed, per DEVELOPMENT-PLAN.md) as the backend, or self-hosted Grafana/Loki/Tempo if cost/control demands it
-- [ ] Add correlation IDs propagated across the full lifecycle of a request: HTTP call → BullMQ job → worker processing → storage upload → client notification — so a single trace can be followed end to end in Grafana/Tempo
-- [ ] Integrate Sentry on both the editor client (React error boundary + source maps) and the API/worker (unhandled exception capture)
-- [ ] Build core Grafana dashboards: API request latency (p50/p95/p99), error rate by endpoint, BullMQ queue depth + job processing time, Postgres connection pool utilization
-- [ ] Set up basic alerting (e.g., via Grafana Alerting or a simple PagerDuty/Slack webhook integration) for: error rate spike, queue depth sustained above threshold, API latency SLA breach
-- [ ] Write a basic on-call/incident response runbook doc (even if you're the only responder right now — the habit matters more than the audience size)
+- [x] `packages/telemetry`: OpenTelemetry tracing with an OTLP exporter, correlation ids on `AsyncLocalStorage`, a hand-written Prometheus registry, and structured JSON logs. **Manual instrumentation, not auto-instrumentation** — see the tech notes
+- [x] Correlation ids across the whole lifecycle: browser header → API span → **BullMQ payload** (a queue has no headers, so the W3C `traceparent` is carried by hand) → worker spans → storage write → the `export_jobs.correlation_id` column
+- [x] `/metrics` on both services, with route _patterns_ as labels rather than paths — the difference between twenty time series and one per project id
+- [x] A React error boundary per panel, plus `window.onerror` and `unhandledrejection`, reporting to a **Sentry-compatible endpoint** written by hand rather than the SDK. Nothing leaves the browser unless `VITE_SENTRY_DSN` is set
+- [x] Grafana dashboard JSON and Prometheus alert rules under `ops/`, with four alerts that each have a runbook entry — and no alert that does not
+- [x] `docs/RUNBOOK.md`: what to do when each alert fires, what is deliberately _not_ alerted on, and what this sprint does not cover
+- [x] **Added:** `tools/trace` — `pnpm trace <correlation-id>` prints the definition-of-done view from a local span file, so the claim is checked by a test rather than asserted in a document
+
+**Tech notes:**
+
+- **No auto-instrumentation, deliberately.** `@opentelemetry/auto-instrumentations-node` would patch `http`, `pg` and `ioredis` at load time and produce a great deal for free. Two objections, and the second decided it: patching the module registry means the service under test differs from the service in production by whatever the patches do; and a trace made of `HTTP POST` and `pg.query` spans says what the _runtime_ did, while `export.build` and `export.store` say what the _product_ did. The second is the one somebody reads at two in the morning.
+- **Why a correlation id when a trace id exists.** A trace id is useful to somebody holding a tracing backend. A correlation id is useful to somebody holding a log file, a support email, or a screenshot — it is short, readable, and printed on the crash screen and next to a failed export. It is validated on the way in against a strict shape, because a caller-supplied newline in that header would split one JSON log line into two, the second of which the caller writes.
+- **The metrics registry is ninety lines rather than `prom-client`.** What a scrape endpoint has to produce is text in a format that has not changed in a decade, and three instrument types cover everything here. What that costs: no exemplars, no native histograms, no free `process_*` collectors. If any of those become load-bearing, take the dependency.
+- **Cardinality is the whole design of the metrics.** Every label comes from a fixed list of route patterns; anything unrecognised collapses to `unmatched`, so a scanner spraying URLs adds one series rather than thousands.
+- **A boundary per panel, not one around the editor.** One outer boundary is less code and much worse: a properties panel throwing on a malformed field would take the viewport and the toolbar with it, and the user would lose sight of a scene that is still perfectly fine in memory.
 
 **Deliverables:** Full observability stack, dashboards, alerting, incident runbook.
 
 **Definition of Done:** You can pick any single export request from the last hour and trace its complete path — HTTP call, queue entry, worker processing, storage upload, client callback — in one Grafana view using its correlation ID, with timing at each stage.
+
+**Met locally, not in Grafana.** An end-to-end test presses **Build on the server** in a real browser, reads the correlation id out of the response header the way a user's browser would, waits for the download, and then prints the whole path from the spans two separate processes wrote:
+
+```
+trace       5487617f734794ef0ced565617fbbad0
+correlation hela_65653ad44b8da5a9
+services    api, export-worker
+spans       7, 430.9ms end to end
+
+  +0ms      13.1ms    api                      POST /projects/:project/exports
+  +5ms      3.5ms     api                        export.record
+  +8ms      3.9ms     api                        export.enqueue
+  +16ms     414.9ms   export-worker                export.job
+  +27ms     3.0ms     export-worker                  export.load_scene
+  +31ms     395.1ms   export-worker                  export.build
+  +428ms    2.6ms     export-worker                  export.store
+```
+
+Every stage the definition names, with a duration on each, from one id. What is **not** met is the words "in one Grafana view": there is no Grafana Cloud account and no container runtime here, so the dashboard JSON and the alert rules have never been loaded into a running Grafana or Prometheus. They are reviewed configuration, and `docs/RUNBOOK.md` says so in its own words. The metrics they query _are_ asserted by tests to exist with those names and labels, so the queries have the right inputs — but a panel that renders is not something this sprint can claim.
+
+Three more honest gaps. **No alert delivery**: the rules carry `severity: page` and `severity: ticket`, and nothing is wired to PagerDuty or Slack. **No log shipping**: logs are structured JSON on stdout, which is what Loki and every platform shipper expect, and nothing ships them. **No Sentry account**: the editor's reporter is exercised against a fake DSN in a unit test, never against Sentry itself.
+
+The bug worth recording cost a debugging session and is the sort that would have quietly ruined the feature. The one log line per request — the line that exists to be searched by correlation id — was being written _without_ one. `AsyncLocalStorage` does not follow an event listener: Node runs an emitter's callbacks in the async context the emitter was created in, not the one `.once()` was called from. The listener now re-enters the correlation explicitly. A second, related: the request span was ended where the handler returned, which meant every _failed_ request — the ones somebody would go looking for — got a span with no status code, because a thrown handler never reaches that line. The span now ends when the response closes.
 
 ---
 

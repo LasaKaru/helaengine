@@ -1,4 +1,19 @@
+import { resolve } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
+
+/**
+ * Where the API and the worker write their spans (Sprint 33).
+ *
+ * Set for the run rather than for a test, because the interesting property is that *two processes*
+ * write to it and one trace comes back out. The suite reads this file with the same code
+ * `pnpm trace` uses, which is how the sprint's definition of done — follow any export end to end —
+ * is checked by a test instead of asserted in a document.
+ */
+const TRACE_FILE = process.env['HELA_TRACE_FILE'] ?? resolve('.hela-traces-e2e/spans.ndjson');
+
+// Also visible to the *test* process, not only to the services: this config is evaluated by the
+// runner, and a test that reads the file needs to know where the two servers were told to write it.
+process.env['HELA_TRACE_FILE'] = TRACE_FILE;
 
 /**
  * Only a smoke test today (Sprint 3). This grows into the export visual-regression suite in
@@ -127,6 +142,7 @@ export default defineConfig({
           process.env['TEST_DATABASE_URL'] ?? 'postgres://hela@127.0.0.1:5433/helaengine_e2e',
         REDIS_URL: process.env['TEST_REDIS_URL'] ?? 'redis://127.0.0.1:6379',
         EXPORT_ROOT: process.env['EXPORT_ROOT'] ?? '.hela-exports-e2e',
+        HELA_TRACE_FILE: TRACE_FILE,
         // Uploaded assets (Sprint 30) land on disk. A directory per run keeps one run's models out
         // of the next one's storage, the same bargain `SHARE_ROOT` makes below.
         ASSET_ROOT: process.env['ASSET_ROOT'] ?? '.hela-assets-e2e',
@@ -148,6 +164,7 @@ export default defineConfig({
         ENGINE_RUNTIME: 'packages/engine/dist/runtime-full.js',
         EXPORT_ROOT: process.env['EXPORT_ROOT'] ?? '.hela-exports-e2e',
         EXPORT_WORKER_PORT: '3300',
+        HELA_TRACE_FILE: TRACE_FILE,
       },
     },
     {

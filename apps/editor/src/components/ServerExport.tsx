@@ -167,6 +167,17 @@ export function ServerExport(): React.JSX.Element | null {
       {error !== '' && (
         <p className="export-error" role="alert">
           {error}
+          {job?.correlationId && (
+            // Shown only on a failure, and only for a build the server actually recorded. It is
+            // the string that turns "my export broke" into one query across the API's logs, the
+            // worker's logs and the trace — see docs/RUNBOOK.md.
+            <>
+              {' '}
+              <span className="panel-hint">
+                Reference: <code data-testid="export-reference">{job.correlationId}</code>
+              </span>
+            </>
+          )}
         </p>
       )}
     </section>

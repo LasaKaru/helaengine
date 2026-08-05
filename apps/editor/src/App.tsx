@@ -6,6 +6,7 @@ import { primeUiAssetUrls } from './storage/uiAssets';
 import { exposeDevApi } from './devApi';
 import { AssetLibraryPanel } from './components/AssetLibraryPanel';
 import { DragChip } from './components/DragChip';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { InspectorPanel } from './components/Panels';
 import { ProjectsScreen } from './components/ProjectsScreen';
 import { ShortcutsModal } from './components/ShortcutsModal';
@@ -160,9 +161,23 @@ export function App(): React.JSX.Element {
     <div className="editor">
       <TopBar manifest={manifest ?? state.library.manifest} />
       <div className="workspace">
-        <AssetLibraryPanel manifest={manifest ?? state.library.manifest} uploads={uploads} />
-        <Viewport loader={state.library.loader} resolver={state.library.resolver} />
-        <InspectorPanel manifest={manifest ?? state.library.manifest} />
+        {/*
+          A boundary per panel rather than one around the editor (Sprint 33).
+          
+          One outer boundary would be less code and much worse: a properties panel that throws on a
+          malformed field would take the viewport, the toolbar and the asset library down with it,
+          and the user would lose sight of a scene that is still perfectly fine in memory. Scoped
+          like this, a broken panel is a broken panel.
+        */}
+        <ErrorBoundary where="the asset library">
+          <AssetLibraryPanel manifest={manifest ?? state.library.manifest} uploads={uploads} />
+        </ErrorBoundary>
+        <ErrorBoundary where="the level view">
+          <Viewport loader={state.library.loader} resolver={state.library.resolver} />
+        </ErrorBoundary>
+        <ErrorBoundary where="the properties panel">
+          <InspectorPanel manifest={manifest ?? state.library.manifest} />
+        </ErrorBoundary>
       </div>
       <DragChip />
       <ShortcutsModal />

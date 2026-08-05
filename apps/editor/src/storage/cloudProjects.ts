@@ -1,5 +1,6 @@
 import { migrateScene, type Scene } from '@helaengine/schema';
 import { ProjectLoadError, type ProjectSummary } from './projects';
+import { rememberCorrelationId } from '../telemetry/report';
 
 /**
  * The same project store, over the API.
@@ -220,6 +221,9 @@ export class CloudProjects {
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
+      // Kept so a crash report, or a support conversation, can name the last thing this tab asked
+      // the server to do. See `telemetry/report.ts`.
+      rememberCorrelationId(response);
     } catch {
       throw new Error(
         `Could not reach the API at ${this.#session.origin} — it may not be running, or it may ` +
