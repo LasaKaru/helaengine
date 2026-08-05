@@ -117,14 +117,18 @@ async function startPlaying(page: Page): Promise<void> {
  * status, and demanding the dirty label there would fail a test whose whole point is that saving an
  * untouched scene still writes a thumbnail.
  */
-async function saveAndSettle(page: Page, via: 'button' | 'keyboard' = 'button'): Promise<void> {
+async function saveAndSettle(
+  page: Page,
+  via: 'button' | 'keyboard' = 'button',
+  timeout = 10_000,
+): Promise<void> {
   const status = page.getByRole('status', { name: 'Save state' });
   await expect(status).not.toHaveText('Saved');
 
   if (via === 'keyboard') await page.keyboard.press('Control+s');
   else await page.getByRole('button', { name: 'Save', exact: true }).click();
 
-  await expect(status).toHaveText('Saved');
+  await expect(status).toHaveText('Saved', { timeout });
 }
 
 test.describe('editor shell', () => {
@@ -3177,10 +3181,15 @@ test.describe('cloud save', () => {
     await page.waitForFunction(() => window.helaengine !== undefined);
 
     await page.evaluate(() => window.helaengine!.addObject('rock_boulder_01', [4, 0, 4]));
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByRole('status', { name: 'Save state' })).toContainText(/Saved/i, {
-      timeout: 30_000,
-    });
+    /**
+     * Settled, not merely clicked.
+     *
+     * Asserting `Saved` without first asserting *not* `Saved` passes on the state left by the
+     * previous save — so the second browser could open the project while this save was still in
+     * flight and read the version before the edit. That is what a full run caught once here: 29
+     * objects where 30 were expected, in the browser that had done nothing wrong.
+     */
+    await saveAndSettle(page, 'button', 30_000);
 
     const objectCount = await page.evaluate(
       () => window.helaengine!.store.getState().scene.objects.length,
