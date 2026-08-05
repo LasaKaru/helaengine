@@ -969,8 +969,20 @@ project, so it passed instantly while the save under test was still in flight, a
 interrupted it. The record then kept its previous contents, which is exactly what the failure
 showed: a project still named "Untitled scene" after a rename had been saved. The fix pins the
 transition rather than the end state (wait for "Unsaved changes", then save, then "Saved"), and the
-group now runs clean three times over with retries disabled. Worth recording because the test was
-wrong from the day it was written and only contention made it say so.
+group now runs clean three times over with retries disabled, and a full run went from five flaky to
+one. Worth recording because the test was wrong from the day it was written and only contention made
+it say so — and because the first version of the fix broke a different test, the one that saves an
+_untouched_ scene to check thumbnails, which has no dirty state to wait for. Caught by running the
+suite again rather than by assuming the fix worked.
+
+**The last flake is not explained.** "edits survive a full page reload" still fails about one run in
+three, always the same way: after a rename and a save that visibly transitions to "Saved", the
+reloaded project list shows the project under its _creation-time_ name. `saveProject` writes
+`name: project.scene.name` unconditionally, and `save()` reads the store at call time, so a
+completed save cannot produce that record — which means either the save that produced it ran before
+the rename, or the write landed and the list read something older. Neither is demonstrated by the
+evidence to hand. It retries green and is the same test flagged as pre-existing debt in Sprint 24;
+it is now the only one left, which makes it worth a session of its own rather than another guess.
 
 Also not done: **sculpting is not in the two-browser test**. The document-level test proves terrain replicates and that concurrent sculpts are last-write-wins, but driving two simultaneous brush strokes through two software-rendered canvases would be measuring the test harness. And there is **no reconnection test in a browser** — the state-vector resync is proven at the document level, where a client that edited while offline and one that edited while online both keep their work, but nothing in the suite pulls a real socket out and puts it back.
 
