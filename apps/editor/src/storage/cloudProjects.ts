@@ -52,6 +52,15 @@ export interface CloudSession {
   origin: string;
   token: string;
   organizationId: string;
+  /**
+   * Who is signed in.
+   *
+   * Carried on the session rather than held beside it because collaboration needs it — a
+   * collaborator's identity *is* their account, and their colour is derived from this id, so two
+   * people in one organisation must not be able to look like the same person.
+   */
+  userId: string;
+  displayName: string;
 }
 
 /** Where the API lives, when one is configured at all. */

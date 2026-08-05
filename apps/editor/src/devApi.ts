@@ -8,6 +8,7 @@ import type {
 } from '@helaengine/engine';
 import { SceneObjectSchema, type AssetManifestEntry, type Vec3 } from '@helaengine/schema';
 import type { AssetLibrary } from './engine/assetLibrary';
+import { collabPeers, collabStatus, currentSession } from './collab/current';
 import { useEditorStore } from './store/editorStore';
 import { nextObjectId, useSceneStore } from './store/sceneStore';
 
@@ -47,6 +48,18 @@ export interface DevApi {
   setCameraPose(position: [number, number, number], target: [number, number, number]): boolean;
   /** Whether a transform gizmo is currently attached in the scene. */
   hasGizmo(): boolean;
+  /**
+   * The collaborative session, or null when this tab is editing alone.
+   *
+   * `peers` is everybody else in the room — this seat excluded — which is what the top bar draws
+   * and what the viewport highlights. A test asserting on it is asserting on the same data the UI
+   * renders, rather than on a parallel bookkeeping the UI might disagree with.
+   */
+  collab(): {
+    status: string;
+    peers: Array<{ userId: string; displayName: string; selection: string[]; editing: boolean }>;
+    canUndo: boolean;
+  } | null;
   /** World height of the live terrain at a world X/Z — proves a sculpt reached the geometry. */
   terrainHeightAt(x: number, z: number): number | null;
   /** Client-space coordinates of an object, for driving precise clicks in tests. */
@@ -331,6 +344,21 @@ export function exposeDevApi(library: AssetLibrary): void {
     assetIds: () => library.manifest.assets.map((asset) => asset.id),
 
     assetEntry: (assetId) => library.manifest.assets.find((asset) => asset.id === assetId) ?? null,
+
+    collab: () => {
+      const session = currentSession();
+      if (!session) return null;
+      return {
+        status: collabStatus(),
+        peers: collabPeers().map((peer) => ({
+          userId: peer.userId,
+          displayName: peer.displayName,
+          selection: peer.selection,
+          editing: peer.editing,
+        })),
+        canUndo: session.canUndo(),
+      };
+    },
 
     addObject(assetId, position = [0, 0, 0], rotationY = 0) {
       const state = useSceneStore.getState();

@@ -9,7 +9,9 @@ on:
   pull_request:
     paths:
       - 'apps/api/**'
+      - 'apps/collab/**'
       - 'packages/schema/**'
+      - 'packages/collab/**'
       - '.github/workflows/api.yml'
   workflow_dispatch:
 
@@ -19,7 +21,7 @@ concurrency:
 
 jobs:
   api:
-    name: Accounts, orgs and role gating
+    name: Accounts, orgs, assets and collaboration
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -57,3 +59,9 @@ jobs:
         run: pnpm --filter @helaengine/api test
         env:
           TEST_DATABASE_URL: postgres://hela:hela@localhost:5432/helaengine_test
+
+      # The room server's own suite needs no database — it substitutes an in-memory store, so the
+      # tests are about the sync protocol rather than about Postgres. It runs here because it is the
+      # other half of the same feature and belongs next to the tests it shares a schema with.
+      - name: Run the collaboration server suite
+        run: pnpm --filter @helaengine/collab-server test

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useEditorStore } from './store/editorStore';
 import { useProjectStore } from './store/projectStore';
 import { useSceneStore } from './store/sceneStore';
+import { runRedo, runUndo } from './collab/current';
 
 /**
  * The keybind scheme, in one place so the reference modal and the handler cannot drift apart.
@@ -89,14 +90,16 @@ export function useShortcuts(options: ShortcutOptions = {}): void {
 
       if (modifier && event.key.toLowerCase() === 'z') {
         event.preventDefault();
-        if (event.shiftKey) scene.redo();
-        else scene.undo();
+        // Routed through the same controls the toolbar buttons use, so the keyboard and the
+        // buttons cannot end up driving two different histories in a collaborative session.
+        if (event.shiftKey) runRedo();
+        else runUndo();
         return;
       }
 
       if (modifier && event.key.toLowerCase() === 'y') {
         event.preventDefault();
-        scene.redo();
+        runRedo();
         return;
       }
 

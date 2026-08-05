@@ -15,6 +15,7 @@ import { PhysicsPreview } from './PhysicsPreview';
 import { SculptController } from './SculptController';
 import { SelectionController } from './SelectionController';
 import { SelectionHighlight } from './SelectionHighlight';
+import { PeerHighlight } from './PeerHighlight';
 import { TransformGizmo } from './TransformGizmo';
 
 /** Publishes the r3f camera to the dev API. Dev/test tooling only; nothing renders. */
@@ -128,6 +129,10 @@ export function Viewport({ loader, resolver }: ViewportProps): React.JSX.Element
         <PhysicsPreview loadedScene={loadedScene} resolver={resolver} loader={loader} />
         <WaypointEditor loadedScene={loadedScene} />
         {!playing && <SculptController loadedScene={loadedScene} />}
+        {/* Outside the select-tool branch on purpose: a collaborator's selection is worth seeing
+            while you are sculpting or painting, and it is the only cue that somebody else is about
+            to change the thing under your brush. */}
+        {!playing && <PeerHighlight loadedScene={loadedScene} />}
         {tool === 'select' && !playing && !editingWaypoints && (
           <>
             <SelectionController loadedScene={loadedScene} />

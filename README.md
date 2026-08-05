@@ -7,12 +7,14 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 30 — the platform has accounts, cloud save and per-organisation asset uploads.
+**Status:** Sprint 31 — the platform has accounts, cloud save, per-organisation asset uploads and
+real-time collaborative editing.
 Exports are playable games, checked in three browsers, played before anyone can have them, automatically repaired where a fix
 exists, refused with a reason where one does not, and shareable as a link rather than a zip; a
 project now belongs to a user in an organisation with role-gated access, and is saved to a server
 with a version for every save; and an organisation can upload its own `.glb` files, which appear in
-the library beside the curated ones and are placeable exactly like them. A working editor,
+the library beside the curated ones and are placeable exactly like them; and two people can edit one
+project at once, seeing each other's selections and changes as they happen. A working editor,
 behaviours, physics, enemies, trigger volumes, a measured performance baseline, first/third/top-down cameras with one input layer covering
 keyboard, touch and gamepad, a schema-driven menu/HUD shell, and now combat: a weapon catalogue in
 the document, hitscan firing, ammo and reloading, pickups, player damage and respawn — plus secrets
@@ -64,6 +66,14 @@ with three starter templates; work saves on Ctrl+S, on leaving the editor, and a
 seconds after you stop editing. Every
 project is validated against the schema on the way back in, so a document written by an older build
 fails loudly at the boundary rather than halfway through a render.
+
+With a collaboration server configured (`VITE_COLLAB_ORIGIN`), opening a cloud project joins a room:
+other people's selections are outlined in the viewport in their own colour, their initials appear in
+the top bar, and anyone mid-gesture gets a soft-lock ring so two people do not fight over one gizmo.
+Edits to different objects merge without either person noticing; undo is scoped to your own
+operations, so Ctrl+Z never takes back a colleague's work. Terrain is the exception and is honest
+about it — a heightmap is one blob, so two simultaneous sculpts end with the later one winning. See
+`apps/collab/README.md`.
 
 Signed in, the asset rail also grows a **My Assets** section: drop a `.glb` on it and it uploads to
 your organisation, appears in the library beside the curated assets, and can be placed exactly like

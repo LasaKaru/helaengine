@@ -1709,3 +1709,35 @@ body,
 .account-form input {
   min-width: 11rem;
 }
+
+/* ---- Collaborators (Sprint 31) ---- */
+
+.collaborators {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 10px;
+}
+
+.collaborator {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 600;
+  /* Dark text on every presence colour: the palette in `schema/collab.ts` is chosen bright enough
+     that a light label on it is the unreadable option, not the other way round. */
+  color: #10141c;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  user-select: none;
+}
+
+/* Mid-gesture. The same signal the viewport draws as a second box, so the chip and the world agree
+   about who is busy without either having to explain itself. */
+.collaborator.editing {
+  box-shadow:
+    0 0 0 2px var(--panel),
+    0 0 0 3px currentColor;
+}

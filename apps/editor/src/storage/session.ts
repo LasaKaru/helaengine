@@ -37,8 +37,12 @@ export async function restore(): Promise<SignedIn | null> {
     // in once, not that they still are, and starting the editor in a state the server disagrees
     // with is how a save fails at the worst possible moment.
     const me = await fetchMe(stored);
-    adoptSession(stored);
-    return { session: stored, ...me };
+    // Refreshed from the server rather than trusted from storage: a session written by an older
+    // build has no user id on it, and a collaborator with an empty id would share a colour with
+    // everybody else in the same state.
+    const session = { ...stored, userId: me.userId, displayName: me.displayName };
+    adoptSession(session);
+    return { session, ...me };
   } catch {
     localStorage.removeItem(STORAGE_KEY);
     return null;
@@ -51,7 +55,7 @@ export async function signUp(input: {
   displayName: string;
 }): Promise<SignedIn> {
   const body = await post<{
-    user: { email: string; displayName: string };
+    user: { id: string; email: string; displayName: string };
     personalOrganizationId: string;
     session: { token: string };
   }>('/auth/signup', input);
@@ -60,6 +64,8 @@ export async function signUp(input: {
     origin: API_ORIGIN!,
     token: body.session.token,
     organizationId: body.personalOrganizationId,
+    userId: body.user.id,
+    displayName: body.user.displayName,
   };
   return remember(session, body.user);
 }
@@ -72,10 +78,20 @@ export async function signIn(input: { email: string; password: string }): Promis
     origin: API_ORIGIN!,
     token: body.session.token,
     organizationId: '',
+    userId: '',
+    displayName: '',
   };
   const me = await fetchMe(partial);
 
-  return remember({ ...partial, organizationId: me.organizationId }, me);
+  return remember(
+    {
+      ...partial,
+      organizationId: me.organizationId,
+      userId: me.userId,
+      displayName: me.displayName,
+    },
+    me,
+  );
 }
 
 export function signOut(): void {
@@ -91,7 +107,7 @@ function remember(session: CloudSession, who: { email: string; displayName: stri
 
 async function fetchMe(
   session: CloudSession,
-): Promise<{ email: string; displayName: string; organizationId: string }> {
+): Promise<{ userId: string; email: string; displayName: string; organizationId: string }> {
   const response = await fetch(`${session.origin}/me`, {
     headers: { authorization: `Bearer ${session.token}` },
   });
@@ -99,14 +115,19 @@ async function fetchMe(
   if (!response.ok) throw new Error('The API did not answer.');
 
   const body = (await response.json()) as {
-    user: { email: string; displayName: string };
+    user: { id: string; email: string; displayName: string };
     organizations: Array<{ id: string; isPersonal: boolean }>;
   };
 
   const personal = body.organizations.find((org) => org.isPersonal) ?? body.organizations[0];
   if (!personal) throw new Error('This account has no workspace.');
 
-  return { ...body.user, organizationId: personal.id };
+  return {
+    userId: body.user.id,
+    email: body.user.email,
+    displayName: body.user.displayName,
+    organizationId: personal.id,
+  };
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {

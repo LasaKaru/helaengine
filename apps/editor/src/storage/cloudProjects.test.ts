@@ -10,7 +10,13 @@ import { CloudProjects, ConflictError, NotSignedIn } from './cloudProjects';
  * API's own behaviour is tested against a real Postgres in `apps/api`.
  */
 
-const session = { origin: 'http://api.test', token: 'tok', organizationId: 'org' };
+const session = {
+  origin: 'http://api.test',
+  token: 'tok',
+  organizationId: 'org',
+  userId: 'user_test',
+  displayName: 'Test Person',
+};
 
 function scene(name = 'Scene'): Scene {
   return parseScene({ sceneId: 'scene_x', version: 1, name, objects: [] });

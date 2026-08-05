@@ -107,7 +107,12 @@ export default defineConfig({
       // Points the editor at the platform API, which turns the account bar on. Without it the
       // editor runs exactly as it always has, on IndexedDB — which is what most of this suite
       // exercises and should keep exercising.
-      env: { VITE_API_ORIGIN: 'http://127.0.0.1:3100' },
+      env: {
+        VITE_API_ORIGIN: 'http://127.0.0.1:3100',
+        // Turns collaborative editing on (Sprint 31). Without it the editor is single-player, which
+        // is what it is for anybody who has not configured a collaboration server.
+        VITE_COLLAB_ORIGIN: 'ws://127.0.0.1:3200',
+      },
     },
     {
       // The platform API (Sprint 28-29). Cloud save is only testable if something is on the other
@@ -123,6 +128,19 @@ export default defineConfig({
         // Uploaded assets (Sprint 30) land on disk. A directory per run keeps one run's models out
         // of the next one's storage, the same bargain `SHARE_ROOT` makes below.
         ASSET_ROOT: process.env['ASSET_ROOT'] ?? '.hela-assets-e2e',
+      },
+    },
+    {
+      // The collaboration server (Sprint 31). Two browsers editing one project only means anything
+      // if there is a room for them to meet in, and a mock would be testing the mock.
+      command: 'pnpm --filter @helaengine/collab-server start',
+      url: 'http://127.0.0.1:3200/health',
+      reuseExistingServer: !process.env['CI'],
+      timeout: 120_000,
+      env: {
+        COLLAB_PORT: '3200',
+        DATABASE_URL:
+          process.env['TEST_DATABASE_URL'] ?? 'postgres://hela@127.0.0.1:5433/helaengine_e2e',
       },
     },
     {

@@ -72,6 +72,13 @@ export interface SceneState {
    * leaves you no way back has not asked permission, it has taken it.
    */
   replaceScene(scene: Scene, label: string): void;
+  /**
+   * Adopts a change made by somebody else, without touching this client's undo stack.
+   *
+   * The third way to set a document, and the distinction matters: see the implementation for why
+   * neither of the other two is correct for a remote edit.
+   */
+  applyRemoteScene(scene: Scene): void;
   addObject(object: SceneObject): void;
   removeObject(objectId: string): void;
   removeObjects(objectIds: string[]): void;
@@ -538,6 +545,32 @@ export const useSceneStore = create<SceneState>()(
           commit('scene/setName', (draft) => {
             draft.name = name;
           }),
+
+        /**
+         * A change that came from a collaborator.
+         *
+         * Neither `setScene` nor `replaceScene`. `setScene` clears the undo stack, which would mean
+         * losing your history every time somebody else nudges a rock. `replaceScene` commits an
+         * undo entry, which would put *their* edit on *your* undo stack — press Ctrl+Z and you
+         * silently revert a colleague's work.
+         *
+         * So: the document changes and history does not move at all. In a collaborative session
+         * undo is Yjs's job (see `collab/session.ts`), scoped to this client's own operations, so
+         * that Ctrl+Z takes back what you did and nothing else.
+         */
+        applyRemoteScene: (next) => {
+          const alive = new Set(next.objects.map((object) => object.id));
+          set(
+            (state) => ({
+              scene: next,
+              // Somebody else deleting what you had selected must not leave the inspector pointing
+              // at an object that is no longer in the scene.
+              selectedIds: state.selectedIds.filter((id) => alive.has(id)),
+            }),
+            false,
+            'scene/remote',
+          );
+        },
 
         undo: () => {
           const { scene, history } = get();

@@ -56,7 +56,26 @@ jobs:
   e2e:
     name: Editor end-to-end
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+
+    # The suite starts the platform API (Sprint 28-29) and the collaboration server (Sprint 31) as
+    # Playwright web servers, and both need a real database. Without one they never answer their
+    # health check and the whole run dies waiting — so CI provides Postgres rather than the suite
+    # quietly skipping everything that needs an account.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hela
+          POSTGRES_PASSWORD: hela
+          POSTGRES_DB: helaengine_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - uses: actions/checkout@v4
@@ -85,6 +104,8 @@ jobs:
 
       - name: Run editor e2e suite
         run: pnpm --filter @helaengine/editor e2e
+        env:
+          TEST_DATABASE_URL: postgres://hela:hela@localhost:5432/helaengine_e2e
 
       - uses: actions/upload-artifact@v4
         if: failure()

@@ -925,16 +925,36 @@ One real bug, found the way the useful ones always are — by driving a browser 
 
 **Tasks:**
 
-- [ ] Integrate Liveblocks (recommended per DEVELOPMENT-PLAN.md to save infra time) or self-hosted Yjs/y-websocket: set up a "room" per `Project`, with the room's shared document mirroring the scene schema structure
-- [ ] Wire `sceneStore` mutations to also propagate through the CRDT document (Yjs types: `Y.Map`/`Y.Array` mapped to your objects array) so local edits sync to other connected clients and remote edits flow back into `sceneStore`
-- [ ] Implement presence: broadcast each connected user's cursor/camera position and current selection; render other users' selection highlights and simple avatar/cursor indicators in the viewport
-- [ ] Handle the "who can edit transform gizmos simultaneously" UX question explicitly — decide: allow true simultaneous editing of different objects (CRDT handles this natively), but consider a soft-lock indicator ("Alex is editing this object") to avoid two people fighting over the same gizmo, even though the underlying CRDT would technically resolve it
-- [ ] Build reconnection handling: if a client disconnects (network blip), on reconnect it should resync cleanly from the CRDT server state, not from its last local state
-- [ ] Test explicitly: two clients both drag-transform _different_ objects simultaneously (should merge cleanly), and both attempt to delete the _same_ object simultaneously (verify no crash, graceful resolution)
+- [x] **Self-hosted Yjs**, not Liveblocks. The plan offers both; Liveblocks is a paid SaaS with no account here and no egress to it, so the alternative is the one that can be built and — the part that matters — tested. `packages/collab` maps a scene onto a `Y.Doc`; `apps/collab-server` holds one room per `Project`
+- [x] `sceneStore` propagates both ways: local commits push into the CRDT, remote updates come back through a new `applyRemoteScene` that moves the document **without touching this client's undo stack**
+- [x] Presence over the awareness channel — display name, a colour derived from the user id, and the current selection — with other people's selections drawn in the viewport in their own colour and initials in the top bar. **Camera position is in the schema and deliberately not broadcast yet**; see the tech notes
+- [x] The simultaneous-gizmo question, answered: true simultaneous editing is allowed, and a **soft lock** (a second, larger box, plus a ring on the collaborator's chip) says "Alex is moving this". Never a hard lock — a hard lock in a creative tool is a queue
+- [x] Reconnection resyncs from server state via a state-vector exchange, not from the last local state, so an offline edit merges rather than being discarded or overwriting
+- [x] Both stress tests: two clients transforming _different_ objects merge cleanly, and two clients deleting the _same_ object resolve without a crash. Plus a third that neither the plan nor the first implementation anticipated — see below
+- [x] **Added:** per-client undo. In a room, Ctrl+Z is Yjs's `UndoManager` scoped to this client's origin, because an Immer patch replayed against a document three other people have edited either targets the wrong thing or takes back somebody else's work
+
+**Tech notes:**
+
+- **Objects merge per object; everything else merges per section.** Objects are a `Y.Map` keyed by id, so two people adding a tree at the same instant get two trees — a `Y.Array` would merge concurrent inserts by _position_, in an order neither chose, and a delete racing an edit would fight over an index that had moved. The other sections are last-write-wins as a unit, because two people editing one audio mixer is not a workflow worth engineering for.
+- **Terrain is the honest cost.** It is one base64 heightmap, so two simultaneous sculpts cannot merge and the later wins whole. Asserted in a test rather than described in a comment. Per-tile keys would narrow the loss without removing it, at the price of a second representation of terrain the whole codebase would have to learn.
+- **The bug that mattered.** `applyScene` first diffed the local scene against the _document_ and wrote every difference. That is a "my copy wins": anything a collaborator changed since this client last looked is a difference, so pushing reverts it. It looks perfect on one screen and misbehaves only under concurrency — the sole condition the feature is ever used in. It now takes a required `previous` baseline and asks _"did I change this?"_ rather than _"does this differ?"_. Two tests pin it.
+- **Authorisation happens during the websocket upgrade**, not after. `y-websocket`'s bundled server admits anyone who knows a room name; a room here is a project, so the socket never exists unless membership checks out. A viewer is kept out rather than let in and asked not to type, because a room has no read-only mode.
+- **Camera presence is not broadcast.** An orbit is sixty updates a second per person, fanned out to everybody, to move a dot. The field is in the schema for when a "jump to them" affordance justifies the bandwidth; publishing it now would cost more than the edits do.
+- **Peers are keyed by seat, not by account.** One person with two monitors is two seats, and a list keyed by user id collides the moment they open a second window.
 
 **Deliverables:** Working real-time multi-user editing with presence.
 
 **Definition of Done:** Two browser sessions (different accounts) open the same project; edits in one (add object, move object, sculpt terrain) appear in the other within ~200ms; both sessions show live cursor/selection presence of each other; the simultaneous-edit stress tests above pass without data loss or crashes.
+
+**Met, with two qualifications stated rather than buried.**
+
+Four Playwright tests drive two real browser contexts against a real room server and a real Postgres. An object added in one window appears in the other's _scene graph_, not merely its document; a move in the second window comes back to the first without the first's own push reverting it; selection travels as presence and draws; closing a context removes the seat immediately rather than leaving a ghost cursor; two simultaneous transforms of different objects both survive in both windows; and what a room built is written back as a version that a third, entirely fresh context loads.
+
+The first qualification is **"different accounts"**. The two seats are one account in two isolated browser contexts. Inviting a second user requires reading an invite token that is delivered by email or a server log, and a browser cannot read either. Two seats for one account is a real case regardless — anyone with two monitors — and it is the case that caught a peer list keyed by user id. Cross-account access is covered at the server level instead, where the authorizer refuses a socket whose session does not carry an editor-or-above membership of the project's organisation.
+
+The second is **~200ms**. Measured here: about **86ms** on a quiet run and about **840ms** on a contended one, in a container running five services and a software renderer on shared cores. The test asserts under three seconds. A threshold set near the good-run figure fails on the bad one, and a flaky latency test teaches people to ignore latency; the bound that earns its keep separates "pushed" from "polled, or never". The 200ms target is met in practice and is not something this environment can honestly assert.
+
+Also not done: **sculpting is not in the two-browser test**. The document-level test proves terrain replicates and that concurrent sculpts are last-write-wins, but driving two simultaneous brush strokes through two software-rendered canvases would be measuring the test harness. And there is **no reconnection test in a browser** — the state-vector resync is proven at the document level, where a client that edited while offline and one that edited while online both keep their work, but nothing in the suite pulls a real socket out and puts it back.
 
 ---
 

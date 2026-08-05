@@ -12,9 +12,24 @@ import { ShortcutsModal } from './components/ShortcutsModal';
 import { useShortcuts } from './useShortcuts';
 import { useAutosave } from './useAutosave';
 import { useProjectStore } from './store/projectStore';
+import { useCollab } from './collab/useCollab';
+import { usePublishPresence } from './collab/usePublishPresence';
+import { currentSession as cloudSession, isCloud } from './storage/backend';
 import { useUploadedAssets } from './storage/useUploadedAssets';
 import { TopBar } from './components/TopBar';
 import { Viewport } from './components/Viewport';
+
+/**
+ * Who this browser is, in a room.
+ *
+ * Read from the cloud session rather than kept separately: a collaborator's identity *is* their
+ * account, and a second copy would be a second thing to keep in step.
+ */
+function useCollabIdentity(): { userId: string; displayName: string } | null {
+  const session = cloudSession();
+  if (!session?.userId) return null;
+  return { userId: session.userId, displayName: session.displayName || 'Someone' };
+}
 
 type LoadState =
   | { status: 'loading' }
@@ -27,6 +42,18 @@ export function App(): React.JSX.Element {
 
   useShortcuts();
   useAutosave(screen === 'editor');
+
+  /**
+   * Join the room for the open project.
+   *
+   * Only for a *cloud* project. One stored in this browser's IndexedDB has no room to join — the
+   * collaboration server has never heard of it and there is nobody to share it with — so the editor
+   * runs exactly as it always has, which is what it does for everyone without an account.
+   */
+  const projectId = useProjectStore((store) => store.projectId);
+  const identity = useCollabIdentity();
+  useCollab(screen === 'editor' && isCloud() ? projectId : null, identity);
+  usePublishPresence();
 
   const library = state.status === 'ready' ? state.library : null;
   const uploads = useUploadedAssets(library);

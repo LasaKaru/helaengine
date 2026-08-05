@@ -40,7 +40,13 @@ afterEach(() => {
 describe('which store is used', () => {
   it('is local until somebody signs in, and local again after they leave', () => {
     expect(backend.isCloud()).toBe(false);
-    backend.signIn({ origin: 'http://api.test', token: 't', organizationId: 'o' });
+    backend.signIn({
+      origin: 'http://api.test',
+      token: 't',
+      organizationId: 'o',
+      userId: 'user_test',
+      displayName: 'Test Person',
+    });
     expect(backend.isCloud()).toBe(true);
     backend.signOut();
     expect(backend.isCloud()).toBe(false);
@@ -77,7 +83,13 @@ describe('version bookkeeping', () => {
       return { status: 200, body: {} };
     });
 
-    backend.signIn({ origin: 'http://api.test', token: 't', organizationId: 'o' });
+    backend.signIn({
+      origin: 'http://api.test',
+      token: 't',
+      organizationId: 'o',
+      userId: 'user_test',
+      displayName: 'Test Person',
+    });
     const id = await backend.createProject('X', scene());
 
     await backend.saveProject({ id, scene: scene('a') });
@@ -102,7 +114,13 @@ describe('version bookkeeping', () => {
       return { status: 200, body: {} };
     });
 
-    backend.signIn({ origin: 'http://api.test', token: 't', organizationId: 'o' });
+    backend.signIn({
+      origin: 'http://api.test',
+      token: 't',
+      organizationId: 'o',
+      userId: 'user_test',
+      displayName: 'Test Person',
+    });
     await expect(backend.saveProject({ id: 'p1', scene: scene() })).rejects.toBeInstanceOf(
       backend.ConflictError,
     );

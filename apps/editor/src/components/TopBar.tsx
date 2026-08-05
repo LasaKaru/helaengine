@@ -4,6 +4,8 @@ import { ExportWizard } from './ExportWizard';
 import { VersionHistory } from './VersionHistory';
 import { useProjectStore } from '../store/projectStore';
 import { useSceneStore } from '../store/sceneStore';
+import { useCollabPeers, useHistoryControls } from '../collab/current';
+import { Collaborators } from './Collaborators';
 
 function saveLabel(
   state: ReturnType<typeof useProjectStore.getState>['saveState'],
@@ -28,9 +30,10 @@ export function TopBar({ manifest }: { manifest?: AssetManifest } = {}): React.J
   const name = useSceneStore((state) => state.scene.name);
   const setName = useSceneStore((state) => state.setName);
   const objectCount = useSceneStore((state) => state.scene.objects.length);
-  const history = useSceneStore((state) => state.history);
-  const undo = useSceneStore((state) => state.undo);
-  const redo = useSceneStore((state) => state.redo);
+  // Undo comes from whichever history is in charge — this browser's patch stack alone, or Yjs's
+  // per-client stack in a room. See `collab/current.ts` for why the two cannot be the same thing.
+  const { undo, redo, canUndo, canRedo } = useHistoryControls();
+  const peers = useCollabPeers();
   const saveState = useProjectStore((state) => state.saveState);
   const dirty = useProjectStore((state) => state.dirty);
   const save = useProjectStore((state) => state.save);
@@ -63,21 +66,13 @@ export function TopBar({ manifest }: { manifest?: AssetManifest } = {}): React.J
         {saveLabel(saveState, dirty)}
       </div>
 
+      {peers.length > 0 && <Collaborators peers={peers} />}
+
       <div className="topbar-actions">
-        <button
-          type="button"
-          onClick={undo}
-          disabled={history.past.length === 0}
-          title="Undo (Ctrl+Z)"
-        >
+        <button type="button" onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)">
           Undo
         </button>
-        <button
-          type="button"
-          onClick={redo}
-          disabled={history.future.length === 0}
-          title="Redo (Ctrl+Shift+Z)"
-        >
+        <button type="button" onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)">
           Redo
         </button>
         <button
