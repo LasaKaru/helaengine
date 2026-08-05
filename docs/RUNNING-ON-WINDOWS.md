@@ -1,6 +1,44 @@
 # Running HelaEngine on Windows
 
-Every command below is written for **PowerShell**, which is what Windows 11 opens by default. Where
+## Just want to try it? Don't clone anything.
+
+Run `pnpm portable` (or ask for the zip) and you get a folder that needs **no clone, no pnpm and no
+install step**:
+
+1. Unzip it.
+2. Double-click **START.bat**.
+3. Your browser opens the editor.
+
+The only prerequisite is [Node.js](https://nodejs.org) — the LTS installer, defaults accepted. The
+bundle carries its own tiny server, so there is nothing to `npm install`.
+
+That gets you the entire editor: templates, placing and transforming objects, terrain sculpting,
+behaviours, physics, enemies, combat, audio, play preview, `.hela` files and game export. What it
+does **not** carry is accounts, cloud saving and collaboration, because those need a database and
+three background services — that is Level 2 below.
+
+## A note on npm
+
+**`npm install` does not work on this repository**, and cannot be made to without changing every
+package. The workspace dependencies use the `workspace:*` protocol, which pnpm and yarn understand
+and npm rejects outright with `EUNSUPPORTEDPROTOCOL`.
+
+You do not need to install pnpm separately, though — it comes with Node:
+
+```powershell
+corepack enable
+```
+
+That is one command, once, and then `pnpm` works everywhere.
+
+---
+
+## Setting up to develop
+
+Everything below is for changing the engine itself, not for using it. If you only want to build
+games, the portable bundle above is the whole story.
+
+Every command is written for **PowerShell**, which is what Windows 11 opens by default. Where
 `cmd.exe` differs, it is called out — the difference is almost always how an environment variable is
 set, and getting that wrong is the single most common way this goes sideways on Windows.
 

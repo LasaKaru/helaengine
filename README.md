@@ -36,6 +36,9 @@ pnpm editor          # -> http://localhost:5174   the editor
 pnpm demo            # -> http://localhost:5173   framework-free runtime harness
 ```
 
+**Just want to try it?** `pnpm portable` produces a folder that runs with no clone, no pnpm and no
+install — unzip, double-click `START.bat`, and the editor opens. Node is the only prerequisite.
+
 **On Windows?** There is a step-by-step guide at
 [`docs/RUNNING-ON-WINDOWS.md`](docs/RUNNING-ON-WINDOWS.md), including the PowerShell equivalents of
 the environment variables above and the two scripts in this repository that are Linux-only.

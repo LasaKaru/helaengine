@@ -25,6 +25,11 @@ export default tseslint.config(
       // Builds published to the local share service. Whole exports — minified engine bundles and
       // third-party decoders — which are lint targets only in the sense that a zip is.
       '**/.hela-shared*/**',
+      // The assembled portable bundle: the same minified output, plus a copy of the launcher.
+      'portable/**',
+      // The launcher shipped inside that bundle. Deliberately plain CommonJS with no build step and
+      // no dependencies — it has to run from an unzipped folder on a machine that has only Node.
+      'tools/portable/files/**',
       '**/.hela-assets*/**',
     ],
   },
