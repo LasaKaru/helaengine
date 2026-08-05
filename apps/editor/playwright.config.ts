@@ -125,9 +125,29 @@ export default defineConfig({
         API_PORT: '3100',
         DATABASE_URL:
           process.env['TEST_DATABASE_URL'] ?? 'postgres://hela@127.0.0.1:5433/helaengine_e2e',
+        REDIS_URL: process.env['TEST_REDIS_URL'] ?? 'redis://127.0.0.1:6379',
+        EXPORT_ROOT: process.env['EXPORT_ROOT'] ?? '.hela-exports-e2e',
         // Uploaded assets (Sprint 30) land on disk. A directory per run keeps one run's models out
         // of the next one's storage, the same bargain `SHARE_ROOT` makes below.
         ASSET_ROOT: process.env['ASSET_ROOT'] ?? '.hela-assets-e2e',
+      },
+    },
+    {
+      // The export worker (Sprint 32). A server-side build is only testable if something is on the
+      // other end of the queue, and a mock would be testing the mock. Needs Redis, the generated
+      // asset library and the built engine bundle — the artifacts it makes are made of all three.
+      command: 'pnpm --filter @helaengine/export-worker start',
+      url: 'http://127.0.0.1:3300/health',
+      reuseExistingServer: !process.env['CI'],
+      timeout: 120_000,
+      env: {
+        DATABASE_URL:
+          process.env['TEST_DATABASE_URL'] ?? 'postgres://hela@127.0.0.1:5433/helaengine_e2e',
+        REDIS_URL: process.env['TEST_REDIS_URL'] ?? 'redis://127.0.0.1:6379',
+        ASSET_ROOT: 'generated/assets',
+        ENGINE_RUNTIME: 'packages/engine/dist/runtime-full.js',
+        EXPORT_ROOT: process.env['EXPORT_ROOT'] ?? '.hela-exports-e2e',
+        EXPORT_WORKER_PORT: '3300',
       },
     },
     {

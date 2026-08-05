@@ -31,6 +31,7 @@ export default tseslint.config(
       // no dependencies — it has to run from an unzipped folder on a machine that has only Node.
       'tools/portable/files/**',
       '**/.hela-assets*/**',
+      '**/.hela-exports*/**',
     ],
   },
   js.configs.recommended,

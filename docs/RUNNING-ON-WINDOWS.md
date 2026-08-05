@@ -241,6 +241,25 @@ VITE_SHARE_ORIGIN=http://127.0.0.1:4000
 
 Only reachable from your own machine — this is a local server, not a public host.
 
+### Building exports on a server
+
+For large projects: the build runs outside the browser, so it cannot exhaust the tab's memory and it
+survives closing it. Needs Level 2, plus **Redis** — install
+[Memurai](https://www.memurai.com/get-memurai) (a Redis-compatible Windows service) or run Redis
+inside WSL2.
+
+```powershell
+$env:DATABASE_URL = "postgres://postgres:YOUR_PASSWORD@localhost:5432/helaengine"
+pnpm --filter @helaengine/export-worker start
+```
+
+The worker needs the generated asset library and the built engine, so run `pnpm ingest-assets` and
+`pnpm --filter @helaengine/engine build` first — it says so plainly if either is missing.
+
+With it running, the Export dialog grows a **Build on the server** section showing how many exports
+are left this period. Without Redis the editor works exactly as before: the in-browser export is
+still there, and is still the better choice for a small level.
+
 ### Co-op multiplayer in exported games
 
 ```powershell
@@ -259,6 +278,7 @@ Runs on port 2567. Needed only by exported games whose scene enables co-op.
 | Runtime demo (`pnpm demo`) | 5173 | no               |
 | Platform API               | 3000 | yes              |
 | Collaboration server       | 3200 | yes              |
+| Export worker (health)     | 3300 | yes, plus Redis  |
 | Share service              | 4000 | no               |
 | Co-op server               | 2567 | no               |
 

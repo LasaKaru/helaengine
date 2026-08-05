@@ -75,6 +75,14 @@ export interface ApiOptions {
   db: Db;
   /** Where uploaded assets live. Local files stand in for object storage — see `assets.ts`. */
   storage?: AssetStorage;
+  /**
+   * Where finished exports live.
+   *
+   * Separate from the asset store, and it has to be: the worker writes builds somewhere of its own,
+   * and reading them out of the asset directory finds nothing. Different lifetimes too — an asset
+   * is permanent and cached forever, an export expires in a day.
+   */
+  exportStorage?: AssetStorage;
   /** Signs upload tickets. Generated per process when absent, which invalidates tickets on restart. */
   uploadSecret?: string;
   /**
@@ -96,6 +104,8 @@ export function createApiServer(options: ApiOptions): Server {
   const storage =
     options.storage ?? new LocalAssetStorage(process.env['ASSET_ROOT'] ?? '.hela-assets');
   const uploadSecret = options.uploadSecret ?? newUploadSecret();
+  const exportStorage =
+    options.exportStorage ?? new LocalAssetStorage(process.env['EXPORT_ROOT'] ?? '.hela-exports');
   const queue = options.queue ?? null;
 
   return createServer((request, response) => {
@@ -197,6 +207,54 @@ export function createApiServer(options: ApiOptions): Server {
         bytes,
       });
       return send(response, asset.status === 'ready' ? 200 : 422, { asset });
+    }
+
+    /**
+     * Downloading a finished build.
+     *
+     * Placed before `identify` for one reason: a browser's own download manager cannot send an
+     * `Authorization` header, and pulling a 200 MB zip through `fetch` into a Blob first is exactly
+     * the tab-memory problem this whole feature exists to avoid — reintroduced at the last step.
+     *
+     * So the token may arrive in the query here, and **only** here. A credential in a URL can end
+     * up in a history entry or a referrer, which is why it is not a global convenience: every other
+     * route still requires the header. The link is not the permission either — membership of the
+     * job's organisation is checked exactly as it would be anywhere else.
+     */
+    const downloadMatch = new RegExp(`^/export-jobs/(${UUID})/download$`).exec(path);
+    if (downloadMatch && method === 'GET') {
+      const header = request.headers.authorization;
+      const token = header?.startsWith('Bearer ')
+        ? header.slice('Bearer '.length)
+        : (url.searchParams.get('token') ?? '');
+      if (!token) throw new Unauthorized('this endpoint needs a session token');
+
+      const downloader = await auth.identify(token);
+      if (!downloader) throw new Unauthorized('that session is not valid');
+
+      const job = await loadExportJob(db, downloadMatch[1]!);
+      await requireRole(db, job.organizationId, downloader, 'viewer');
+      requireDownloadable(job);
+
+      const bytes = exportStorage.read(job.artifactPath!);
+      if (!bytes) {
+        // The row says there is an artifact and storage disagrees. Reported as gone rather than as
+        // a 500: from the user's side it *is* gone, and telling them to export again is the fix.
+        return send(response, 404, {
+          error: 'that build is no longer available — export the project again',
+        });
+      }
+
+      response.writeHead(200, {
+        'content-type': 'application/zip',
+        'content-disposition': `attachment; filename="${exportFilename(job.projectId)}"`,
+        'content-length': bytes.byteLength,
+        // Never cached: the URL is stable but what it serves expires, and a cached copy would
+        // outlive the expiry the whole design rests on.
+        'cache-control': 'no-store',
+      });
+      response.end(Buffer.from(bytes));
+      return;
     }
 
     const fileMatch = /^\/assets\/(.+)$/.exec(path);
@@ -575,37 +633,14 @@ export function createApiServer(options: ApiOptions): Server {
       }
     }
 
-    const exportJobMatch = new RegExp(`^/export-jobs/(${UUID})(/download)?$`).exec(path);
+    const exportJobMatch = new RegExp(`^/export-jobs/(${UUID})$`).exec(path);
     if (exportJobMatch && method === 'GET') {
       const job = await loadExportJob(db, exportJobMatch[1]!);
       // Membership in the job's organisation, checked before anything about the job is revealed —
       // including whether it exists.
       await requireRole(db, job.organizationId, userId, 'viewer');
 
-      if (exportJobMatch[2] !== '/download') {
-        return send(response, 200, { job, downloadable: artifactIsDownloadable(job) });
-      }
-
-      requireDownloadable(job);
-      const bytes = storage.read(job.artifactPath!);
-      if (!bytes) {
-        // The row says there is an artifact and storage disagrees. Reported as gone rather than as
-        // a 500: from the user's side it *is* gone, and telling them to export again is the fix.
-        return send(response, 404, {
-          error: 'that build is no longer available — export the project again',
-        });
-      }
-
-      response.writeHead(200, {
-        'content-type': 'application/zip',
-        'content-disposition': `attachment; filename="${exportFilename(job.projectId)}"`,
-        'content-length': bytes.byteLength,
-        // Never cached: the URL is stable but what it serves expires, and a cached copy would
-        // outlive the expiry the whole design rests on.
-        'cache-control': 'no-store',
-      });
-      response.end(Buffer.from(bytes));
-      return;
+      return send(response, 200, { job, downloadable: artifactIsDownloadable(job) });
     }
 
     const quotaMatch = new RegExp(`^/orgs/(${UUID})/export-quota$`).exec(path);

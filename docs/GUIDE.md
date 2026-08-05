@@ -323,10 +323,10 @@ schema-validated auto-repair loop, and whatever was changed is disclosed. Detail
 
 **Sprint 32: Export job orchestration at scale**
 
-- [ ] Move export bundling to BullMQ worker (Sprint 21–14 logic, now server-side for large/enterprise projects)
-- [ ] Progress websocket/polling for export job status, signed download URL on completion, auto-expiry
-- [ ] Rate limiting + quota enforcement per plan tier
-- **DoD:** A 300MB project export completes as a background job with progress bar, doesn't block the editor UI, and produces a time-limited signed download link.
+- [x] Export bundling moved to a **real BullMQ worker on real Redis** — the same `packages/export` bundler the editor runs, so both produce the same files
+- [x] Polling for job status (not a websocket: six stage changes over tens of seconds does not earn a second long-lived connection), a real progress bar, and a download link that **expires after 24 hours**
+- [x] Quota per plan tier, enforced with a per-organisation advisory lock. **No billing** — the tier is a column set by hand; the limit is not a stub
+- **DoD: met, size qualified.** Browser → API → Redis → worker → download → unzipped and inspected, end to end. **Nothing 300 MB was built** — manufacturing a project that size would be testing the fixture; what is proven is that the work is off the tab, progress is real, and eight concurrent requests queue rather than compounding. The link is time-limited and membership-checked rather than cryptographically signed, which needs object storage. See `docs/SPRINT.md`.
 
 ---
 

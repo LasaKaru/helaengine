@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { AssetManifest, Visibility } from '@helaengine/schema';
 import { useSceneStore } from '../store/sceneStore';
+import { ServerExport } from './ServerExport';
 import {
   collectUsedAssets,
   DEFAULT_EXPORT_OPTIONS,
@@ -420,6 +421,12 @@ export function ExportWizard({
             ))}
           </div>
         )}
+
+        {/*
+          Offered beside the in-tab export rather than instead of it. Renders nothing at all
+          without an account and a cloud project, which is most people most of the time.
+        */}
+        <ServerExport />
 
         <div className="modal-actions">
           <button

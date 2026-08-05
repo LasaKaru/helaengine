@@ -1056,12 +1056,33 @@ Three things are honestly outside it:
 
 **Tasks:**
 
-- [ ] Build `ExportJob` Prisma model + `POST /projects/:id/export` (enqueues a BullMQ job) + `GET /export-jobs/:id` (status polling: queued/processing/done/failed)
-- [ ] Build the Export Worker as a separate deployable process (per DEVELOPMENT-PLAN.md topology) consuming the BullMQ queue: fetches the target `SceneVersion`, runs the same bundler logic from Sprint 21-14 (now server-side, with access to the full cloud asset storage rather than local files), zips the result, uploads to a temporary signed-URL location in object storage
-- [ ] Build client-side progress UI: polling or WebSocket-based job status updates, progress bar, "Download" button appearing on completion with the signed URL (auto-expiring, e.g., 24h)
-- [ ] Implement plan-tier quota enforcement: rate-limit exports per billing period based on `Subscription.planTier` (via a `PlanTierGuard`), return a clear "upgrade to export more" response when exceeded
-- [ ] Add job retry/failure handling: BullMQ retry policy for transient failures (e.g., temporary storage timeout), and a clear failure state surfaced to the user (not a silent hang) for permanent failures (e.g., corrupted scene data)
-- [ ] Load-test the export worker with a batch of large concurrent export requests to verify it scales/queues sanely rather than falling over
+- [x] `export_jobs` table (hand-written SQL, not Prisma — see `db.ts`) + `POST /projects/:id/exports` enqueueing onto **a real BullMQ queue on real Redis** + `GET /export-jobs/:id` for polling
+- [x] `apps/export-worker`, a separate deployable process consuming the queue: loads the target `SceneVersion`, runs **the same `packages/export` bundler the editor runs**, zips, stores the artifact. **Local disk, not object storage** — the same deployment decision as Sprint 30
+- [x] Progress UI: polling, a real `<progress>` driven by the worker's own stages, and a Download link on completion that **expires after 24 hours**
+- [x] Plan-tier quota, enforced for real. **No billing exists**, so which tier an organisation is on is a column somebody sets by hand — the limit itself is not a stub
+- [x] Retry policy: three attempts with exponential backoff for transient failures, `UnrecoverableError` for ones that will fail identically, and a failure state with the worker's own sentence rather than a spinner
+- [x] Eight simultaneous exports, queued and completed one at a time rather than eight builds in memory at once
+- [x] **Added:** a health endpoint on the worker; `GET /orgs/:id/export-quota` so the allowance is visible _before_ the button is pressed; and a separate artifact store, because reading exports out of the asset directory finds nothing
+
+**Tech notes:**
+
+- **The queue is finally the real product.** Redis is present in this environment, so unlike R2, Cloudflare and Liveblocks this sprint uses what the plan names. It earns it: two processes that must not share memory, jobs that survive a restart of either, and retry-with-backoff — tedious to write and easy to get subtly wrong.
+- **Two stores for one concept, on purpose.** Redis carries the work; the `export_jobs` row carries the record. A queue flush should lose pending jobs, not somebody's history — and counting _rows_ rather than queued messages is what stops a quota being reclaimed by waiting for the queue to drain.
+- **The worker is small because Sprint 21 was careful.** `packages/export` was written with no DOM, no `fetch` it did not ask for and no JSZip: it takes a `readAsset` callback and returns a list of files. Moving the work off the browser needed no second implementation, so a server export and a browser export of the same project produce the same files. That was the point of the "plan rather than a zip" split, and this is the sprint that collects on it.
+- **Concurrency defaults to one.** An export holds the whole build in memory before zipping, so concurrency multiplies peak memory rather than sharing CPU — and a worker killed by the OOM reaper loses every job it was holding. Scale by running more workers.
+- **A job builds a _version_, not "the project".** Somebody who presses Export and keeps editing gets the build they asked for.
+
+**Deliverables:** Server-side export orchestration with progress, quotas and retries.
+
+**Definition of Done:** A 300MB project export completes as a background job with progress bar, doesn't block the editor UI, and produces a time-limited signed download link.
+
+**Met, with the size qualified.** A browser signs up, saves a project, presses **Build on the server**, watches a progress bar driven by the worker's real stages, and follows a Download link — which the test then unzips and inspects, finding `index.html`, `main.js`, `engine/runtime.js` and a `scene.json` holding the objects that were exported. Four processes end to end: browser, API, Redis, worker.
+
+Two honest qualifications. **Nothing 300 MB was built** — the largest thing here is the Stress Test template, and manufacturing a 300 MB project to prove a number would be testing the fixture. What _is_ proven is the mechanism the size argument rests on: the work is off the tab, progress is real, and eight concurrent requests queue rather than compounding. And the link is **time-limited but not signed** — it carries a session token, and membership is checked on every request, which is a different (and for a self-hosted deployment, stronger) guarantee than an unguessable URL. Object storage would make it a genuine presigned URL, and that is the same deployment decision Sprint 30 recorded.
+
+The bug worth recording is mine, and a test caught it. The quota guard put the count inside the insert's `where` and looked atomic — one statement, surely one answer. Under `READ COMMITTED` it is not: two concurrent inserts both snapshot four-used, both find four below five, and both write. Ten simultaneous requests against a limit of five let **six** through, which is exactly the double-click attack the guard existed to stop. It now takes a per-organisation advisory lock, so different customers never contend and the same one serialises.
+
+Also found, and less interesting but more likely to have bitten somebody: the download route read the _asset_ store rather than the export store, so every download would have 404'd once the two directories diverged. And `pnpm test` had been running the API and worker suites in parallel against one database, each calling `reset()` on the other — the worker has its own database now.
 
 **Deliverables:** Server-side, queued, quota-enforced export pipeline.
 

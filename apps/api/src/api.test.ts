@@ -26,6 +26,8 @@ let db: Db;
 let server: Server;
 let origin: string;
 let assetRoot: string;
+let storage: LocalAssetStorage;
+let exportStorage: LocalAssetStorage;
 const invites: Array<{ email: string; token: string }> = [];
 
 /**
@@ -44,9 +46,12 @@ beforeAll(async () => {
 
   assetRoot = mkdtempSync(join(tmpdir(), 'hela-assets-test-'));
 
+  storage = new LocalAssetStorage(assetRoot);
+  exportStorage = new LocalAssetStorage(join(assetRoot, 'exports-store'));
   server = createApiServer({
     db,
-    storage: new LocalAssetStorage(assetRoot),
+    storage,
+    exportStorage,
     uploadSecret: UPLOAD_SECRET,
     // Captured rather than logged, so a test can read the token the way a person would read their
     // inbox — without the test knowing anything about how invites are stored.
@@ -1287,6 +1292,48 @@ describe('export jobs', () => {
     });
     expect(expired.status).toBe(403);
     expect(expired.body.error).toMatch(/expired/);
+  });
+
+  it('accepts a token in the query for the download only, and still checks membership', async () => {
+    const { token, projectId } = await workspace();
+    const stranger = await signup('nosy-downloader@example.com');
+
+    const requested = await call<{ job: { id: string } }>(
+      'POST',
+      `/projects/${projectId}/exports`,
+      { token },
+    );
+    const jobId = requested.body.job.id;
+
+    // Finished, with bytes behind it.
+    const artifact = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3]);
+    exportStorage.put('exports/from-a-test.zip', artifact);
+    await db.query(
+      `update export_jobs set status = 'done', artifact_path = 'exports/from-a-test.zip',
+              artifact_bytes = $2, expires_at = now() + interval '1 day' where id = $1`,
+      [jobId, artifact.byteLength],
+    );
+
+    // A browser's download manager cannot send an Authorization header, so the token may ride in
+    // the query — here and nowhere else.
+    const downloaded = await fetch(`${origin}/export-jobs/${jobId}/download?token=${token}`);
+    expect(downloaded.status).toBe(200);
+    expect(downloaded.headers.get('content-type')).toBe('application/zip');
+    expect(downloaded.headers.get('content-disposition')).toMatch(/attachment/);
+    // Never cached: the URL is stable and what it serves expires.
+    expect(downloaded.headers.get('cache-control')).toBe('no-store');
+    expect(new Uint8Array(await downloaded.arrayBuffer())).toEqual(artifact);
+
+    // The link is not the permission. Somebody else's valid token gets nothing.
+    const refused = await fetch(`${origin}/export-jobs/${jobId}/download?token=${stranger.token}`);
+    expect(refused.status).toBe(404);
+
+    // And no token at all is refused rather than treated as anonymous.
+    expect((await fetch(`${origin}/export-jobs/${jobId}/download`)).status).toBe(401);
+
+    // The convenience is confined to downloads: every other route still wants the header.
+    const viaQuery = await fetch(`${origin}/export-jobs/${jobId}?token=${token}`);
+    expect(viaQuery.status).toBe(401);
   });
 
   it('lists a project’s builds, newest first', async () => {

@@ -1,6 +1,14 @@
 import { execFileSync } from 'node:child_process';
-import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
+import {
+  createReadStream,
+  existsSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { mkdir } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { createServer } from 'node:http';
 import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -3784,5 +3792,80 @@ test.describe('project files', () => {
     await expect(page.getByRole('alert')).toContainText(/not a HelaEngine project/i, {
       timeout: 15_000,
     });
+  });
+});
+
+/**
+ * Sprint 32 — building an export on the server.
+ *
+ * The worker has its own tests against a real BullMQ queue, and the API has its own against a real
+ * Postgres. Neither answers the question this one does: does a person who presses a button in the
+ * editor get a working game back? That crosses four processes — browser, API, Redis, worker — and
+ * every sprint so far has found its bug in exactly that kind of gap.
+ */
+test.describe('server-side export', () => {
+  test('a build requested from the editor arrives as a downloadable zip', async ({ page }) => {
+    test.setTimeout(300_000);
+
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Create an account' }).click();
+    await page.getByLabel('Display name').fill('Export Person');
+    await page.getByLabel('Email').fill(`server-export-${Date.now().toString(36)}@example.com`);
+    await page.getByLabel('Password').fill('a-long-enough-password');
+    await page.getByRole('button', { name: 'Create account' }).click();
+    await expect(page.getByText('Signed in as')).toBeVisible({ timeout: 30_000 });
+
+    // A cloud project, saved — the server builds a *version*, so there has to be one.
+    await page.getByRole('button', { name: /Forest clearing/ }).click();
+    await expect(page.getByRole('banner')).toBeVisible();
+    await page.waitForFunction(() => window.helaengine !== undefined);
+    await saveAndSettle(page);
+
+    await page.getByRole('button', { name: 'Export' }).click();
+    const serverExport = page.getByRole('region', { name: 'Build on the server' });
+    await expect(serverExport).toBeVisible();
+
+    // The allowance is shown before anything is pressed, so running out is something you saw coming.
+    await expect(serverExport.getByTestId('export-quota')).toContainText(/exports left/);
+
+    await serverExport.getByRole('button', { name: 'Build on the server' }).click();
+
+    // A real build, on a real worker, through a real queue. Generous timeout: it compresses the
+    // whole engine bundle and every asset the scene uses.
+    const ready = serverExport.getByTestId('export-ready');
+    await expect(ready).toBeVisible({ timeout: 180_000 });
+    await expect(ready).toContainText(/Download \(/);
+
+    // Followed, and what comes back is a zip that unzips to a playable build — not merely a 200.
+    const href = await ready.getByRole('link', { name: /Download/ }).getAttribute('href');
+    expect(href).toBeTruthy();
+
+    const downloaded = await page.request.get(href!);
+    expect(downloaded.status()).toBe(200);
+    expect(downloaded.headers()['content-type']).toBe('application/zip');
+
+    const body = await downloaded.body();
+    // `PK\x03\x04` — it really is an archive.
+    expect([...body.subarray(0, 4)]).toEqual([0x50, 0x4b, 0x03, 0x04]);
+    expect(body.byteLength).toBeGreaterThan(100_000);
+
+    const extracted = join(tmpdir(), `hela-server-export-${Date.now()}`);
+    await mkdir(extracted, { recursive: true });
+    const zipPath = join(extracted, 'export.zip');
+    writeFileSync(zipPath, body);
+    execFileSync('unzip', ['-o', '-q', zipPath, '-d', extracted]);
+
+    const folder = readdirSync(extracted).find((entry) => entry !== 'export.zip')!;
+    const root = join(extracted, folder);
+    expect(existsSync(join(root, 'index.html'))).toBe(true);
+    expect(existsSync(join(root, 'main.js'))).toBe(true);
+    expect(existsSync(join(root, 'scene.json'))).toBe(true);
+    expect(existsSync(join(root, 'engine', 'runtime.js'))).toBe(true);
+
+    // The scene that came back is the one that was exported, not an empty shell.
+    const built = JSON.parse(readFileSync(join(root, 'scene.json'), 'utf8')) as {
+      objects: unknown[];
+    };
+    expect(built.objects.length).toBeGreaterThan(0);
   });
 });
