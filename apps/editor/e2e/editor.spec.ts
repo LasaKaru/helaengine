@@ -72,6 +72,32 @@ async function startPlaying(page: Page): Promise<void> {
  * not exist until Sprint 4. When it does, this test switches to clicking, and the assertion below
  * stays exactly the same.
  */
+/**
+ * Saves, and waits for the save to have actually landed.
+ *
+ * `expect(status).toHaveText('Saved')` on its own is a race, and a subtle one: the status is
+ * *already* "Saved" from the write that created the project, so the assertion can pass instantly
+ * while the save just triggered is still in flight — after which a reload interrupts it and the
+ * record keeps its previous contents. It fails only when a save is slow, which is why it survived
+ * until the suite grew a fifth service and started running under more contention.
+ *
+ * So the precondition is that the status is *not already* "Saved" — which pins the transition
+ * rather than the end state, and makes the "Saved" that follows necessarily the save under test.
+ *
+ * Not "Unsaved changes" specifically: a project that has been opened but not edited shows an empty
+ * status, and demanding the dirty label there would fail a test whose whole point is that saving an
+ * untouched scene still writes a thumbnail.
+ */
+async function saveAndSettle(page: Page, via: 'button' | 'keyboard' = 'button'): Promise<void> {
+  const status = page.getByRole('status', { name: 'Save state' });
+  await expect(status).not.toHaveText('Saved');
+
+  if (via === 'keyboard') await page.keyboard.press('Control+s');
+  else await page.getByRole('button', { name: 'Save', exact: true }).click();
+
+  await expect(status).toHaveText('Saved');
+}
+
 test.describe('editor shell', () => {
   test.beforeEach(async ({ page }) => {
     await openEditor(page);
@@ -639,8 +665,7 @@ test.describe('projects and local save', () => {
       window.helaengine!.store.getState().setName('Persisted Scene');
       window.helaengine!.addObject('building_hut_01', [2, 0, 3]);
     });
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByRole('status', { name: 'Save state' })).toHaveText('Saved');
+    await saveAndSettle(page);
 
     await page.reload();
     await page.waitForFunction(() => window.helaengine !== undefined);
@@ -673,8 +698,7 @@ test.describe('projects and local save', () => {
     const height = await page.evaluate(() => window.helaengine!.terrainHeightAt(0, 0));
     expect(height).toBeGreaterThan(0);
 
-    await page.keyboard.press('Control+s');
-    await expect(page.getByRole('status', { name: 'Save state' })).toHaveText('Saved');
+    await saveAndSettle(page, 'keyboard');
     await page.reload();
     await page.waitForFunction(() => window.helaengine !== undefined);
     await page
@@ -692,8 +716,7 @@ test.describe('projects and local save', () => {
     await expect(page.getByRole('banner')).toBeVisible();
     await page.waitForTimeout(1500);
 
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByRole('status', { name: 'Save state' })).toHaveText('Saved');
+    await saveAndSettle(page);
 
     await page.getByRole('button', { name: 'Projects' }).click();
 
@@ -718,6 +741,10 @@ test.describe('projects and local save', () => {
     // document, which the template then replaces.
     await expect(page.getByRole('banner')).toBeVisible();
     await page.evaluate(() => window.helaengine!.addObject('rock_boulder_01'));
+    // Waited on before leaving, so the edit has demonstrably reached the store. `goHome` saves
+    // unconditionally, but a click that lands in the same tick as the `evaluate` is a race about
+    // what the save *contains* rather than whether it happens.
+    await expect(page.getByRole('status', { name: 'Save state' })).toHaveText('Unsaved changes');
 
     // No explicit save — clicking away is enough. The projects screen only appears once the
     // save has resolved, so its arrival is the signal that the write landed.
@@ -840,8 +867,7 @@ test.describe('behaviours', () => {
     await panel.getByLabel('Speed').fill('4.5');
     await panel.getByLabel('Speed').press('Enter');
 
-    await page.keyboard.press('Control+s');
-    await expect(page.getByRole('status', { name: 'Save state' })).toHaveText('Saved');
+    await saveAndSettle(page, 'keyboard');
 
     await page.reload();
     await page.waitForFunction(() => window.helaengine !== undefined);
@@ -1697,8 +1723,7 @@ test.describe('game UI authoring', () => {
     await page.getByLabel('Theme').selectOption('neon');
     await panel(page).getByRole('button', { name: 'Add HUD element' }).click();
 
-    await page.keyboard.press('Control+s');
-    await expect(page.getByRole('status', { name: 'Save state' })).toHaveText('Saved');
+    await saveAndSettle(page, 'keyboard');
 
     await page.reload();
     await page.waitForFunction(() => window.helaengine !== undefined);
@@ -1761,8 +1786,7 @@ test.describe('combat', () => {
     await panel.getByLabel('Weapon 1 starting').check();
     await panel.getByRole('button', { name: 'Remove weapon 1' }).click();
 
-    await page.keyboard.press('Control+s');
-    await expect(page.getByRole('status', { name: 'Save state' })).toHaveText('Saved');
+    await saveAndSettle(page, 'keyboard');
   });
 
   test('walking into the crate picks up the pistol, and the HUD says so', async ({ page }) => {
@@ -2025,8 +2049,7 @@ test.describe('secrets', () => {
     expect(secret.actions[0]).toMatchObject({ type: 'teleportPlayer', target: [40, 0, 0] });
 
     // And it saves, which is the only proof the document is actually valid.
-    await page.keyboard.press('Control+s');
-    await expect(page.getByRole('status', { name: 'Save state' })).toHaveText('Saved');
+    await saveAndSettle(page, 'keyboard');
   });
 
   test('the method picker only offers the closed vocabulary', async ({ page }) => {
@@ -2187,8 +2210,7 @@ test.describe('checkpoints', () => {
 
     // Save the scene so reopening it is the same scene — a save is keyed by sceneId.
     await exitWalk(page);
-    await page.keyboard.press('Control+s');
-    await expect(page.getByRole('status', { name: 'Save state' })).toHaveText('Saved');
+    await saveAndSettle(page, 'keyboard');
 
     await page.reload();
     await page.waitForFunction(() => window.helaengine !== undefined);

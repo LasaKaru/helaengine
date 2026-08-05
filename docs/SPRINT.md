@@ -954,6 +954,24 @@ The first qualification is **"different accounts"**. The two seats are one accou
 
 The second is **~200ms**. Measured here: about **86ms** on a quiet run and about **840ms** on a contended one, in a container running five services and a software renderer on shared cores. The test asserts under three seconds. A threshold set near the good-run figure fails on the bad one, and a flaky latency test teaches people to ignore latency; the bound that earns its keep separates "pushed" from "polled, or never". The 200ms target is met in practice and is not something this environment can honestly assert.
 
+One rough edge worth naming before somebody finds it: **the Save button and the room both write
+versions.** The room appends a version on a debounce and on the last departure; the editor's own
+save sends the base version it holds and is refused with a 409 if the room moved past it. In a
+collaborative session the manual save is largely redundant — the room is already persisting — and
+the two can disagree about which version is next. Nothing in the suite has hit it, because a room's
+debounced write and a deliberate Ctrl+S rarely land in the same second, but the interaction is real
+and the fix is to make the save button a no-op inside a room rather than a race. Not done here.
+
+One more thing this sprint flushed out, in the tests rather than the product. Five save-and-reload
+e2e tests started flaking once a fifth service joined the run. The assertion was
+`expect(saveState).toHaveText('Saved')` — which is _already_ true from the write that created the
+project, so it passed instantly while the save under test was still in flight, and the reload
+interrupted it. The record then kept its previous contents, which is exactly what the failure
+showed: a project still named "Untitled scene" after a rename had been saved. The fix pins the
+transition rather than the end state (wait for "Unsaved changes", then save, then "Saved"), and the
+group now runs clean three times over with retries disabled. Worth recording because the test was
+wrong from the day it was written and only contention made it say so.
+
 Also not done: **sculpting is not in the two-browser test**. The document-level test proves terrain replicates and that concurrent sculpts are last-write-wins, but driving two simultaneous brush strokes through two software-rendered canvases would be measuring the test harness. And there is **no reconnection test in a browser** — the state-vector resync is proven at the document level, where a client that edited while offline and one that edited while online both keep their work, but nothing in the suite pulls a real socket out and puts it back.
 
 ---

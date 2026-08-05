@@ -308,17 +308,18 @@ schema-validated auto-repair loop, and whatever was changed is disclosed. Detail
 
 **Sprint 30: Asset storage + CDN pipeline**
 
-- [ ] S3/R2 bucket structure: `/orgs/{orgId}/assets/{assetId}/...`, signed upload URLs, backend-triggered ingest job (Sprint 2's script now runs as a queued worker, not local CLI)
-- [ ] Custom asset upload flow for premium/enterprise tier (bring-your-own-GLB)
-- [ ] CDN in front of asset bucket, cache headers, versioned asset URLs (immutable caching)
-- **DoD:** User uploads a custom GLB, it's auto-compressed/thumbnailed within seconds via background job, and appears in their private asset library.
+- [x] `/orgs/{orgId}/assets/...` structure and signed upload URLs — **local files behind an `AssetStorage` interface, not S3/R2**, which is a deployment decision rather than missing code
+- [ ] Backend-triggered ingest job: **not done.** There is no queue and no worker; uploads are validated and stored as sent. The `pending -> ready | failed` column is the seam one plugs into
+- [x] Custom asset upload flow ("My Assets"). **Not tiered** — no billing exists until Sprint 32
+- [x] Content-hash paths with `max-age=31536000, immutable`. **No CDN**; the route is the origin one would sit in front of
+- **DoD: partially met.** A browser drops a `.glb`, watches it go Processing → Ready, and places it — with the engine drawing the customer's own GLB rather than a placeholder. Nothing is compressed or thumbnailed, which is the middle of the DoD sentence. See `docs/SPRINT.md`.
 
 **Sprint 31: Real-time collaboration**
 
-- [ ] Yjs document mirroring the scene schema; y-websocket server (or Liveblocks managed service to save infra time)
-- [ ] Presence (cursors/selection highlight per collaborator), awareness API
-- [ ] Conflict-free merge of simultaneous transform edits (this is why CRDT over naive last-write-wins)
-- **DoD:** Two browser tabs (different users) editing the same project see each other's cursor, selection, and object edits live within <200ms, with no data loss on simultaneous edits.
+- [x] Yjs document mirroring the scene schema, and a y-websocket-protocol server that checks project membership during the upgrade. **Self-hosted, not Liveblocks** — a paid service with no account here
+- [x] Presence over the awareness API: selection highlights in each collaborator's own colour, initials in the top bar, a soft lock while somebody is mid-gesture. **Camera position deliberately not broadcast** — sixty updates a second per person to move a dot
+- [x] Conflict-free merge of simultaneous transforms, keyed per object per field. Terrain is the honest exception: one base64 blob, so concurrent sculpts are last-write-wins
+- **DoD: met, with two qualifications.** Two browser contexts see each other's selections and edits live, and simultaneous transforms of different objects both survive. The two seats are **one account** — an invite token is unreachable from a browser — and latency is asserted under 3s rather than 200ms, because this container measures ~86ms quiet and ~840ms contended. See `docs/SPRINT.md`.
 
 **Sprint 32: Export job orchestration at scale**
 
@@ -394,7 +395,7 @@ schema-validated auto-repair loop, and whatever was changed is disclosed. Detail
 2. **Scene schema churn without migrations.** Once real users have saved projects, every schema change needs a migration function — never a breaking change without one.
 3. **Asset licensing.** If you use any third-party low-poly asset packs for speed, verify redistribution rights before letting users export them in their own downloadable projects — enterprise customers will ask about this.
 4. **Underestimating export edge cases.** Circular parent/child references, missing assets, very large heightmaps — build the Playwright export-diff suite (Sprint 23) early, not at the end.
-5. **Real-time collab complexity.** Yjs/CRDT is not trivial — budget real time for it (Sprint 31 alone may run long); a simpler "locking" model (one editor at a time per project) is an acceptable v1 fallback if timeline is tight.
+5. **Real-time collab complexity.** Yjs/CRDT is not trivial — budget real time for it (Sprint 31 alone may run long); a simpler "locking" model (one editor at a time per project) is an acceptable v1 fallback if timeline is tight. **Borne out.** The CRDT itself was the easy part; the hard part was the client's _push_ direction, which in its first form diffed local state against the shared document and so reverted every concurrent edit — correct-looking on one screen, wrong only under concurrency.
 
 ---
 
