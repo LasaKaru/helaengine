@@ -2,7 +2,9 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { ZodError } from 'zod';
 import {
   AssetCategorySchema,
+  EXPORTS_PER_PERIOD,
   InviteRequestSchema,
+  remainingExports,
   LoginRequestSchema,
   RoleSchema,
   SignupRequestSchema,
@@ -24,6 +26,16 @@ import {
 } from './auth.js';
 import type { Db } from './db.js';
 import { Forbidden, NotFound, requireRole, roleIn, TooLarge, Unauthorized } from './roles.js';
+import {
+  artifactIsDownloadable,
+  createExportJob,
+  exportsUsed,
+  listExportJobs,
+  loadExportJob,
+  planTier,
+  requireDownloadable,
+} from './exportJobs.js';
+import { JOB_OPTIONS, type ExportQueue } from './queue.js';
 import {
   createProject,
   deleteProject,
@@ -65,6 +77,14 @@ export interface ApiOptions {
   storage?: AssetStorage;
   /** Signs upload tickets. Generated per process when absent, which invalidates tickets on restart. */
   uploadSecret?: string;
+  /**
+   * Where export jobs are handed to the worker.
+   *
+   * Optional, and absent is a working configuration rather than a broken one: the API still records
+   * the job and still enforces quota, the work simply waits until a queue exists. That is what lets
+   * the account tests run without Redis.
+   */
+  queue?: ExportQueue;
   auth?: AuthProvider;
   /** Where invite emails would go. Absent means they are logged instead — see `sendInvite`. */
   sendInvite?: (invite: { email: string; token: string; organizationName: string }) => void;
@@ -76,6 +96,7 @@ export function createApiServer(options: ApiOptions): Server {
   const storage =
     options.storage ?? new LocalAssetStorage(process.env['ASSET_ROOT'] ?? '.hela-assets');
   const uploadSecret = options.uploadSecret ?? newUploadSecret();
+  const queue = options.queue ?? null;
 
   return createServer((request, response) => {
     void handle(request, response).catch((error: unknown) => {
@@ -429,7 +450,7 @@ export function createApiServer(options: ApiOptions): Server {
     // it, so it is looked up once and the role checked against that — a project id in a URL is not
     // an authorisation, and treating it as one is how tenants leak into each other.
     const projectMatch = new RegExp(
-      `^/projects/(${UUID})(/versions|/versions/[0-9]+/restore)?$`,
+      `^/projects/(${UUID})(/versions|/versions/[0-9]+/restore|/exports)?$`,
     ).exec(path);
     if (projectMatch) {
       const projectId = projectMatch[1]!;
@@ -510,6 +531,98 @@ export function createApiServer(options: ApiOptions): Server {
         });
         return send(response, 201, restored);
       }
+
+      if (suffix === '/exports' && method === 'POST') {
+        // Editor, not viewer: an export is a build somebody can hand out, and it costs minutes of
+        // CPU. Somebody with read access to a project has not been given the right to spend that.
+        await requireRole(db, organizationId, userId, 'editor');
+
+        if (loaded.version === 0) {
+          return send(response, 400, {
+            error: 'Save the project before exporting it — there is no version to build from.',
+          });
+        }
+
+        // The row first, then the message. If enqueueing fails the user sees a job that never
+        // starts, which is recoverable; if the message went first, a crash between the two would
+        // hand the worker a job id that does not exist.
+        const job = await createExportJob(db, {
+          projectId,
+          organizationId,
+          sceneVersion: loaded.version,
+          userId,
+        });
+
+        if (queue) {
+          await queue.add(
+            'export',
+            {
+              jobId: job.id,
+              projectId,
+              organizationId,
+              sceneVersion: loaded.version,
+            },
+            JOB_OPTIONS,
+          );
+        }
+
+        return send(response, 202, { job });
+      }
+
+      if (suffix === '/exports' && method === 'GET') {
+        await requireRole(db, organizationId, userId, 'viewer');
+        return send(response, 200, { jobs: await listExportJobs(db, projectId) });
+      }
+    }
+
+    const exportJobMatch = new RegExp(`^/export-jobs/(${UUID})(/download)?$`).exec(path);
+    if (exportJobMatch && method === 'GET') {
+      const job = await loadExportJob(db, exportJobMatch[1]!);
+      // Membership in the job's organisation, checked before anything about the job is revealed —
+      // including whether it exists.
+      await requireRole(db, job.organizationId, userId, 'viewer');
+
+      if (exportJobMatch[2] !== '/download') {
+        return send(response, 200, { job, downloadable: artifactIsDownloadable(job) });
+      }
+
+      requireDownloadable(job);
+      const bytes = storage.read(job.artifactPath!);
+      if (!bytes) {
+        // The row says there is an artifact and storage disagrees. Reported as gone rather than as
+        // a 500: from the user's side it *is* gone, and telling them to export again is the fix.
+        return send(response, 404, {
+          error: 'that build is no longer available — export the project again',
+        });
+      }
+
+      response.writeHead(200, {
+        'content-type': 'application/zip',
+        'content-disposition': `attachment; filename="${exportFilename(job.projectId)}"`,
+        'content-length': bytes.byteLength,
+        // Never cached: the URL is stable but what it serves expires, and a cached copy would
+        // outlive the expiry the whole design rests on.
+        'cache-control': 'no-store',
+      });
+      response.end(Buffer.from(bytes));
+      return;
+    }
+
+    const quotaMatch = new RegExp(`^/orgs/(${UUID})/export-quota$`).exec(path);
+    if (quotaMatch && method === 'GET') {
+      const organizationId = quotaMatch[1]!;
+      await requireRole(db, organizationId, userId, 'viewer');
+
+      const tier = await planTier(db, organizationId);
+      const used = await exportsUsed(db, organizationId);
+      // Shown *before* somebody presses Export, so running out is something they saw coming rather
+      // than something that happened to them.
+      return send(response, 200, {
+        tier,
+        used,
+        limit: EXPORTS_PER_PERIOD[tier],
+        remaining: remainingExports(tier, used),
+      });
     }
 
     const assetsMatch = new RegExp(`^/orgs/(${UUID})/assets$`).exec(path);
@@ -659,6 +772,11 @@ function sendInviteEmail(
     `[api] no email service configured; invite for ${invite.email} to ` +
       `${invite.organizationName} has token ${invite.token}`,
   );
+}
+
+/** A filename somebody can find in their downloads folder. */
+function exportFilename(projectId: string): string {
+  return `helaengine-export-${projectId.slice(0, 8)}.zip`;
 }
 
 function send(response: ServerResponse, status: number, body: unknown): void {

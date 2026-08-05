@@ -42,7 +42,8 @@ http
       return;
     }
 
-    if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html');
+    if (fs.existsSync(file) && fs.statSync(file).isDirectory())
+      file = path.join(file, 'index.html');
     // A single-page app: unknown paths are routes, not missing files.
     if (!fs.existsSync(file)) file = path.join(ROOT, 'index.html');
 

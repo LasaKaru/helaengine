@@ -137,6 +137,7 @@ export default tseslint.config(
       'apps/share/src/index.ts',
       'apps/realtime/src/index.ts',
       'apps/collab/src/index.ts',
+      'apps/export-worker/src/index.ts',
     ],
     rules: {
       'no-console': 'off',

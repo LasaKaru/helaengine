@@ -1,22 +1,23 @@
 {
-  "name": "@helaengine/api",
+  "name": "@helaengine/export-worker",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Accounts, organisations and role-gated access. The platform every later backend feature builds on.",
+  "description": "Consumes the export queue and builds projects server-side. A separate deployable process: minutes of CPU per job has no business sharing a container with an API that answers in milliseconds.",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
-    "migrate": "tsx src/migrate-cli.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
+    "@helaengine/api": "workspace:*",
+    "@helaengine/export": "workspace:*",
     "@helaengine/schema": "workspace:*",
     "bullmq": "^6.0.8",
     "ioredis": "^5.4.1",
-    "pg": "^8.13.1",
-    "zod": "^3.24.1"
+    "jszip": "3.10.1",
+    "pg": "^8.13.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
@@ -24,17 +25,5 @@
     "tsx": "^4.23.1",
     "typescript": "^5.9.3",
     "vitest": "^2.1.9"
-  },
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
-    },
-    "./*": {
-      "types": "./src/*.ts",
-      "default": "./src/*.ts"
-    }
   }
 }

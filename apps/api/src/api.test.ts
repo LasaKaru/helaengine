@@ -66,7 +66,7 @@ beforeEach(async () => {
   // Truncated rather than dropped: each test starts from nothing, and rebuilding the schema per
   // test would make the suite slow enough that somebody stops running it.
   await db.query(
-    'truncate sessions, invites, scene_versions, projects, memberships, organizations, users, assets cascade',
+    'truncate sessions, invites, export_jobs, scene_versions, projects, memberships, organizations, users, assets cascade',
   );
   invites.length = 0;
 });
@@ -1099,5 +1099,254 @@ describe('assets', () => {
     // the wrong file, and "the API failed to handle this request" is not that sentence.
     const sent = await put(granted.body.upload.url, tooBig);
     expect(sent.status).toBe(413);
+  });
+});
+
+/**
+ * Sprint 32 — exporting as a job, and the quota that keeps it affordable.
+ *
+ * These are about the *API's* half: recording a request, refusing one over quota, and refusing to
+ * hand out somebody else's build. The worker's half — that the job actually produces a playable zip
+ * — is tested in `apps/export-worker`, against a real BullMQ queue.
+ *
+ * No queue is passed here on purpose. Enqueueing is one line and Redis is a second service to stand
+ * up; what these tests are about is the row and the guard, both of which happen before any message
+ * is sent.
+ */
+describe('export jobs', () => {
+  async function workspace(tier = 'pro'): Promise<{
+    token: string;
+    organizationId: string;
+    projectId: string;
+  }> {
+    const owner = await signup(`exporter-${Math.random().toString(36).slice(2)}@example.com`);
+    await db.query('update organizations set plan_tier = $2 where id = $1', [
+      owner.personalOrganizationId,
+      tier,
+    ]);
+
+    const created = await call<{ project: { id: string } }>(
+      'POST',
+      `/orgs/${owner.personalOrganizationId}/projects`,
+      {
+        token: owner.token,
+        body: {
+          name: 'Exportable',
+          scene: {
+            sceneId: 'scene_export',
+            version: 1,
+            name: 'Exportable',
+            objects: [{ id: 'obj_0001', assetId: 'tree_pine_01' }],
+          },
+        },
+      },
+    );
+
+    return {
+      token: owner.token,
+      organizationId: owner.personalOrganizationId,
+      projectId: created.body.project.id,
+    };
+  }
+
+  it('records a requested export against the version it will build', async () => {
+    const { token, projectId } = await workspace();
+
+    const requested = await call<{ job: { id: string; status: string; sceneVersion: number } }>(
+      'POST',
+      `/projects/${projectId}/exports`,
+      { token },
+    );
+
+    // 202, not 201: the work has been accepted, not done. A 200 here would be the API claiming to
+    // have exported something it has not started.
+    expect(requested.status).toBe(202);
+    expect(requested.body.job.status).toBe('queued');
+    // The *version*, so a project edited while the job waits still builds what was asked for.
+    expect(requested.body.job.sceneVersion).toBe(1);
+
+    const polled = await call<{ job: { id: string; status: string }; downloadable: boolean }>(
+      'GET',
+      `/export-jobs/${requested.body.job.id}`,
+      { token },
+    );
+    expect(polled.status).toBe(200);
+    expect(polled.body.job.id).toBe(requested.body.job.id);
+    expect(polled.body.downloadable).toBe(false);
+  });
+
+  it('refuses to export a project that has never been saved', async () => {
+    const owner = await signup('unsaved@example.com');
+    const created = await db.query<{ id: string }>(
+      `insert into projects (organization_id, name, created_by) values ($1, 'Empty', $2) returning id`,
+      [owner.personalOrganizationId, owner.userId],
+    );
+
+    // There is no version to build. Better to say so than to queue a job that must fail.
+    const refused = await call<{ error: string }>(
+      'POST',
+      `/projects/${created.rows[0]!.id}/exports`,
+      { token: owner.token },
+    );
+    expect(refused.status).toBe(400);
+    expect(refused.body.error).toMatch(/Save the project/);
+  });
+
+  it('stops at the plan limit, and says what the limit is', async () => {
+    const { token, projectId } = await workspace('free');
+
+    // Five on the free tier, per `EXPORTS_PER_PERIOD`.
+    for (let index = 0; index < 5; index += 1) {
+      expect((await call('POST', `/projects/${projectId}/exports`, { token })).status).toBe(202);
+    }
+
+    const refused = await call<{ error: string }>('POST', `/projects/${projectId}/exports`, {
+      token,
+    });
+
+    expect(refused.status).toBe(429);
+    // The number, not "quota exceeded": a message that says what the limit is can be acted on.
+    expect(refused.body.error).toMatch(/all 5 exports/);
+    expect(refused.body.error).toMatch(/free plan/);
+  });
+
+  it('counts failed exports against the quota, because they cost the same', async () => {
+    const { token, organizationId, projectId } = await workspace('free');
+
+    await call('POST', `/projects/${projectId}/exports`, { token });
+    await db.query(`update export_jobs set status = 'failed', error = 'nope'`);
+
+    const quota = await call<{ used: number; remaining: number; limit: number }>(
+      'GET',
+      `/orgs/${organizationId}/export-quota`,
+      { token },
+    );
+
+    // A build that failed still burned the CPU the quota exists to protect. Giving it back would
+    // make a reliably-failing project an unlimited one.
+    expect(quota.body.used).toBe(1);
+    expect(quota.body.remaining).toBe(4);
+    expect(quota.body.limit).toBe(5);
+  });
+
+  it('cannot beat the quota by firing everything at once', async () => {
+    const { token, projectId } = await workspace('free');
+
+    // Ten simultaneous requests against a limit of five. A read-then-write guard would let most of
+    // them through, because they all read the same count before any of them wrote.
+    const results = await Promise.all(
+      Array.from({ length: 10 }, () => call('POST', `/projects/${projectId}/exports`, { token })),
+    );
+
+    expect(results.filter((result) => result.status === 202)).toHaveLength(5);
+    expect(results.filter((result) => result.status === 429)).toHaveLength(5);
+  });
+
+  it('will not hand somebody else’s build over', async () => {
+    const mine = await workspace();
+    const stranger = await signup('nosy-exporter@example.com');
+
+    const requested = await call<{ job: { id: string } }>(
+      'POST',
+      `/projects/${mine.projectId}/exports`,
+      { token: mine.token },
+    );
+
+    // A job id in a URL is not an authorisation, and the refusal does not reveal that the job
+    // exists — the same 404 an invented id gets.
+    const peek = await call('GET', `/export-jobs/${requested.body.job.id}`, {
+      token: stranger.token,
+    });
+    expect(peek.status).toBe(404);
+  });
+
+  it('refuses to download a build that is not finished, and one that has expired', async () => {
+    const { token, projectId } = await workspace();
+    const requested = await call<{ job: { id: string } }>(
+      'POST',
+      `/projects/${projectId}/exports`,
+      { token },
+    );
+    const jobId = requested.body.job.id;
+
+    const early = await call<{ error: string }>('GET', `/export-jobs/${jobId}/download`, { token });
+    expect(early.status).toBe(404);
+    expect(early.body.error).toMatch(/not finished/);
+
+    // Finished, but its day is up. Expiry is checked when the download is asked for rather than
+    // swept on a timer — a sweep that has not run yet would serve a build that is supposed to be
+    // gone.
+    await db.query(
+      `update export_jobs set status = 'done', artifact_path = 'exports/x.zip',
+              artifact_bytes = 10, expires_at = now() - interval '1 hour' where id = $1`,
+      [jobId],
+    );
+
+    const expired = await call<{ error: string }>('GET', `/export-jobs/${jobId}/download`, {
+      token,
+    });
+    expect(expired.status).toBe(403);
+    expect(expired.body.error).toMatch(/expired/);
+  });
+
+  it('lists a project’s builds, newest first', async () => {
+    const { token, projectId } = await workspace();
+
+    await call('POST', `/projects/${projectId}/exports`, { token });
+    await call('POST', `/projects/${projectId}/exports`, { token });
+
+    const listed = await call<{ jobs: Array<{ id: string; createdAt: string }> }>(
+      'GET',
+      `/projects/${projectId}/exports`,
+      { token },
+    );
+
+    expect(listed.body.jobs).toHaveLength(2);
+    expect(Date.parse(listed.body.jobs[0]!.createdAt)).toBeGreaterThanOrEqual(
+      Date.parse(listed.body.jobs[1]!.createdAt),
+    );
+  });
+
+  it('needs editor to export, and viewer only to look', async () => {
+    const owner = await signup('export-owner@example.com');
+    const viewer = await signup('export-viewer@example.com');
+
+    const org = await call<{ organization: { id: string } }>('POST', '/orgs', {
+      token: owner.token,
+      body: { name: 'Studio' },
+    });
+    const organizationId = org.body.organization.id;
+
+    await call('POST', `/orgs/${organizationId}/invites`, {
+      token: owner.token,
+      body: { email: 'export-viewer@example.com', role: 'viewer' },
+    });
+    await call('POST', '/invites/accept', {
+      token: viewer.token,
+      body: { token: invites.at(-1)!.token },
+    });
+
+    const created = await call<{ project: { id: string } }>(
+      'POST',
+      `/orgs/${organizationId}/projects`,
+      {
+        token: owner.token,
+        body: {
+          name: 'Team Level',
+          scene: { sceneId: 's', version: 1, name: 'Team Level', objects: [] },
+        },
+      },
+    );
+    const projectId = created.body.project.id;
+
+    // Exporting spends minutes of CPU and produces something you can hand out. Read access to a
+    // project is not permission to do that.
+    expect(
+      (await call('POST', `/projects/${projectId}/exports`, { token: viewer.token })).status,
+    ).toBe(403);
+
+    expect(
+      (await call('GET', `/projects/${projectId}/exports`, { token: viewer.token })).status,
+    ).toBe(200);
   });
 });

@@ -10,6 +10,7 @@ on:
     paths:
       - 'apps/api/**'
       - 'apps/collab/**'
+      - 'apps/export-worker/**'
       - 'packages/schema/**'
       - 'packages/collab/**'
       - '.github/workflows/api.yml'
@@ -26,6 +27,16 @@ jobs:
     timeout-minutes: 15
 
     services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
       postgres:
         image: postgres:16
         env:
@@ -65,3 +76,15 @@ jobs:
       # other half of the same feature and belongs next to the tests it shares a schema with.
       - name: Run the collaboration server suite
         run: pnpm --filter @helaengine/collab-server test
+
+      # Its own database and a Redis, because the export pipeline is BullMQ end to end and a mocked
+      # queue would test the mock. Separate from the API's database on purpose: both suites drop and
+      # re-migrate their schema, and sharing one makes them delete each other's tables in parallel.
+      - name: Create the worker's database
+        run: PGPASSWORD=hela psql -h localhost -U hela -d helaengine_test -c 'create database helaengine_worker_test'
+
+      - name: Run the export worker suite
+        run: pnpm --filter @helaengine/export-worker test
+        env:
+          TEST_DATABASE_URL: postgres://hela:hela@localhost:5432/helaengine_worker_test
+          TEST_REDIS_URL: redis://localhost:6379
