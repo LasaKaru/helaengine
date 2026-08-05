@@ -40,6 +40,15 @@ export interface ProjectState {
   saveState: SaveState;
   /** True when the document has changed since the last successful save. */
   dirty: boolean;
+  /**
+   * The exact document this project was opened with.
+   *
+   * Held by reference so `useAutosave` can tell "this scene change *is* the project opening" from
+   * "this scene change is an edit that arrived in the same pass as the opening". Comparing project
+   * ids alone cannot: both look like the first run for a new id, and the second was silently
+   * treated as a load — leaving the first edit of a session undirty and unsaved.
+   */
+  adoptedScene: Scene | null;
   loadError: string | null;
 
   setCaptureThumbnail(capture: ThumbnailCapture | null): void;
@@ -144,6 +153,7 @@ export const useProjectStore = create<ProjectState>()(
       projects: [],
       saveState: { status: 'idle' },
       dirty: false,
+      adoptedScene: null,
       loadError: null,
       fileName: null,
       fileNotice: null,
@@ -173,6 +183,7 @@ export const useProjectStore = create<ProjectState>()(
             projectId: id,
             screen: 'editor',
             dirty: false,
+            adoptedScene: scene,
             loadError: null,
             saveState: { status: 'idle' },
           },
@@ -191,6 +202,7 @@ export const useProjectStore = create<ProjectState>()(
               projectId: id,
               screen: 'editor',
               dirty: false,
+              adoptedScene: scene,
               loadError: null,
               saveState: { status: 'idle' },
             },
@@ -304,6 +316,7 @@ export const useProjectStore = create<ProjectState>()(
               projectId: id,
               screen: 'editor',
               dirty: false,
+              adoptedScene: imported.scene,
               loadError: null,
               saveState: { status: 'idle' },
               fileName: null,

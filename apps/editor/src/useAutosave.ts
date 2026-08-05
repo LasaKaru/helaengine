@@ -24,14 +24,22 @@ export function useAutosave(enabled: boolean): void {
   useEffect(() => {
     if (!enabled || !projectId) return;
 
-    // The run right after a project opens is the document being loaded, not edited.
-    //
-    // Tracked here rather than reset from a second effect keyed on `projectId`: effects run in
-    // declaration order, so that reset landed *after* this one and left the flag raised — which
-    // swallowed the first real edit of every session, dirty flag, autosave and all.
+    /**
+     * The run right after a project opens is the document being loaded, not edited.
+     *
+     * Tracked here rather than reset from a second effect keyed on `projectId`: effects run in
+     * declaration order, so that reset landed *after* this one and left the flag raised — which
+     * swallowed the first real edit of every session, dirty flag, autosave and all.
+     *
+     * The identity check on top of it is the other half. An edit that lands in the same effect
+     * pass as the opening arrives here looking exactly like a load — same "first run for this
+     * project id" — and was treated as one, leaving a real edit undirty and unsaved until the
+     * next one. Comparing the scene against the document the project was opened *with* tells the
+     * two apart, because an edit always produces a new object.
+     */
     if (loadedProject.current !== projectId) {
       loadedProject.current = projectId;
-      return;
+      if (scene === useProjectStore.getState().adoptedScene) return;
     }
 
     useProjectStore.getState().markDirty();

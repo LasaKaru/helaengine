@@ -749,11 +749,12 @@ test.describe('projects and local save', () => {
     // Creating from a template is async — editing before it lands would be edits to the outgoing
     // document, which the template then replaces.
     await expect(page.getByRole('banner')).toBeVisible();
+    const saveState = page.getByRole('status', { name: 'Save state' });
     await page.evaluate(() => window.helaengine!.addObject('rock_boulder_01'));
     // Waited on before leaving, so the edit has demonstrably reached the store. `goHome` saves
     // unconditionally, but a click that lands in the same tick as the `evaluate` is a race about
     // what the save *contains* rather than whether it happens.
-    await expect(page.getByRole('status', { name: 'Save state' })).toHaveText('Unsaved changes');
+    await expect(saveState).toHaveText('Unsaved changes');
 
     // No explicit save — clicking away is enough. The projects screen only appears once the
     // save has resolved, so its arrival is the signal that the write landed.
@@ -1742,10 +1743,27 @@ test.describe('game UI authoring', () => {
       .click();
     await expect(page.getByRole('banner')).toBeVisible();
 
-    const ui = await page.evaluate(() => window.helaengine!.store.getState().scene.uiConfig);
-    expect(ui.homeScreen.title).toBe('Goblin Valley');
-    expect(ui.theme.preset).toBe('neon');
-    expect(ui.hud.customElements).toHaveLength(1);
+    /**
+     * Polled, not read once.
+     *
+     * Opening a project shows the banner *before* the document has been read back out of IndexedDB,
+     * so a single `evaluate` here races the load and sometimes sees the default `uiConfig` — which
+     * fails as "My Game", exactly as if the save had lost the title. It reproduced two runs in four
+     * on this machine and was surviving in CI on the suite's one retry. The reload test above
+     * already polls for the same reason.
+     */
+    await expect
+      .poll(async () =>
+        page.evaluate(() => {
+          const ui = window.helaengine!.store.getState().scene.uiConfig;
+          return {
+            title: ui.homeScreen.title,
+            preset: ui.theme.preset,
+            elements: ui.hud.customElements.length,
+          };
+        }),
+      )
+      .toEqual({ title: 'Goblin Valley', preset: 'neon', elements: 1 });
   });
 });
 
