@@ -1,14 +1,22 @@
 import type { Server } from 'node:http';
 import { createHmac } from 'node:crypto';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { roleAtLeast, type Role } from '@helaengine/schema';
+import {
+  createLogger,
+  serviceMetrics,
+  startTelemetry,
+  type ServiceMetrics,
+  type SpanRecord,
+} from '@helaengine/telemetry';
 import { createPool, migrate, reset, type Db } from './db.js';
 import { LocalAssetStorage } from './assets.js';
 import { hashToken } from './auth.js';
 import { createApiServer } from './server.js';
+import { routePattern } from './observability.js';
 
 /**
  * Sprint 28 — accounts, organisations and role gating.
@@ -39,6 +47,21 @@ const invites: Array<{ email: string; token: string }> = [];
  */
 const UPLOAD_SECRET = 'a-test-upload-secret';
 
+/** The token `/metrics` asks for, so the suite can check both sides of that door. */
+const METRICS_TOKEN = 'a-test-metrics-token';
+
+/**
+ * Real telemetry, into a real file and a real registry (Sprint 33).
+ *
+ * The alternative — a spy tracer — would confirm that the server calls a tracer, which is not the
+ * claim anybody cares about. The claim is that a request produces a span, carrying a correlation
+ * id, that an operator can find later; so the suite reads the same NDJSON file `tools/trace` does.
+ */
+let metrics: ServiceMetrics;
+let telemetry: ReturnType<typeof startTelemetry>;
+let tracePath: string;
+const logged: string[] = [];
+
 beforeAll(async () => {
   db = createPool(DATABASE_URL);
   await reset(db);
@@ -48,11 +71,24 @@ beforeAll(async () => {
 
   storage = new LocalAssetStorage(assetRoot);
   exportStorage = new LocalAssetStorage(join(assetRoot, 'exports-store'));
+
+  tracePath = join(assetRoot, 'spans.ndjson');
+  telemetry = startTelemetry({ serviceName: 'helaengine-api', tracePath });
+  metrics = serviceMetrics();
+
   server = createApiServer({
     db,
     storage,
     exportStorage,
     uploadSecret: UPLOAD_SECRET,
+    telemetry: {
+      tracer: telemetry.tracer,
+      metrics,
+      // Kept rather than printed: the suite asserts on what the API logged, and a hundred request
+      // lines on the console would drown the one failure worth reading.
+      log: createLogger({ service: 'api', level: 'debug', write: (line) => logged.push(line) }),
+      metricsToken: METRICS_TOKEN,
+    },
     // Captured rather than logged, so a test can read the token the way a person would read their
     // inbox — without the test knowing anything about how invites are stored.
     sendInvite: (invite) => invites.push({ email: invite.email, token: invite.token }),
@@ -63,6 +99,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await new Promise<void>((done) => server.close(() => done()));
+  await telemetry.shutdown();
   await db.end();
   rmSync(assetRoot, { recursive: true, force: true });
 });
@@ -1395,5 +1432,141 @@ describe('export jobs', () => {
     expect(
       (await call('GET', `/projects/${projectId}/exports`, { token: viewer.token })).status,
     ).toBe(200);
+  });
+});
+
+/** Waits for something written after a response was already delivered. */
+async function eventually<T>(read: () => T | undefined, timeoutMs = 5_000): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const found = read();
+    if (found !== undefined) return found;
+    if (Date.now() > deadline) throw new Error('nothing was written within the deadline');
+    await new Promise((done) => setTimeout(done, 25));
+  }
+}
+
+describe('what the API says about itself', () => {
+  it('turns a path into a route pattern, and refuses to learn new ones', () => {
+    expect(routePattern('/health')).toBe('/health');
+    expect(routePattern('/orgs/8f14e45f-ceea-467a-9f3c-4e2c2a1b8d90/projects')).toBe(
+      '/orgs/:org/projects',
+    );
+    expect(routePattern('/projects/8f14e45f-ceea-467a-9f3c-4e2c2a1b8d90/versions/12/restore')).toBe(
+      '/projects/:project/versions/:version/restore',
+    );
+    expect(routePattern('/export-jobs/8f14e45f-ceea-467a-9f3c-4e2c2a1b8d90/download')).toBe(
+      '/export-jobs/:job/download',
+    );
+    expect(routePattern('/assets/models/tree_pine_01.glb')).toBe('/assets/:key');
+
+    // The property that keeps the metrics store alive: a scanner spraying URLs adds one series,
+    // not one per URL it invented.
+    expect(routePattern('/wp-admin.php')).toBe('unmatched');
+    expect(routePattern('/orgs/8f14e45f-ceea-467a-9f3c-4e2c2a1b8d90/nonsense')).toBe('unmatched');
+  });
+
+  it('answers with the correlation id the caller sent', async () => {
+    const response = await fetch(`${origin}/health`, {
+      headers: { 'x-correlation-id': 'hela_0123456789abcdef' },
+    });
+    expect(response.headers.get('x-correlation-id')).toBe('hela_0123456789abcdef');
+  });
+
+  it('mints one when the caller sends nothing, or sends something hostile', async () => {
+    const fresh = await fetch(`${origin}/health`);
+    expect(fresh.headers.get('x-correlation-id')).toMatch(/^hela_[0-9a-f]{16}$/);
+
+    // A newline in this header would split one JSON log line into two, the second written by the
+    // caller. It is replaced rather than escaped.
+    const hostile = await fetch(`${origin}/health`, {
+      headers: { 'x-correlation-id': 'not a valid id' },
+    });
+    expect(hostile.headers.get('x-correlation-id')).toMatch(/^hela_[0-9a-f]{16}$/);
+  });
+
+  it('writes a span and a log line per request, both naming that request', async () => {
+    const correlationId = 'hela_feedfacefeedface';
+    await fetch(`${origin}/me`, {
+      headers: { 'x-correlation-id': correlationId, authorization: 'Bearer nonsense' },
+    });
+
+    /**
+     * Polled rather than read once, and the reason is a design decision rather than flakiness:
+     * the request line is written when the *response closes*, which is deliberately after the
+     * client has its answer. Instrumentation that made `fetch` wait for a log write would be
+     * instrumentation that charges every user for the monitoring.
+     */
+    const line = await eventually(() =>
+      logged
+        .map((each) => JSON.parse(each) as Record<string, unknown>)
+        .find((each) => each['correlationId'] === correlationId),
+    );
+    expect(line).toMatchObject({ route: '/me', method: 'GET', status: 401 });
+
+    const span = await eventually(() =>
+      readFileSync(tracePath, 'utf8')
+        .trim()
+        .split('\n')
+        .map((each) => JSON.parse(each) as SpanRecord)
+        .find((each) => each.attributes['hela.correlation_id'] === correlationId),
+    );
+    expect(span.name).toBe('GET /me');
+    expect(span.attributes['http.response.status_code']).toBe(401);
+  });
+
+  it('serves Prometheus text, counting by route rather than by path', async () => {
+    const owner = await signup('metrics-owner@example.com');
+    await call('GET', '/me', { token: owner.token });
+
+    const response = await fetch(`${origin}/metrics`, {
+      headers: { authorization: `Bearer ${METRICS_TOKEN}` },
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('text/plain');
+
+    const text = await response.text();
+    expect(text).toContain('hela_http_requests_total{route="/me",method="GET",status="2xx"}');
+    expect(text).toContain('hela_http_request_duration_seconds_bucket{route="/me",method="GET"');
+    // The pool numbers are read when the scrape asks, which is the only way `waiting` is ever
+    // anything but zero at the moment somebody looks.
+    expect(text).toContain('hela_pg_pool_connections{state="waiting"}');
+  });
+
+  it('refuses a scrape without the token, when one is set', async () => {
+    expect((await fetch(`${origin}/metrics`)).status).toBe(401);
+    expect(
+      (await fetch(`${origin}/metrics`, { headers: { authorization: 'Bearer wrong' } })).status,
+    ).toBe(401);
+  });
+
+  it('records the correlation id on the export job it creates', async () => {
+    const owner = await signup('export-correlation@example.com');
+    const created = await call<{ project: { id: string } }>(
+      'POST',
+      `/orgs/${owner.personalOrganizationId}/projects`,
+      {
+        token: owner.token,
+        body: {
+          name: 'Traceable',
+          scene: { sceneId: 's', version: 1, name: 'Traceable', objects: [] },
+        },
+      },
+    );
+
+    const correlationId = 'hela_abcdef0123456789';
+    const response = await fetch(`${origin}/projects/${created.body.project.id}/exports`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${owner.token}`,
+        'x-correlation-id': correlationId,
+      },
+    });
+    expect(response.status).toBe(202);
+
+    // The join between what a user can quote and what the tracing backend holds. Without it, a
+    // support thread about a bad export starts with "which one?".
+    const body = (await response.json()) as { job: { correlationId: string } };
+    expect(body.job.correlationId).toBe(correlationId);
   });
 });

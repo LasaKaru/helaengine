@@ -1,5 +1,16 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { timingSafeEqual } from 'node:crypto';
+import { trace } from '@opentelemetry/api';
 import { ZodError } from 'zod';
+import {
+  createLogger,
+  currentCorrelationId,
+  inSpan,
+  PROMETHEUS_CONTENT_TYPE,
+  serviceMetrics,
+  traceCarrier,
+} from '@helaengine/telemetry';
+import { createObserver, type ApiTelemetry } from './observability.js';
 import {
   AssetCategorySchema,
   EXPORTS_PER_PERIOD,
@@ -94,6 +105,13 @@ export interface ApiOptions {
    */
   queue?: ExportQueue;
   auth?: AuthProvider;
+  /**
+   * Traces, metrics and logs.
+   *
+   * Optional, and absent means a real tracer with no exporter plus a private registry — see
+   * `createApiServer`. The service is instrumented either way; only the destination changes.
+   */
+  telemetry?: ApiTelemetry;
   /** Where invite emails would go. Absent means they are logged instead — see `sendInvite`. */
   sendInvite?: (invite: { email: string; token: string; organizationName: string }) => void;
 }
@@ -108,29 +126,47 @@ export function createApiServer(options: ApiOptions): Server {
     options.exportStorage ?? new LocalAssetStorage(process.env['EXPORT_ROOT'] ?? '.hela-exports');
   const queue = options.queue ?? null;
 
+  /**
+   * Telemetry, with defaults that do nothing visible.
+   *
+   * A server built without one still counts, still spans and still logs — to a tracer with no
+   * exporter and a registry nobody scrapes. That is deliberate: the instrumented code path is then
+   * the *only* code path, so the tests exercise what production runs. What it must not do is
+   * chatter, hence `warn` — a test suite that starts forty servers should not print forty thousand
+   * request lines.
+   */
+  const telemetry: ApiTelemetry = options.telemetry ?? {
+    tracer: trace.getTracer('helaengine-api'),
+    metrics: serviceMetrics(),
+    log: createLogger({ service: 'api', level: 'warn' }),
+  };
+  const observer = createObserver(telemetry, db);
+
   return createServer((request, response) => {
-    void handle(request, response).catch((error: unknown) => {
-      const status = (error as { status?: number }).status;
-      if (typeof status === 'number') {
-        send(response, status, { error: (error as Error).message });
-        return;
-      }
-      if (error instanceof ZodError) {
-        const first = error.errors[0];
-        send(response, 400, {
-          error: first
-            ? `${first.path.join('.') || 'request'}: ${first.message}`
-            : 'invalid request',
-        });
-        return;
-      }
-      if (error instanceof SyntaxError) {
-        send(response, 400, { error: 'the request body was not valid JSON' });
-        return;
-      }
-      console.error('[api] request failed', error);
-      send(response, 500, { error: 'the API failed to handle this request' });
-    });
+    void observer
+      .observe(request, response, () => handle(request, response))
+      .catch((error: unknown) => {
+        const status = (error as { status?: number }).status;
+        if (typeof status === 'number') {
+          send(response, status, { error: (error as Error).message });
+          return;
+        }
+        if (error instanceof ZodError) {
+          const first = error.errors[0];
+          send(response, 400, {
+            error: first
+              ? `${first.path.join('.') || 'request'}: ${first.message}`
+              : 'invalid request',
+          });
+          return;
+        }
+        if (error instanceof SyntaxError) {
+          send(response, 400, { error: 'the request body was not valid JSON' });
+          return;
+        }
+        console.error('[api] request failed', error);
+        send(response, 500, { error: 'the API failed to handle this request' });
+      });
   });
 
   async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -149,6 +185,25 @@ export function createApiServer(options: ApiOptions): Server {
     if (method === 'OPTIONS') return void response.writeHead(204).end();
 
     if (path === '/health') return send(response, 200, { ok: true });
+
+    /**
+     * The scrape endpoint.
+     *
+     * Before `identify`, because Prometheus has no session and no interest in getting one. That
+     * makes the exposure worth being explicit about: these numbers are counts and latencies, never
+     * user data, but they do describe the shape of the business — how many exports, how many
+     * organisations are active. `METRICS_TOKEN` closes it when the port is reachable from
+     * somewhere it should not be; the usual deployment keeps it on a private network instead.
+     */
+    if (path === '/metrics' && method === 'GET') {
+      const expected = telemetry.metricsToken ?? process.env['METRICS_TOKEN'];
+      if (expected !== undefined && expected !== '' && !bearerMatches(request, expected)) {
+        return send(response, 401, { error: 'this endpoint needs the metrics token' });
+      }
+      response.writeHead(200, { 'content-type': PROMETHEUS_CONTENT_TYPE });
+      response.end(observer.scrape());
+      return;
+    }
 
     if (path === '/auth/signup' && method === 'POST') {
       const body = SignupRequestSchema.parse(JSON.parse(await readBody(request)));
@@ -604,24 +659,42 @@ export function createApiServer(options: ApiOptions): Server {
         // The row first, then the message. If enqueueing fails the user sees a job that never
         // starts, which is recoverable; if the message went first, a crash between the two would
         // hand the worker a job id that does not exist.
-        const job = await createExportJob(db, {
-          projectId,
-          organizationId,
-          sceneVersion: loaded.version,
-          userId,
-        });
-
-        if (queue) {
-          await queue.add(
-            'export',
-            {
-              jobId: job.id,
+        const job = await inSpan(
+          telemetry.tracer,
+          'export.record',
+          { 'hela.project_id': projectId },
+          () =>
+            createExportJob(db, {
               projectId,
               organizationId,
               sceneVersion: loaded.version,
-            },
-            JOB_OPTIONS,
-          );
+              userId,
+              // Stored on the row so a build somebody complains about can be turned back into the
+              // request that made it, months later, without a tracing backend.
+              correlationId: currentCorrelationId(),
+            }),
+        );
+
+        if (queue) {
+          // Its own span because "the queue accepted it" is a distinct claim from "the row
+          // exists", and the gap between the two is exactly where a job that never starts lives.
+          await inSpan(telemetry.tracer, 'export.enqueue', { 'hela.job_id': job.id }, async () => {
+            await queue.add(
+              'export',
+              {
+                jobId: job.id,
+                projectId,
+                organizationId,
+                sceneVersion: loaded.version,
+                correlationId: currentCorrelationId(),
+                // The W3C `traceparent`, carried by hand because a queue has no headers. This is
+                // what makes the worker's spans children of this request rather than an unrelated
+                // trace that happens to be about the same job.
+                carrier: traceCarrier(),
+              },
+              JOB_OPTIONS,
+            );
+          });
         }
 
         return send(response, 202, { job });
@@ -741,6 +814,21 @@ export function createApiServer(options: ApiOptions): Server {
 
     send(response, 404, { error: 'no such endpoint' });
   }
+}
+
+/**
+ * A shared-secret check for `/metrics`, in constant time.
+ *
+ * `===` on a secret leaks its length and its matching prefix through timing. That is a thin attack
+ * against a scrape token and a real one against anything else, and the habit is worth more than the
+ * argument about whether this particular token is worth defending.
+ */
+function bearerMatches(request: IncomingMessage, expected: string): boolean {
+  const header = request.headers.authorization ?? '';
+  const offered = header.startsWith('Bearer ') ? header.slice('Bearer '.length) : '';
+  const a = Buffer.from(offered);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 async function identify(request: IncomingMessage, auth: AuthProvider): Promise<string> {

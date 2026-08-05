@@ -23,6 +23,7 @@
     "bench": "node tools/benchmark/run.mjs",
     "smoke": "pnpm --filter @helaengine/smoke smoke",
     "smoke:test": "pnpm --filter @helaengine/smoke smoke:test",
+    "trace": "pnpm --filter @helaengine/trace trace",
     "api": "pnpm --filter @helaengine/api start",
     "portable": "pnpm --filter @helaengine/editor build && node tools/portable/build.mjs"
   },

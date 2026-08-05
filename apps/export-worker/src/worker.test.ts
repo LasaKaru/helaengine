@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -19,6 +19,15 @@ import {
   type ExportQueue,
 } from '@helaengine/api/queue';
 import { loadExportJob } from '@helaengine/api/exportJobs';
+import {
+  createLogger,
+  inSpan,
+  serviceMetrics,
+  startTelemetry,
+  traceCarrier,
+  withCorrelation,
+  type SpanRecord,
+} from '@helaengine/telemetry';
 import { createExportWorker, recordFailures, type ArtifactStorage } from './worker.js';
 import type { AssetSource } from './build.js';
 import type { ExportJobPayload } from '@helaengine/api/queue';
@@ -104,6 +113,17 @@ class MemoryStorage implements ArtifactStorage {
 
 let storage: MemoryStorage;
 
+/**
+ * Real tracing, writing to a real file (Sprint 33).
+ *
+ * Not a mock tracer: the thing worth checking is that a span made in *this* process joins a trace
+ * started in another one, and a fake that records calls would confirm the calls rather than the
+ * join. The file is what `tools/trace` reads, so these tests read exactly what an operator does.
+ */
+let tracePath: string;
+let telemetry: ReturnType<typeof startTelemetry>;
+const metrics = serviceMetrics();
+
 beforeAll(async () => {
   db = createPool(DATABASE_URL);
   await reset(db);
@@ -112,6 +132,8 @@ beforeAll(async () => {
   connection = createRedis(REDIS_URL);
   queue = createExportQueue(connection);
   artifactRoot = mkdtempSync(join(tmpdir(), 'hela-exports-test-'));
+  tracePath = join(artifactRoot, 'spans.ndjson');
+  telemetry = startTelemetry({ serviceName: 'helaengine-export-worker', tracePath });
 }, 60_000);
 
 afterAll(async () => {
@@ -188,11 +210,19 @@ async function enqueue(input: {
   organizationId: string;
   userId: string;
   sceneVersion?: number;
+  correlationId?: string;
+  carrier?: Record<string, string>;
 }): Promise<string> {
   const row = await db.query<{ id: string }>(
-    `insert into export_jobs (project_id, organization_id, scene_version, requested_by)
-     values ($1, $2, $3, $4) returning id`,
-    [input.projectId, input.organizationId, input.sceneVersion ?? 1, input.userId],
+    `insert into export_jobs (project_id, organization_id, scene_version, requested_by, correlation_id)
+     values ($1, $2, $3, $4, $5) returning id`,
+    [
+      input.projectId,
+      input.organizationId,
+      input.sceneVersion ?? 1,
+      input.userId,
+      input.correlationId ?? null,
+    ],
   );
   const jobId = row.rows[0]!.id;
 
@@ -203,12 +233,39 @@ async function enqueue(input: {
       projectId: input.projectId,
       organizationId: input.organizationId,
       sceneVersion: input.sceneVersion ?? 1,
+      ...(input.correlationId ? { correlationId: input.correlationId } : {}),
+      ...(input.carrier ? { carrier: input.carrier } : {}),
     },
     JOB_OPTIONS,
   );
 
   return jobId;
 }
+
+/** The spans this worker has written so far, as `tools/trace` would read them. */
+function spans(): SpanRecord[] {
+  if (!existsSync(tracePath)) return [];
+  return readFileSync(tracePath, 'utf8')
+    .trim()
+    .split('\n')
+    .filter((line) => line !== '')
+    .map((line) => JSON.parse(line) as SpanRecord);
+}
+
+/**
+ * A logger that keeps its lines.
+ *
+ * Silent on the console because several of these tests fail jobs on purpose, and a stack trace per
+ * deliberate failure buries the one that is not deliberate. Kept rather than discarded so the tests
+ * below can assert on what the worker said — a log line nobody ever checks is a log line that
+ * quietly stops being written.
+ */
+const logged: string[] = [];
+const quiet = createLogger({
+  service: 'export-worker',
+  level: 'debug',
+  write: (line) => logged.push(line),
+});
 
 function start(
   overrides: Partial<Parameters<typeof createExportWorker>[0]> = {},
@@ -219,9 +276,10 @@ function start(
     storage,
     source,
     concurrency: 1,
+    telemetry: { tracer: telemetry.tracer, metrics, log: quiet },
     ...overrides,
   });
-  recordFailures(started, db);
+  recordFailures(started, db, quiet);
   workers.push(started);
   return started;
 }
@@ -391,4 +449,76 @@ describe('under load', () => {
     expect(new Set(finished.map((job) => job.artifactPath)).size).toBe(8);
     expect(storage.files.size).toBe(8);
   }, 180_000);
+});
+
+describe('what the worker says about itself', () => {
+  it('continues the API request’s trace rather than starting one of its own', async () => {
+    const owner = await project();
+
+    // Exactly what the API does at enqueue time: start a span, inject a carrier into the payload.
+    // Faked here only in that no HTTP is involved — the carrier is produced by the same code.
+    const api = startTelemetry({ serviceName: 'helaengine-api', tracePath });
+    let carrier: Record<string, string> = {};
+    let requestTraceId = '';
+    await withCorrelation('hela_1111111111111111', () =>
+      inSpan(api.tracer, 'POST /projects/:project/exports', {}, async (span) => {
+        requestTraceId = span.spanContext().traceId;
+        carrier = traceCarrier();
+      }),
+    );
+
+    const jobId = await enqueue({ ...owner, correlationId: 'hela_1111111111111111', carrier });
+    start();
+    const job = await settle(jobId, 60_000);
+    expect(job.status).toBe('done');
+
+    const written = spans();
+    const build = written.find(
+      (span) => span.name === 'export.job' && span.attributes['hela.job_id'] === jobId,
+    )!;
+
+    // The whole sprint in one assertion: the work a queue did belongs to the request that asked
+    // for it, so one trace id covers browser to artifact.
+    expect(build.traceId).toBe(requestTraceId);
+    expect(build.attributes['hela.correlation_id']).toBe('hela_1111111111111111');
+    expect(build.service).toBe('helaengine-export-worker');
+
+    // And the stages are on the timeline, in order, as child spans of that job.
+    const children = written.filter((span) => span.traceId === requestTraceId);
+    expect(children.map((span) => span.name)).toEqual(
+      expect.arrayContaining(['export.load_scene', 'export.build', 'export.store']),
+    );
+
+    await api.shutdown();
+  }, 90_000);
+
+  it('counts a build and how long it took', async () => {
+    const owner = await project();
+    const before = metrics.jobsProcessed.get({ outcome: 'done' });
+
+    const jobId = await enqueue(owner);
+    start();
+    expect((await settle(jobId, 60_000)).status).toBe('done');
+
+    expect(metrics.jobsProcessed.get({ outcome: 'done' })).toBe(before + 1);
+    const text = metrics.registry.render();
+    expect(text).toContain('hela_export_job_duration_seconds_count{outcome="done"}');
+  }, 90_000);
+
+  it('marks the span of a build that failed, with the reason on it', async () => {
+    const owner = await project();
+    const jobId = await enqueue({ ...owner, sceneVersion: 99 });
+
+    start();
+    expect((await settle(jobId, 60_000)).status).toBe('failed');
+
+    const failed = spans().find(
+      (span) => span.name === 'export.job' && span.attributes['hela.job_id'] === jobId,
+    )!;
+    // A span that swallowed its error would be a trace saying everything was fine next to a user
+    // looking at a failed export.
+    expect(failed.status).toBe('error');
+    expect(failed.message).toMatch(/no longer exists/);
+    expect(metrics.jobsProcessed.get({ outcome: 'failed' })).toBeGreaterThan(0);
+  }, 90_000);
 });

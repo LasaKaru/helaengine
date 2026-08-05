@@ -1,0 +1,27 @@
+{
+  "name": "@helaengine/trace",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Follows one request through every service that touched it. The definition-of-done view for Sprint 33, without a Grafana account.",
+  "scripts": {
+    "trace": "tsx src/cli.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@helaengine/telemetry": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  },
+  "exports": {
+    "./*": {
+      "types": "./src/*.ts",
+      "default": "./src/*.ts"
+    }
+  }
+}

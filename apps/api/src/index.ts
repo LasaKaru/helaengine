@@ -1,5 +1,6 @@
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createLogger, serviceMetrics, startTelemetry } from '@helaengine/telemetry';
 import { LocalAssetStorage } from './assets.js';
 import { createPool, migrate } from './db.js';
 import { createExportQueue, createRedis } from './queue.js';
@@ -7,6 +8,15 @@ import { createApiServer } from './server.js';
 
 const port = Number(process.env['API_PORT'] ?? 3000);
 const db = createPool();
+
+/**
+ * Telemetry first, before anything that might want to be traced.
+ *
+ * Exports nowhere unless `OTEL_EXPORTER_OTLP_ENDPOINT` or `HELA_TRACE_FILE` says otherwise, so a
+ * developer running `pnpm dev` pays nothing and sends nothing.
+ */
+const telemetry = startTelemetry({ serviceName: 'helaengine-api' });
+const log = createLogger({ service: 'api' });
 
 const applied = await migrate(db);
 if (applied.length > 0) console.log(`[api] applied ${applied.join(', ')}`);
@@ -38,9 +48,32 @@ const exports_ = new LocalAssetStorage(
   resolve(REPO_ROOT, process.env['EXPORT_ROOT'] ?? '.hela-exports'),
 );
 
-createApiServer({ db, storage, exportStorage: exports_, queue: createExportQueue(redis) }).listen(
-  port,
-  () => {
-    console.log(`[api] listening on http://localhost:${port}`);
-  },
-);
+const server = createApiServer({
+  db,
+  storage,
+  exportStorage: exports_,
+  queue: createExportQueue(redis),
+  telemetry: { tracer: telemetry.tracer, metrics: serviceMetrics(), log },
+});
+
+server.listen(port, () => {
+  log.info('listening', { port, metrics: `http://localhost:${port}/metrics` });
+});
+
+/**
+ * Flush before going away.
+ *
+ * Without this the spans describing a shutdown — including whatever request was in flight when the
+ * deploy landed — are the ones that never leave the process, which is precisely the window worth
+ * having traces for.
+ */
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.once(signal, () => {
+    void (async () => {
+      server.close();
+      await telemetry.shutdown();
+      await db.end();
+      process.exit(0);
+    })();
+  });
+}

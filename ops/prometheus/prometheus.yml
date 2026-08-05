@@ -1,0 +1,33 @@
+# Scrape configuration for the helaengine services (Sprint 33).
+#
+# Written for a self-hosted Prometheus, which is also what Grafana Cloud's agent understands: point
+# `grafana-agent` at this file and the same jobs are shipped to a hosted backend. Nothing here is
+# specific to either — that is the point of exposing an ordinary /metrics endpoint rather than an
+# SDK bound to one vendor.
+#
+#   docker run -p 9090:9090 -v $PWD/ops/prometheus:/etc/prometheus prom/prometheus
+#
+# **Untested against a live Prometheus.** No container runtime is available in the environment this
+# was developed in, so this file and the rules beside it are reviewed configuration rather than
+# verified configuration. What *is* verified by tests is the thing they consume: every metric named
+# here is asserted to exist, with these labels, in `apps/api/src/api.test.ts` and
+# `apps/export-worker/src/worker.test.ts`.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - alerts.yml
+
+scrape_configs:
+  - job_name: helaengine-api
+    static_configs:
+      - targets: ['api:3000']
+    # Set when the API is reachable from outside its own network. See `METRICS_TOKEN`.
+    # authorization:
+    #   credentials_file: /etc/prometheus/metrics-token
+
+  - job_name: helaengine-export-worker
+    static_configs:
+      - targets: ['export-worker:3300']

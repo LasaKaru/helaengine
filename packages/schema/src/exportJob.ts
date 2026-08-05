@@ -76,6 +76,14 @@ export const ExportJobSchema = z.object({
   artifactBytes: z.number().int().nonnegative().nullable().default(null),
   /** When the artifact stops being downloadable. A finished export is not storage. */
   expiresAt: z.string().nullable().default(null),
+  /**
+   * The request that asked for this build (Sprint 33).
+   *
+   * Surfaced to the client rather than kept server-side, because the moment it earns its keep is
+   * when somebody is looking at a failed export and wants to say what went wrong. "Reference
+   * hela_9f3c…" turns a support thread into one query. Null for jobs made before this existed.
+   */
+  correlationId: z.string().nullable().default(null),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

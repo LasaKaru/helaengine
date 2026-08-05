@@ -37,12 +37,14 @@ interface JobRow {
   artifact_path: string | null;
   artifact_bytes: string | number | null;
   expires_at: Date | null;
+  correlation_id: string | null;
   created_at: Date;
   updated_at: Date;
 }
 
 const COLUMNS = `id, project_id, organization_id, scene_version, status, stage, progress,
-                 attempts, error, artifact_path, artifact_bytes, expires_at, created_at, updated_at`;
+                 attempts, error, artifact_path, artifact_bytes, expires_at, correlation_id,
+                 created_at, updated_at`;
 
 function toJob(row: JobRow): ExportJob {
   return {
@@ -60,6 +62,7 @@ function toJob(row: JobRow): ExportJob {
     // An export size fits comfortably, but the conversion has to be deliberate rather than implicit.
     artifactBytes: row.artifact_bytes === null ? null : Number(row.artifact_bytes),
     expiresAt: row.expires_at?.toISOString() ?? null,
+    correlationId: row.correlation_id,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
@@ -112,6 +115,8 @@ export async function createExportJob(
     organizationId: string;
     sceneVersion: number;
     userId: string;
+    /** The request that asked for this build. Null when the caller carries no telemetry. */
+    correlationId?: string | null;
   },
 ): Promise<ExportJob> {
   const client = await db.connect();
@@ -147,10 +152,17 @@ export async function createExportJob(
     }
 
     const inserted = await client.query<JobRow>(
-      `insert into export_jobs (project_id, organization_id, scene_version, requested_by)
-       values ($1, $2, $3, $4)
+      `insert into export_jobs
+         (project_id, organization_id, scene_version, requested_by, correlation_id)
+       values ($1, $2, $3, $4, $5)
        returning ${COLUMNS}`,
-      [input.projectId, input.organizationId, input.sceneVersion, input.userId],
+      [
+        input.projectId,
+        input.organizationId,
+        input.sceneVersion,
+        input.userId,
+        input.correlationId ?? null,
+      ],
     );
 
     await client.query('commit');

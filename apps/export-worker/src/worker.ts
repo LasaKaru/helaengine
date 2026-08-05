@@ -1,9 +1,19 @@
 import { Worker, UnrecoverableError, type Job } from 'bullmq';
 import type IORedis from 'ioredis';
+import { trace, type Tracer } from '@opentelemetry/api';
 import { STAGE_PROGRESS, migrateScene, type Scene } from '@helaengine/schema';
 import { EXPORT_QUEUE, type ExportJobPayload } from '@helaengine/api/queue';
 import { completeExportJob, updateExportJob } from '@helaengine/api/exportJobs';
 import type { Db } from '@helaengine/api/db';
+import {
+  createLogger,
+  inSpan,
+  serviceMetrics,
+  withCarrier,
+  withCorrelation,
+  type Logger,
+  type ServiceMetrics,
+} from '@helaengine/telemetry';
 import { buildAndZip, type AssetSource } from './build.js';
 
 /**
@@ -29,6 +39,22 @@ export interface WorkerOptions {
   source: AssetSource;
   /** How many jobs at once. One per core is the sane default; see the note below. */
   concurrency?: number;
+  /** Traces, metrics and logs. Absent means instrumented but exporting nowhere — see the API. */
+  telemetry?: WorkerTelemetry;
+}
+
+export interface WorkerTelemetry {
+  tracer: Tracer;
+  metrics: ServiceMetrics;
+  log: Logger;
+}
+
+function defaultTelemetry(): WorkerTelemetry {
+  return {
+    tracer: trace.getTracer('helaengine-export-worker'),
+    metrics: serviceMetrics(),
+    log: createLogger({ service: 'export-worker', level: 'warn' }),
+  };
 }
 
 /**
@@ -46,41 +72,109 @@ function permanent(message: string): UnrecoverableError {
 
 export function createExportWorker(options: WorkerOptions): Worker<ExportJobPayload> {
   const { db, storage, source } = options;
+  const { tracer, metrics, log } = options.telemetry ?? defaultTelemetry();
 
   return new Worker<ExportJobPayload>(
     EXPORT_QUEUE,
     async (job: Job<ExportJobPayload>) => {
-      const { jobId, projectId, sceneVersion } = job.data;
+      const { jobId, projectId, sceneVersion, correlationId, carrier } = job.data;
+      const startedAt = process.hrtime.bigint();
 
-      // `attemptsMade` is zero-based on the first run; the row records how many times it has been
-      // *tried*, which is what a person reading it expects.
-      await updateExportJob(db, jobId, {
-        status: 'processing',
-        stage: 'loading',
-        progress: STAGE_PROGRESS.loading,
-        attempts: job.attemptsMade + 1,
-        error: null,
-      });
+      /**
+       * The seam where a trace crosses a process boundary.
+       *
+       * `withCarrier` makes everything below a child of the HTTP request that enqueued this job,
+       * and `withCorrelation` makes every log line here carry the same id that request did. Both
+       * are no-ops when the fields are absent, so a job from an older API still builds — it simply
+       * starts a trace of its own.
+       */
+      const correlated = <T>(body: () => T): T =>
+        // Absent rather than `"unknown"`: a log line with no correlation id says truthfully that
+        // this job arrived without one, while a placeholder becomes a bucket that every
+        // uncorrelated job in the system shares and somebody eventually searches for.
+        correlationId ? withCorrelation(correlationId, body) : body();
 
-      const scene = await loadScene(db, projectId, sceneVersion);
+      return withCarrier(carrier, () =>
+        correlated(async () => {
+          try {
+            const result = await inSpan(
+              tracer,
+              'export.job',
+              {
+                'hela.job_id': jobId,
+                'hela.project_id': projectId,
+                'hela.scene_version': sceneVersion,
+                'hela.attempt': job.attemptsMade + 1,
+              },
+              async (span) => {
+                // `attemptsMade` is zero-based on the first run; the row records how many times it
+                // has been *tried*, which is what a person reading it expects.
+                await updateExportJob(db, jobId, {
+                  status: 'processing',
+                  stage: 'loading',
+                  progress: STAGE_PROGRESS.loading,
+                  attempts: job.attemptsMade + 1,
+                  error: null,
+                });
 
-      const built = await buildAndZip({ scene, projectName: scene.name, source }, async (stage) => {
-        await updateExportJob(db, jobId, { stage, progress: STAGE_PROGRESS[stage] });
-        // Reported to BullMQ as well, so `queue.getJobs()` and any dashboard see the same thing
-        // the database does rather than a job that looks stuck.
-        await job.updateProgress(STAGE_PROGRESS[stage]);
-      });
+                const scene = await inSpan(tracer, 'export.load_scene', {}, () =>
+                  loadScene(db, projectId, sceneVersion),
+                );
 
-      await updateExportJob(db, jobId, {
-        stage: 'storing',
-        progress: STAGE_PROGRESS.storing,
-      });
+                const built = await inSpan(
+                  tracer,
+                  'export.build',
+                  { 'hela.objects': scene.objects.length },
+                  async () =>
+                    buildAndZip({ scene, projectName: scene.name, source }, async (stage) => {
+                      // An event rather than a span per stage: the stages are contiguous phases of
+                      // one build, and six spans that exactly tile their parent add depth without
+                      // adding information. A timeline of events shows the same shape.
+                      span.addEvent(`stage:${stage}`);
+                      await updateExportJob(db, jobId, { stage, progress: STAGE_PROGRESS[stage] });
+                      // Reported to BullMQ as well, so `queue.getJobs()` and any dashboard see the
+                      // same thing the database does rather than a job that looks stuck.
+                      await job.updateProgress(STAGE_PROGRESS[stage]);
+                    }),
+                );
 
-      const key = `exports/${jobId}.zip`;
-      storage.put(key, built.zip);
-      await completeExportJob(db, jobId, { path: key, bytes: built.zip.byteLength });
+                await updateExportJob(db, jobId, {
+                  stage: 'storing',
+                  progress: STAGE_PROGRESS.storing,
+                });
 
-      return { bytes: built.zip.byteLength, warnings: built.plan.warnings };
+                const key = `exports/${jobId}.zip`;
+                await inSpan(
+                  tracer,
+                  'export.store',
+                  { 'hela.artifact_bytes': built.zip.byteLength },
+                  async () => {
+                    storage.put(key, built.zip);
+                    await completeExportJob(db, jobId, {
+                      path: key,
+                      bytes: built.zip.byteLength,
+                    });
+                  },
+                );
+
+                span.setAttribute('hela.artifact_bytes', built.zip.byteLength);
+                return { bytes: built.zip.byteLength, warnings: built.plan.warnings };
+              },
+            );
+
+            record(metrics, 'done', startedAt);
+            log.info('export built', { jobId, projectId, bytes: result.bytes });
+            return result;
+          } catch (error) {
+            // Counted here rather than in the `failed` handler because this is where the *attempt*
+            // ends — a job that succeeds on its third try still cost three builds, and a duration
+            // histogram that only sees successes hides the retries that made the queue slow.
+            record(metrics, 'failed', startedAt);
+            log.error('export failed', { jobId, projectId, error });
+            throw error;
+          }
+        }),
+      );
     },
     {
       connection: options.connection,
@@ -96,6 +190,12 @@ export function createExportWorker(options: WorkerOptions): Worker<ExportJobPayl
       concurrency: options.concurrency ?? 1,
     },
   );
+}
+
+function record(metrics: ServiceMetrics, outcome: 'done' | 'failed', startedAt: bigint): void {
+  const seconds = Number(process.hrtime.bigint() - startedAt) / 1e9;
+  metrics.jobsProcessed.increment({ outcome });
+  metrics.jobDuration.observe(seconds, { outcome });
 }
 
 /**
@@ -134,7 +234,9 @@ async function loadScene(db: Db, projectId: string, version: number): Promise<Sc
  * failure with retries left (the user is still waiting, and should still see `processing`) and one
  * that has run out (the user needs to be told, in a sentence).
  */
-export function recordFailures(worker: Worker<ExportJobPayload>, db: Db): void {
+export function recordFailures(worker: Worker<ExportJobPayload>, db: Db, log?: Logger): void {
+  const say = log ?? createLogger({ service: 'export-worker', level: 'warn' });
+
   worker.on('failed', (job, error) => {
     if (!job) return;
 
@@ -154,7 +256,7 @@ export function recordFailures(worker: Worker<ExportJobPayload>, db: Db): void {
     }).catch((problem: unknown) => {
       // The job failed *and* recording that failed. Logged loudly: the row will sit on
       // `processing` forever, and knowing why is the difference between a bug and a mystery.
-      console.error(`[export-worker] could not record failure for ${job.data.jobId}`, problem);
+      say.error('could not record failure', { jobId: job.data.jobId, error: problem });
     });
   });
 }

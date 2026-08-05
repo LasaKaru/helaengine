@@ -3,7 +3,13 @@ import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPool } from '@helaengine/api/db';
-import { createRedis } from '@helaengine/api/queue';
+import { createExportQueue, createRedis } from '@helaengine/api/queue';
+import {
+  createLogger,
+  PROMETHEUS_CONTENT_TYPE,
+  serviceMetrics,
+  startTelemetry,
+} from '@helaengine/telemetry';
 import { LocalAssetSource } from './build.js';
 import { createExportWorker, recordFailures, type ArtifactStorage } from './worker.js';
 
@@ -71,14 +77,39 @@ const source = await LocalAssetSource.load({
 const storage = new LocalArtifactStorage(
   resolve(REPO_ROOT, process.env['EXPORT_ROOT'] ?? '.hela-exports'),
 );
+const telemetry = startTelemetry({ serviceName: 'helaengine-export-worker' });
+const log = createLogger({ service: 'export-worker' });
+const metrics = serviceMetrics();
+
 const worker = createExportWorker({
   db,
   connection,
   storage,
   source,
   concurrency: Number(process.env['EXPORT_CONCURRENCY'] ?? 1),
+  telemetry: { tracer: telemetry.tracer, metrics, log },
 });
-recordFailures(worker, db);
+recordFailures(worker, db, log);
+
+/**
+ * Queue depth, asked of Redis at scrape time.
+ *
+ * The one number that says whether this worker is keeping up. Job duration cannot: a queue with a
+ * thousand jobs waiting and a worker cheerfully building each one in twenty seconds looks perfectly
+ * healthy from the inside. `waiting` climbing is what a user experiences as "my export never
+ * starts", and it is what the runbook's backlog alert fires on.
+ */
+const queue = createExportQueue(connection);
+async function readQueueDepth(): Promise<void> {
+  try {
+    const counts = await queue.getJobCounts('waiting', 'active', 'delayed', 'failed');
+    for (const [state, count] of Object.entries(counts)) metrics.queueDepth.set(count, { state });
+  } catch (error) {
+    // A Redis blip should not fail a scrape: the rest of the metrics are still true, and a scrape
+    // that 500s makes the monitoring look like the outage.
+    log.warn('could not read queue depth', { error });
+  }
+}
 
 /**
  * A health endpoint, on a worker with no HTTP surface of its own.
@@ -89,7 +120,16 @@ recordFailures(worker, db);
  * racing its own fixtures.
  */
 const healthPort = Number(process.env['EXPORT_WORKER_PORT'] ?? 3300);
-createServer((request, response) => {
+const health = createServer((request, response) => {
+  // The same scrape endpoint the API exposes, on the port that already exists. A worker with no
+  // HTTP surface is a worker whose queue depth nobody can see.
+  if (request.url === '/metrics') {
+    void readQueueDepth().then(() => {
+      response.writeHead(200, { 'content-type': PROMETHEUS_CONTENT_TYPE });
+      response.end(metrics.registry.render());
+    });
+    return;
+  }
   if (request.url !== '/health') return void response.writeHead(404).end();
   response.writeHead(200, { 'content-type': 'application/json' });
   response.end(
@@ -99,12 +139,14 @@ createServer((request, response) => {
       assets: source.manifest.assets.length,
     }),
   );
-}).listen(healthPort);
+});
+health.listen(healthPort);
 
-console.log(
-  `[export-worker] waiting for jobs (${source.manifest.assets.length} assets, ` +
-    `concurrency ${process.env['EXPORT_CONCURRENCY'] ?? 1}, health on :${healthPort})`,
-);
+log.info('waiting for jobs', {
+  assets: source.manifest.assets.length,
+  concurrency: Number(process.env['EXPORT_CONCURRENCY'] ?? 1),
+  health: `http://localhost:${healthPort}/health`,
+});
 
 /**
  * Finish the job in hand before going away.
@@ -116,8 +158,13 @@ console.log(
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, () => {
     void (async () => {
-      console.log('[export-worker] finishing the current job before stopping…');
+      log.info('finishing the current job before stopping');
       await worker.close();
+      health.close();
+      // Flushed before the connection goes: the spans describing the last job of a deploy are
+      // exactly the ones worth keeping.
+      await telemetry.shutdown();
+      await queue.close();
       await connection.quit();
       await db.end();
       process.exit(0);

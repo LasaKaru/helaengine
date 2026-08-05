@@ -1,0 +1,65 @@
+# Alerts (Sprint 33).
+#
+# Four rules, and the shortness is deliberate. An alert that nobody acts on trains everybody to
+# ignore the channel it arrives in, so the test each of these had to pass is: *if this fires at
+# 03:00, is there something a person would do about it?* Every one of them has an entry in
+# `docs/RUNBOOK.md` saying what that is; an alert without a runbook entry does not belong here.
+#
+# The `for:` clauses matter as much as the thresholds. A single slow minute during a deploy is not
+# an incident, and paging on one is how people start silencing rules.
+
+groups:
+  - name: helaengine
+    rules:
+      - alert: ApiErrorRateHigh
+        # Server errors as a share of all requests. 5xx only: a wall of 401s means somebody's
+        # session expired, which is the system working.
+        expr: |
+          sum(rate(hela_http_requests_total{status="5xx"}[5m]))
+            /
+          sum(rate(hela_http_requests_total[5m]))
+            > 0.05
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: 'More than 5% of API requests are failing'
+          runbook: 'docs/RUNBOOK.md#api-error-rate'
+
+      - alert: ApiLatencyHigh
+        # p95 against the SLA the product actually promises. p99 would fire on one slow export
+        # listing; the median would hide a quarter of users having a bad time.
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, route) (rate(hela_http_request_duration_seconds_bucket[5m]))
+          ) > 1
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: 'p95 latency on {{ $labels.route }} is over a second'
+          runbook: 'docs/RUNBOOK.md#api-latency'
+
+      - alert: ExportQueueBacklog
+        # The number that says a user's export will never start. Job duration cannot say this: a
+        # worker cheerfully building each job in twenty seconds looks healthy with a thousand
+        # waiting behind it.
+        expr: hela_export_queue_depth{state="waiting"} > 50
+        for: 15m
+        labels:
+          severity: page
+        annotations:
+          summary: 'Exports have been backing up for fifteen minutes'
+          runbook: 'docs/RUNBOOK.md#export-backlog'
+
+      - alert: PgPoolSaturated
+        # Requests queueing *inside* the pool. The API goes slow with no slow query to blame, which
+        # is among the harder things to diagnose without this exact number.
+        expr: hela_pg_pool_connections{state="waiting"} > 0
+        for: 5m
+        labels:
+          severity: ticket
+        annotations:
+          summary: 'Requests are waiting for a database connection'
+          runbook: 'docs/RUNBOOK.md#pool-exhaustion'

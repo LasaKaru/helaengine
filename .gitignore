@@ -29,3 +29,6 @@ tools/benchmark/stress.png
 
 # Export artifacts built by the worker.
 .hela-exports*/
+
+# Spans written when HELA_TRACE_FILE is set (Sprint 33). Diagnostics, never source.
+.hela-traces*/

@@ -15,6 +15,37 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    # `pnpm test` runs *every* package's suite, and two of them talk to real infrastructure — the
+    # API to Postgres, the export worker to Postgres and Redis. That is deliberate (a mocked
+    # database leaves the constraints and transaction boundaries untested), and it means this job
+    # needs the same service containers `api.yml` provides. Without them the whole `pnpm test` step
+    # fails on connection errors, which reads as "the tests are broken" rather than "CI is missing a
+    # database".
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hela
+          POSTGRES_PASSWORD: hela
+          POSTGRES_DB: helaengine_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -42,8 +73,16 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # Its own database, because both suites drop and re-migrate their schema and turbo runs
+      # packages in parallel — sharing one has them delete each other's tables mid-test.
+      - name: Create the worker's database
+        run: PGPASSWORD=hela psql -h localhost -U hela -d helaengine_test -c 'create database helaengine_worker_test'
+
       - name: Test
         run: pnpm test
+        env:
+          TEST_DATABASE_URL: postgres://hela:hela@localhost:5432/helaengine_test
+          TEST_REDIS_URL: redis://localhost:6379
 
       # Exercises the real ingest path against the committed sources. Thumbnails are skipped
       # because they need a browser; the compression, measurement and manifest stages are what
@@ -77,6 +116,20 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      # The export worker is one of the web servers this suite starts (Sprint 32), and it does not
+      # come up without a queue to consume — so the whole run would sit waiting on a health check
+      # that can never pass. Sprint 32 added Postgres here and missed this; Sprint 33's end-to-end
+      # trace test, which needs the worker's spans, is what made the omission obvious.
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -102,10 +155,16 @@ jobs:
         env:
           SKIP_THUMBNAILS: '1'
 
+      # The engine bundle the worker inlines into every export. Generated output, so it has to be
+      # built here rather than committed.
+      - name: Build the engine runtime
+        run: pnpm --filter @helaengine/engine build
+
       - name: Run editor e2e suite
         run: pnpm --filter @helaengine/editor e2e
         env:
           TEST_DATABASE_URL: postgres://hela:hela@localhost:5432/helaengine_e2e
+          TEST_REDIS_URL: redis://localhost:6379
 
       - uses: actions/upload-artifact@v4
         if: failure()

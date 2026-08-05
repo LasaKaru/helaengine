@@ -22,6 +22,16 @@ export interface ExportJobPayload {
   projectId: string;
   organizationId: string;
   sceneVersion: number;
+  /**
+   * Diagnostics that have to cross the queue, because a queue has no headers (Sprint 33).
+   *
+   * Both are optional and neither affects what gets built. A message enqueued before this sprint,
+   * or by anything that does not carry telemetry, still exports correctly — it simply starts its
+   * own trace instead of continuing the request's.
+   */
+  correlationId?: string | null;
+  /** A W3C `traceparent` carrier, injected by the API and extracted by the worker. */
+  carrier?: Record<string, string>;
 }
 
 /**
