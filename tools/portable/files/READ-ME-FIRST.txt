@@ -1,0 +1,44 @@
+HelaEngine - portable build
+===========================
+
+WHAT YOU NEED
+  Node.js. If you do not have it: https://nodejs.org -> download the LTS
+  installer -> run it -> accept the defaults.
+  Nothing else. No git, no pnpm, no npm install.
+
+TO START
+  Windows : double-click START.bat
+  Mac/Linux: ./start.sh
+
+  Your browser opens at http://localhost:5174
+  Leave the black window open while you work. Close it to stop.
+
+FIRST FIVE MINUTES
+  1. Pick "Forest clearing" from the templates.
+  2. Drag a tree or a rock from the left panel onto the ground.
+  3. Click it, then use the arrows to move it. W / E / R switch between
+     move, rotate and scale.
+  4. Press  P  to play the level. WASD to walk, mouse to look.
+  5. Press  Escape  to stop, and  ?  to see every shortcut.
+
+SAVING
+  Your work is saved in the browser automatically.
+
+  Ctrl+Shift+S writes a .hela file to your computer: one file holding the
+  whole project. Put it in OneDrive or Google Drive and it is backed up;
+  drop it back on the projects screen to open it again.
+
+EXPORTING A GAME
+  The Export button produces a zip you can unzip, put on any web host and
+  play. It is checked and play-tested before you are allowed to download
+  it - if something is broken it says what, rather than handing you a
+  game that does not run.
+
+WHAT IS NOT IN THIS BUILD
+  Accounts, cloud saving and real-time collaboration need a database and
+  three background services, so they are not part of this portable copy.
+  Everything else - the editor, physics, enemies, combat, audio, the
+  export - is here and works with no internet connection at all.
+
+  To run those parts, clone the repository and follow
+  docs/RUNNING-ON-WINDOWS.md.
