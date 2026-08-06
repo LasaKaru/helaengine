@@ -31,7 +31,11 @@
     "onlyBuiltDependencies": [
       "esbuild",
       "sharp"
-    ]
+    ],
+    "overrides": {
+      "express>path-to-regexp": ">=0.1.13",
+      "ndarray-pixels>sharp": "^0.35.0"
+    }
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",

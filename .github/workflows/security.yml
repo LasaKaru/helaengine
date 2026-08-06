@@ -1,0 +1,79 @@
+name: Security
+
+# Dependency vulnerabilities and static analysis, on every pull request and once a week.
+#
+# The weekly run matters as much as the per-PR one: an advisory published on Wednesday makes code
+# that has not changed newly vulnerable, and a scanner that only runs on changed code never sees it.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Monday morning, so a finding lands at the start of a week rather than during one.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependencies:
+    name: Dependency advisories
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # `--prod` is the gate, and the distinction is the whole design of this job: a ReDoS in
+      # eslint's argument parser is not a vulnerability in a product that ships no eslint, while
+      # the same bug in something the API serves requests with is. Blocking on dev advisories
+      # teaches people to pass `--force`, which costs more than it saves.
+      - name: Runtime dependencies (blocking)
+        run: pnpm audit --prod --audit-level high
+
+      # Everything else, reported and not enforced. Visible in the log, on the weekly run, without
+      # standing between a fix and main.
+      - name: Development dependencies (advisory)
+        run: pnpm audit --audit-level moderate || true
+
+  sast:
+    name: Static analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Semgrep's own container, which is how it is meant to run and saves installing Python here.
+    container:
+      image: semgrep/semgrep:latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # `--error` makes a finding fail the job. The rules are chosen rather than "everything":
+      # `p/typescript` and `p/javascript` for the language, `p/nodejs` and `p/sql-injection` for
+      # what this API actually does, and `p/secrets` because a committed key is the one finding
+      # that is always real. A kitchen-sink ruleset produces enough noise to be ignored.
+      - name: Semgrep
+        run: |
+          semgrep scan \
+            --config p/typescript \
+            --config p/javascript \
+            --config p/nodejs \
+            --config p/sql-injection \
+            --config p/secrets \
+            --config .semgrep.yml \
+            --error \
+            --metrics off

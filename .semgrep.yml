@@ -1,0 +1,81 @@
+# Rules specific to this codebase (Sprint 34).
+#
+# The published rulesets in `.github/workflows/security.yml` cover the generic classes — injection,
+# secrets, unsafe Node APIs. These four cover the invariants that are specific to *this* product,
+# which no published ruleset knows about and which the architecture rests on.
+#
+# Run locally with:
+#   semgrep scan --config .semgrep.yml
+
+rules:
+  - id: hela-no-dynamic-execution
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Scene data is never code. `eval`, `new Function` and string timers must not exist in this
+      codebase: a document is interpreted by closed vocabularies of behaviours, triggers and unlock
+      methods, and any path from a document to executed code turns a shared project into remote code
+      execution in every collaborator's browser and every exported game.
+    patterns:
+      - pattern-either:
+          - pattern: eval(...)
+          - pattern: new Function(...)
+          - pattern: setTimeout("...", ...)
+          - pattern: setInterval("...", ...)
+    paths:
+      exclude:
+        - '**/dist/**'
+        - '**/node_modules/**'
+
+  - id: hela-sql-must-be-parameterised
+    languages: [typescript]
+    severity: ERROR
+    message: >-
+      Build SQL with placeholders ($1, $2) and pass values as parameters. A template literal in a
+      query is how a project name becomes a DROP TABLE.
+    patterns:
+      - pattern-either:
+          - pattern: $DB.query(`...${...}...`, ...)
+          - pattern: $CLIENT.query(`...${...}...`)
+      # The one legitimate interpolation: column lists and SET clauses assembled from hardcoded
+      # names, never from request data. Those are written as `${COLUMNS}` and `${sets.join(', ')}`.
+      - pattern-not: $DB.query(`...${COLUMNS}...`, ...)
+      - pattern-not: $DB.query(`...${$SETS.join(...)}...`, ...)
+    paths:
+      include:
+        - '**/apps/api/**'
+        - '**/apps/collab/**'
+        - '**/apps/export-worker/**'
+      exclude:
+        - '**/*.test.ts'
+
+  - id: hela-no-role-check-by-request-body
+    languages: [typescript]
+    severity: ERROR
+    message: >-
+      Authorisation must come from the session, not from the request. A role or organisation id read
+      out of a body is a claim the caller made about themselves.
+    patterns:
+      - pattern-either:
+          - pattern: requireRole($DB, $ORG, body.$FIELD, ...)
+          - pattern: requireRole($DB, body.$FIELD, ...)
+    paths:
+      include:
+        - '**/apps/api/**'
+
+  - id: hela-no-secrets-in-logs
+    languages: [typescript]
+    severity: WARNING
+    message: >-
+      Do not log a token, password or signature. Structured logs are shipped to a third party and
+      retained; a credential in one is a credential in their storage too.
+    patterns:
+      - pattern-either:
+          - pattern: '$LOG.info(..., {..., token: $X, ...}, ...)'
+          - pattern: '$LOG.warn(..., {..., token: $X, ...}, ...)'
+          - pattern: '$LOG.error(..., {..., token: $X, ...}, ...)'
+          - pattern: '$LOG.info(..., {..., password: $X, ...}, ...)'
+          - pattern: '$LOG.error(..., {..., password: $X, ...}, ...)'
+    paths:
+      exclude:
+        - '**/*.test.ts'

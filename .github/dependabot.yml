@@ -1,0 +1,41 @@
+# Automated dependency updates (Sprint 34).
+#
+# Weekly rather than daily, and grouped rather than one pull request per package. The failure mode
+# this avoids is the one that makes teams turn Dependabot off: forty open pull requests, each
+# needing a full CI run and a human, until nobody reads any of them and a genuine security update
+# sits in the pile unnoticed.
+#
+# So: patch and minor bumps arrive as one pull request per ecosystem per week, majors arrive on
+# their own because they need reading, and security updates are never grouped or delayed — GitHub
+# raises those regardless of this schedule.
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    # One entry covers the whole workspace: pnpm-workspace.yaml lives here, and Dependabot follows
+    # it rather than needing a directory per package.
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # The bulk of the noise, and the least of the risk.
+      routine:
+        patterns: ['*']
+        update-types: ['minor', 'patch']
+    ignore:
+      # Majors are proposed individually, not swept into the group above.
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+    labels:
+      - dependencies
+
+  # The actions in .github/workflows pin versions too, and a stale action is a supply-chain
+  # dependency like any other.
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: monthly
+    labels:
+      - dependencies

@@ -15,11 +15,9 @@
     "@helaengine/engine": "workspace:*",
     "@helaengine/schema": "workspace:*",
     "colyseus": "0.15.17",
-    "express": "4.21.2",
     "three": "^0.172.0"
   },
   "devDependencies": {
-    "@types/express": "^5.0.6",
     "@types/three": "^0.172.0",
     "colyseus.js": "^0.15.26",
     "tsx": "^4.23.1",
