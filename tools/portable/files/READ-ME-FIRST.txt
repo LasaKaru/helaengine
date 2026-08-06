@@ -1,10 +1,7 @@
 HelaEngine - portable build
 ===========================
 
-WHAT YOU NEED
-  Node.js. If you do not have it: https://nodejs.org -> download the LTS
-  installer -> run it -> accept the defaults.
-  Nothing else. No git, no pnpm, no npm install.
+{{PREREQUISITES}}
 
 TO START
   Windows : double-click START.bat
