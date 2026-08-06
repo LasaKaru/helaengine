@@ -84,12 +84,32 @@ async function exitWalk(page: Page): Promise<void> {
 
 async function startPlaying(page: Page): Promise<void> {
   const play = page.locator('.hela-panel button', { hasText: 'Play' });
-  if ((await play.count()) > 0) {
-    await play.first().click();
-    await page.waitForFunction(() => window.helaengine!.uiScreen() === 'playing', undefined, {
-      timeout: 10_000,
-    });
-  }
+  if ((await play.count()) === 0) return;
+
+  /**
+   * Clicked until it takes, rather than once.
+   *
+   * The shell re-renders as the game boots, so a click can land on a button that is on screen and
+   * actionable by every check Playwright makes, and still reach no handler — the element it was
+   * attached to has been replaced. The failure looks exactly like a hang: screen still `home`, Play
+   * button still there, ten seconds gone. Retrying is the honest fix for a race the test cannot
+   * observe from outside; a longer timeout would only wait longer for a click that never took.
+   */
+  await expect
+    .poll(
+      async () => {
+        if ((await page.evaluate(() => window.helaengine!.uiScreen())) === 'playing') return true;
+        await play
+          .first()
+          .click({ timeout: 5_000 })
+          .catch(() => {});
+        await page.waitForTimeout(400);
+        return (await page.evaluate(() => window.helaengine!.uiScreen())) === 'playing';
+      },
+      { timeout: 20_000 },
+    )
+    .toBe(true);
+
   await page.waitForTimeout(300);
 }
 
