@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { initPhysics } from '@helaengine/engine';
-import { loadAssetLibrary, type AssetLibrary } from '../engine/assetLibrary';
+import type { AssetLibrary } from '../engine/assetLibrary';
+import { assetLibraryOnce } from '../engine/libraryOnce';
 import { useEditorStore } from '../store/editorStore';
 import { primeUiAssetUrls } from '../storage/uiAssets';
 import { exposeDevApi } from '../devApi';
@@ -69,7 +70,7 @@ export function EditorWorkspace(): React.JSX.Element {
   useEffect(() => {
     const controller = new AbortController();
 
-    loadAssetLibrary(controller.signal)
+    assetLibraryOnce(controller.signal)
       .then((library) => {
         setState({ status: 'ready', library });
       })

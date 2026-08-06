@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { ProjectsScreen } from './components/ProjectsScreen';
 import { useShortcuts } from './useShortcuts';
 import { useAutosave } from './useAutosave';
@@ -48,6 +48,37 @@ export function App(): React.JSX.Element {
   const identity = useCollabIdentity();
   useCollab(screen === 'editor' && isCloud() ? projectId : null, identity);
   usePublishPresence();
+
+  /**
+   * Publishes the dev API from the shell, not only from the editor.
+   *
+   * `window.helaengine` is the e2e suite's handle on the app, and several of its suites reach for
+   * it on the *projects* screen — opening a `.hela` file is a projects-screen gesture, and the drop
+   * zone lives there. Publishing it only from the workspace, as the first version of this split
+   * did, left those tests waiting forever for a global that now arrived a screen too late.
+   *
+   * The import is dynamic, which is the point: the dev API needs the asset library, the asset
+   * library pulls in the engine, and a static import here would put Three.js straight back into the
+   * entry chunk this split exists to empty. This way the shell renders first and the engine is
+   * fetched afterwards — so it is honest to say the projects screen no longer *waits* on the
+   * engine, and dishonest to say it never downloads it.
+   */
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      const [{ exposeDevApi }, { assetLibraryOnce }] = await Promise.all([
+        import('./devApi'),
+        import('./engine/libraryOnce'),
+      ]);
+      const library = await assetLibraryOnce().catch(() => null);
+      // The workspace republishes with the merged manifest once it mounts, so this is the floor
+      // rather than the final answer — and it must not overwrite the richer one on a late resolve.
+      if (live && library && window.helaengine === undefined) exposeDevApi(library);
+    })();
+    return () => {
+      live = false;
+    };
+  }, []);
 
   if (screen === 'projects') return <ProjectsScreen />;
 

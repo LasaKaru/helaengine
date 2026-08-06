@@ -154,11 +154,15 @@ which is how "our bundle is 4 MB" becomes a sentence nobody can act on.
 | Largest lazy chunk | **810 KiB** (physics) | 900 KiB |
 
 It started at **559 KiB** of initial JS, because the whole editor — Three.js, react-three-fiber, the
-gizmos — sat in the entry chunk: signing in to read a project list downloaded a 3D engine. The
-workspace moved behind `React.lazy`, and the asset-library load and the WebAssembly physics init
-moved with it. Leaving either behind would have moved the *code* out of the entry chunk while still
-triggering the download at boot — a split that looks good in a bundle report and changes nothing a
-user experiences.
+gizmos — sat in the entry chunk: signing in to read a project list downloaded a 3D engine before
+anything rendered. The workspace moved behind `React.lazy`, taking the physics init with it.
+
+**Stated precisely, because the imprecise version would be flattering:** the projects screen no
+longer *waits* on the engine — it renders from a 311 KiB entry chunk — but it does still fetch the
+asset library, and therefore Three.js, shortly afterwards. That is the dev API's doing: the e2e
+suite reaches for `window.helaengine` on the projects screen, since opening a `.hela` file is a
+projects-screen gesture, so the shell publishes it from a dynamic import once it has painted. The
+win is real and it is a first-render win, not a never-downloads-it win.
 
 The budgets are a ratchet set near today's numbers with headroom, not aspirational figures: a budget
 the project cannot currently meet is a red build everybody learns to ignore. They should come down
