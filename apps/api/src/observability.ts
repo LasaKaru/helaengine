@@ -53,6 +53,7 @@ const ROUTES = new Set([
   '/orgs/:org/export-quota',
   '/orgs/:org/assets',
   '/orgs/:org/assets/:asset',
+  '/orgs/:org/audit',
   '/invites/accept',
   '/projects/:project',
   '/projects/:project/versions',

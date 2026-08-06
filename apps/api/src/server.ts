@@ -10,6 +10,7 @@ import {
   serviceMetrics,
   traceCarrier,
 } from '@helaengine/telemetry';
+import { audit, listAudit } from './audit.js';
 import { createObserver, type ApiTelemetry } from './observability.js';
 import {
   AssetCategorySchema,
@@ -300,6 +301,20 @@ export function createApiServer(options: ApiOptions): Server {
         });
       }
 
+      // A build is the thing that leaves the building — the one artefact a customer can hand to
+      // somebody outside their organisation — so who took a copy, and when, is worth keeping.
+      await audit(
+        db,
+        {
+          organizationId: job.organizationId,
+          actorUserId: downloader,
+          action: 'export.downloaded',
+          subject: job.id,
+          detail: { projectId: job.projectId, bytes: bytes.byteLength },
+        },
+        telemetry.log,
+      );
+
       response.writeHead(200, {
         'content-type': 'application/zip',
         'content-disposition': `attachment; filename="${exportFilename(job.projectId)}"`,
@@ -416,6 +431,20 @@ export function createApiServer(options: ApiOptions): Server {
         [organizationId, body.email.trim().toLowerCase(), body.role, hash, expiresAt, userId],
       );
 
+      await audit(
+        db,
+        {
+          organizationId,
+          actorUserId: userId,
+          action: 'member.invited',
+          subject: body.email.trim().toLowerCase(),
+          // The role is the part somebody reviewing wants: an invite to `viewer` and an invite to
+          // `owner` are very different events with the same name.
+          detail: { role: body.role },
+        },
+        telemetry.log,
+      );
+
       const org = await db.query<{ name: string }>('select name from organizations where id = $1', [
         organizationId,
       ]);
@@ -491,6 +520,18 @@ export function createApiServer(options: ApiOptions): Server {
         client.release();
       }
 
+      await audit(
+        db,
+        {
+          organizationId: invite.organization_id,
+          actorUserId: userId,
+          action: 'member.joined',
+          subject: userId,
+          detail: { role: invite.role, email: invite.email },
+        },
+        telemetry.log,
+      );
+
       return send(response, 200, {
         membership: {
           organizationId: invite.organization_id,
@@ -534,6 +575,23 @@ export function createApiServer(options: ApiOptions): Server {
       });
     }
 
+    /**
+     * The trail, for the people who own it.
+     *
+     * Admin, not viewer: an audit log names who did what, which is exactly the sort of thing a
+     * disgruntled member should not be able to read on their way out. And it is per organisation,
+     * because there is no such thing as a global view of it in a multi-tenant product.
+     */
+    const auditMatch = new RegExp(`^/orgs/(${UUID})/audit$`).exec(path);
+    if (auditMatch && method === 'GET') {
+      const organizationId = auditMatch[1]!;
+      await requireRole(db, organizationId, userId, 'admin');
+      const limit = Number(url.searchParams.get('limit') ?? 100);
+      return send(response, 200, {
+        entries: await listAudit(db, organizationId, Number.isFinite(limit) ? limit : 100),
+      });
+    }
+
     const projectsMatch = new RegExp(`^/orgs/(${UUID})/projects$`).exec(path);
     if (projectsMatch && method === 'POST') {
       const organizationId = projectsMatch[1]!;
@@ -550,6 +608,18 @@ export function createApiServer(options: ApiOptions): Server {
         userId,
         ...(body.scene === undefined ? {} : { scene: body.scene }),
       });
+      await audit(
+        db,
+        {
+          organizationId,
+          actorUserId: userId,
+          action: 'project.created',
+          subject: project.id,
+          detail: { name: project.name },
+        },
+        telemetry.log,
+      );
+
       return send(response, 201, { project });
     }
 
@@ -601,6 +671,19 @@ export function createApiServer(options: ApiOptions): Server {
         // work from view, and it should take more than the role that creates things.
         await requireRole(db, organizationId, userId, 'admin');
         await deleteProject(db, projectId);
+        // Written after the delete rather than before: an entry for something that did not happen
+        // is worse than a missing one, because it is indistinguishable from one that did.
+        await audit(
+          db,
+          {
+            organizationId,
+            actorUserId: userId,
+            action: 'project.deleted',
+            subject: projectId,
+            detail: { name: loaded.project.name },
+          },
+          telemetry.log,
+        );
         // 204 means "no content", and a body attached to one is invalid HTTP that clients are
         // entitled to choke on — `response.json()` certainly does.
         response.writeHead(204).end();
@@ -642,6 +725,17 @@ export function createApiServer(options: ApiOptions): Server {
           userId,
           version: Number(restoreMatch[1]),
         });
+        await audit(
+          db,
+          {
+            organizationId,
+            actorUserId: userId,
+            action: 'project.restored',
+            subject: projectId,
+            detail: { version: Number(restoreMatch[1]) },
+          },
+          telemetry.log,
+        );
         return send(response, 201, restored);
       }
 
@@ -696,6 +790,20 @@ export function createApiServer(options: ApiOptions): Server {
             );
           });
         }
+
+        await audit(
+          db,
+          {
+            organizationId,
+            actorUserId: userId,
+            action: 'export.requested',
+            subject: job.id,
+            // An export is the expensive operation and the one that produces something shareable,
+            // so both the project and the version it built are worth keeping.
+            detail: { projectId, sceneVersion: loaded.version },
+          },
+          telemetry.log,
+        );
 
         return send(response, 202, { job });
       }
@@ -808,6 +916,16 @@ export function createApiServer(options: ApiOptions): Server {
     if (assetMatch && method === 'DELETE') {
       await requireRole(db, assetMatch[1]!, userId, 'editor');
       await deleteAsset(db, assetMatch[1]!, assetMatch[2]!);
+      await audit(
+        db,
+        {
+          organizationId: assetMatch[1]!,
+          actorUserId: userId,
+          action: 'asset.deleted',
+          subject: assetMatch[2]!,
+        },
+        telemetry.log,
+      );
       response.writeHead(204).end();
       return;
     }

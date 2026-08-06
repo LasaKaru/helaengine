@@ -108,7 +108,7 @@ beforeEach(async () => {
   // Truncated rather than dropped: each test starts from nothing, and rebuilding the schema per
   // test would make the suite slow enough that somebody stops running it.
   await db.query(
-    'truncate sessions, invites, export_jobs, scene_versions, projects, memberships, organizations, users, assets cascade',
+    'truncate audit_log, sessions, invites, export_jobs, scene_versions, projects, memberships, organizations, users, assets cascade',
   );
   invites.length = 0;
 });
@@ -1808,5 +1808,178 @@ describe('one organisation cannot reach another', () => {
 
     const response = await call('GET', `/orgs/${victim.organizationId}/members`, { token: forged });
     expect(response.status).toBe(401);
+  });
+});
+
+/**
+ * Sprint 34 — the audit trail.
+ *
+ * The plan's task says "implement/verify audit logging is actually being written", and *verify* is
+ * the operative word: a table that exists and is never written to is worse than none, because it
+ * looks like coverage in a security questionnaire. So each action is driven through the API and
+ * then read back through the same endpoint an admin would use.
+ */
+describe('the audit trail', () => {
+  async function entries(
+    token: string,
+    organizationId: string,
+  ): Promise<Array<{ action: string; subject: string | null; detail: Record<string, unknown> }>> {
+    const response = await call<{
+      entries: Array<{ action: string; subject: string | null; detail: Record<string, unknown> }>;
+    }>('GET', `/orgs/${organizationId}/audit`, { token });
+    expect(response.status).toBe(200);
+    return response.body.entries;
+  }
+
+  it('records a project being created, exported and deleted', async () => {
+    const owner = await signup('audit-owner@example.com');
+    const org = owner.personalOrganizationId;
+
+    const created = await call<{ project: { id: string } }>('POST', `/orgs/${org}/projects`, {
+      token: owner.token,
+      body: {
+        name: 'Audited',
+        scene: { sceneId: 's', version: 1, name: 'Audited', objects: [] },
+      },
+    });
+    const projectId = created.body.project.id;
+
+    await call('POST', `/projects/${projectId}/exports`, { token: owner.token });
+    await call('DELETE', `/projects/${projectId}`, { token: owner.token });
+
+    const trail = await entries(owner.token, org);
+    expect(trail.map((entry) => entry.action)).toEqual([
+      // Newest first, which is the order somebody reviewing an incident reads in.
+      'project.deleted',
+      'export.requested',
+      'project.created',
+    ]);
+    expect(trail.every((entry) => entry.subject !== null)).toBe(true);
+  });
+
+  it('survives the thing it describes being deleted', async () => {
+    const owner = await signup('audit-cascade@example.com');
+    const org = owner.personalOrganizationId;
+
+    const created = await call<{ project: { id: string } }>('POST', `/orgs/${org}/projects`, {
+      token: owner.token,
+      body: { name: 'Gone', scene: { sceneId: 's', version: 1, name: 'Gone', objects: [] } },
+    });
+    await call('DELETE', `/projects/${created.body.project.id}`, { token: owner.token });
+
+    // The whole point of `subject` being text rather than a foreign key: the row that says a
+    // project was deleted must outlive the project, which is exactly the case under review.
+    const trail = await entries(owner.token, org);
+    expect(trail.find((entry) => entry.action === 'project.deleted')?.subject).toBe(
+      created.body.project.id,
+    );
+  });
+
+  it('records an invitation and the joining, with the role on both', async () => {
+    const owner = await signup('audit-inviter@example.com');
+    const org = owner.personalOrganizationId;
+    const joiner = await signup('audit-joiner@example.com');
+
+    await call('POST', `/orgs/${org}/invites`, {
+      token: owner.token,
+      body: { email: 'audit-joiner@example.com', role: 'editor' },
+    });
+    await call('POST', '/invites/accept', {
+      token: joiner.token,
+      body: { token: invites.at(-1)!.token },
+    });
+
+    const trail = await entries(owner.token, org);
+    const invited = trail.find((entry) => entry.action === 'member.invited')!;
+    const joined = trail.find((entry) => entry.action === 'member.joined')!;
+
+    // The role is the reviewable part: an invite to `viewer` and an invite to `owner` are very
+    // different events that would otherwise share a name.
+    expect(invited.detail['role']).toBe('editor');
+    expect(invited.subject).toBe('audit-joiner@example.com');
+    expect(joined.detail['role']).toBe('editor');
+  });
+
+  it('records an asset deletion', async () => {
+    const owner = await signup('audit-assets@example.com');
+    const org = owner.personalOrganizationId;
+
+    await call('POST', `/orgs/${org}/assets`, {
+      token: owner.token,
+      body: { assetId: 'doomed_prop', name: 'Doomed', category: 'props' },
+    });
+    await call('DELETE', `/orgs/${org}/assets/doomed_prop`, { token: owner.token });
+
+    const trail = await entries(owner.token, org);
+    expect(trail.find((entry) => entry.action === 'asset.deleted')?.subject).toBe('doomed_prop');
+  });
+
+  it('carries the correlation id, so an entry leads back to the request', async () => {
+    const owner = await signup('audit-correlated@example.com');
+    const org = owner.personalOrganizationId;
+
+    const correlationId = 'hela_5555666677778888';
+    await fetch(`${origin}/orgs/${org}/projects`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${owner.token}`,
+        'content-type': 'application/json',
+        'x-correlation-id': correlationId,
+      },
+      body: JSON.stringify({
+        name: 'Traceable',
+        scene: { sceneId: 's', version: 1, name: 'Traceable', objects: [] },
+      }),
+    });
+
+    const response = await call<{ entries: Array<{ correlationId: string }> }>(
+      'GET',
+      `/orgs/${org}/audit`,
+      { token: owner.token },
+    );
+    // The join between "somebody did this" and every log line and span from the request that did
+    // it. Without it, an audit entry is a fact with no explanation attached.
+    expect(response.body.entries[0]!.correlationId).toBe(correlationId);
+  });
+
+  it('is admin-only, and invisible to another organisation', async () => {
+    const owner = await signup('audit-private@example.com');
+    const org = owner.personalOrganizationId;
+    const stranger = await signup('audit-stranger@example.com');
+
+    // A viewer inside the organisation is refused too: a trail naming who did what is exactly what
+    // a departing member should not be able to read on the way out.
+    await call('POST', `/orgs/${org}/invites`, {
+      token: owner.token,
+      body: { email: 'audit-stranger@example.com', role: 'viewer' },
+    });
+    await call('POST', '/invites/accept', {
+      token: stranger.token,
+      body: { token: invites.at(-1)!.token },
+    });
+
+    expect((await call('GET', `/orgs/${org}/audit`, { token: stranger.token })).status).toBe(403);
+
+    const outsider = await signup('audit-outsider@example.com');
+    expect((await call('GET', `/orgs/${org}/audit`, { token: outsider.token })).status).toBe(404);
+  });
+
+  it('does not fail the action it is recording', async () => {
+    const owner = await signup('audit-resilient@example.com');
+    const org = owner.personalOrganizationId;
+
+    // The table is gone; the product must keep working. A database hiccup in the audit table
+    // turning a deletion into a 500 *after* the deletion committed is a worse outcome than a
+    // missing row — see the note on `audit()`.
+    await db.query('alter table audit_log rename to audit_log_hidden');
+    try {
+      const created = await call<{ project: { id: string } }>('POST', `/orgs/${org}/projects`, {
+        token: owner.token,
+        body: { name: 'Still works', scene: { sceneId: 's', version: 1, name: 'x', objects: [] } },
+      });
+      expect(created.status).toBe(201);
+    } finally {
+      await db.query('alter table audit_log_hidden rename to audit_log');
+    }
   });
 });
