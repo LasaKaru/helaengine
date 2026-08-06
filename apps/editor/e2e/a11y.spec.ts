@@ -97,7 +97,9 @@ test.describe('accessibility', () => {
       const id = window.helaengine!.addObject('tree_pine_01', [0, 0, 0]);
       window.helaengine!.store.getState().select([id]);
     });
-    await expect(page.getByRole('heading', { name: /Properties/i })).toBeVisible();
+    // The transform fields only render once something is selected, and their presence is the
+    // signal that the panel under test is the populated one rather than its empty state.
+    await expect(page.getByRole('group', { name: 'Position' })).toBeVisible();
 
     await scan(page, 'the inspector', ['canvas']);
   });

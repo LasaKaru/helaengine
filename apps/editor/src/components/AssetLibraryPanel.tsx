@@ -105,7 +105,16 @@ function GridCell({
   const asset = assets[rowIndex * columns + columnIndex];
   if (!asset) return null;
   return (
-    <div style={style}>
+    /**
+     * `role="gridcell"` because `react-window` puts the cell inside a `role="row"`, and a row whose
+     * children are plain `div`s is a broken grid — axe reports it as a *critical*
+     * `aria-required-children` violation, and a screen reader reading the asset library gets a
+     * table with no cells in it.
+     *
+     * Found by the Sprint 37 scan, not by reading this file: the markup looks entirely reasonable
+     * until you know what the virtualiser wraps it in.
+     */
+    <div style={style} role="gridcell">
       <AssetCard asset={asset} />
     </div>
   );

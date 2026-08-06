@@ -332,9 +332,22 @@ body,
   border-color: var(--accent);
 }
 
+/*
+  The count beside a category name.
+
+  No opacity, and that is the fix rather than a preference. `.count` is already `--text-dim`, and
+  fading it a further 25% put it at 3.73:1 against the tab — under the 4.5:1 that 11px text needs.
+  Two dimmings stacked: the colour was chosen to be secondary, then made secondary again.
+
+  The active tab's count follows its button to full `--text`, because a tab you are standing on
+  should not have the quietest number on the row.
+*/
 .category-tabs .count {
   font-size: 11px;
-  opacity: 0.75;
+}
+
+.category-tabs button.active .count {
+  color: inherit;
 }
 
 .asset-grid {
