@@ -31,18 +31,30 @@ export function BillingPanel(): React.JSX.Element | null {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  const load = useCallback(async () => {
-    if (!client) return;
-    try {
-      setSummary(await client.summary());
-    } catch (problem: unknown) {
-      setError(problem instanceof Error ? problem.message : String(problem));
-    }
-  }, [client]);
-
+  /**
+   * Fetched in the effect, applied in the callback.
+   *
+   * The `live` flag is not ceremony: a signed-out-then-in during the round trip would otherwise
+   * apply the previous account's plan to the new one, and the lint rule that forbids setting state
+   * directly in an effect is pointing at exactly that class of bug.
+   */
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!client) return;
+    let live = true;
+
+    client
+      .summary()
+      .then((found) => {
+        if (live) setSummary(found);
+      })
+      .catch((problem: unknown) => {
+        if (live) setError(problem instanceof Error ? problem.message : String(problem));
+      });
+
+    return () => {
+      live = false;
+    };
+  }, [client]);
 
   const upgrade = useCallback(
     async (tier: PlanTier) => {
