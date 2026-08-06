@@ -1196,6 +1196,14 @@ What is **not** met is the phrase "against staging". There is no staging deploym
 - [ ] Build in-app billing UI: current plan display, usage meters, upgrade/downgrade flow, invoice history (Stripe-hosted portal is often sufficient here rather than building custom UI)
 - [ ] Test plan transitions explicitly: downgrade from Pro to Free while over the Free tier's storage limit — decide and implement the actual behavior (e.g., read-only lockout of excess projects vs. grace period) rather than leaving it undefined
 
+**The cloud-save flake recurred once.** In one full run the second browser read 29 objects where 30
+were expected — the version from before the edit — and passed on the next two runs. Sprint 34 fixed
+a real precondition bug in that test (it asserted `Saved` without first asserting _not_ `Saved`), so
+this is what is left: most likely Sprint 31's recorded race between the Save button and the
+collaboration room's own versioning, where a second browser loads the saved scene and then joins a
+room whose persisted document is older. The API side is not implicated — `loadProject` orders by
+`version desc`, so there is no tie to lose. Recorded rather than closed.
+
 **Open question, found while testing and not part of this sprint:** `page.keyboard.press('Escape')`
 does not dismiss the Export wizard, on a freshly opened dialog with `phase === 'idle'` — the case
 its handler is written to allow. A probe established that the `window` keydown listener _is_
