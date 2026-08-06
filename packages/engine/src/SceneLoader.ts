@@ -171,6 +171,15 @@ export class LoadedScene {
   readonly #objects: Map<string, THREE.Object3D>;
   readonly missingAssetIds: readonly string[];
   readonly #disposables: DisposableResource[];
+  /**
+   * Resources owned by exactly one object, so deleting that object can free them immediately.
+   *
+   * The split matters and is not cosmetic. Placeholder geometries and materials are *cached per
+   * asset* and shared by every object using that asset — freeing one on delete would blank every
+   * other tree in the level. What lands here is only what was built for one object and is reachable
+   * from nowhere else: a trigger volume's edges geometry and its line material.
+   */
+  readonly #owned: Map<string, DisposableResource[]>;
   /** Exactly the nodes this load added to `threeScene`, so teardown touches nothing else. */
   readonly #added: THREE.Object3D[];
 
@@ -182,6 +191,7 @@ export class LoadedScene {
     objects: Map<string, THREE.Object3D>;
     missingAssetIds: string[];
     disposables: DisposableResource[];
+    owned?: Map<string, DisposableResource[]>;
     added: THREE.Object3D[];
     instances?: InstanceManager | null;
   }) {
@@ -190,6 +200,7 @@ export class LoadedScene {
     this.#objects = init.objects;
     this.missingAssetIds = init.missingAssetIds;
     this.#disposables = init.disposables;
+    this.#owned = init.owned ?? new Map();
     this.#added = init.added;
     this.instances = init.instances ?? null;
   }
@@ -263,13 +274,40 @@ export class LoadedScene {
     this.#objects.set(objectId, node);
     this.threeScene.add(node);
     this.#added.push(node);
-    this.#disposables.push(...disposables);
+
+    // A node coming back out of the loader's pool carries the resources it owned before it was
+    // recycled, since `release` parked them there rather than freeing them. Re-registering both
+    // sources is what keeps a spawn/despawn/respawn cycle from either leaking or double-freeing.
+    const parked = (node.userData['ownedDisposables'] as DisposableResource[] | undefined) ?? [];
+    delete node.userData['ownedDisposables'];
+
+    const owned = [...parked, ...disposables];
+    if (owned.length > 0) this.#owned.set(objectId, owned);
   }
 
-  /** Removes a node this scene owns and takes it out of the world. */
-  release(objectId: string): void {
+  /**
+   * Removes a node this scene owns and takes it out of the world, freeing what only it was using.
+   *
+   * Deleting an object used to detach the node and leave its GPU resources on the scene-wide list
+   * until the project closed — so a session that placed and deleted fifty trigger volumes held
+   * fifty edges geometries and fifty line materials it could never reach again. That is the
+   * un-disposed-on-delete leak, and this is where it is paid off.
+   *
+   * `keepResources` is for the object pool: a recycled node is going to be used again, so its
+   * resources are parked on the node rather than freed, and `adopt` picks them back up.
+   */
+  release(objectId: string, options: { keepResources?: boolean } = {}): void {
     const node = this.#objects.get(objectId);
     if (!node) return;
+
+    const owned = this.#owned.get(objectId);
+    // Deleted from the map either way: leaving the entry behind would make `dispose` free
+    // resources a second time, or free ones the pool has already handed to another object.
+    this.#owned.delete(objectId);
+    if (owned) {
+      if (options.keepResources) node.userData['ownedDisposables'] = owned;
+      else for (const disposable of owned) disposable.dispose();
+    }
 
     this.instances?.remove(objectId);
     this.#objects.delete(objectId);
@@ -319,6 +357,13 @@ export class LoadedScene {
 
   dispose(): void {
     this.instances?.dispose();
+    // Per-object resources first, and only the ones still held: anything already released has been
+    // freed and taken out of the map, so nothing here is disposed twice.
+    for (const owned of this.#owned.values()) {
+      for (const disposable of owned) disposable.dispose();
+    }
+    this.#owned.clear();
+
     for (const disposable of this.#disposables) {
       disposable.dispose();
     }
@@ -441,6 +486,15 @@ export class SceneLoader {
 
   /** Releases the models this loader preloaded. Loaded scenes hold clones and are unaffected. */
   disposeModels(): void {
+    // Pooled nodes may be parked holding resources they exclusively own (see `recycle`). Dropping
+    // the pool without freeing those is the same leak in a quieter place.
+    for (const pool of this.#pool.values()) {
+      for (const node of pool) {
+        const parked = node.userData['ownedDisposables'] as DisposableResource[] | undefined;
+        for (const disposable of parked ?? []) disposable.dispose();
+        delete node.userData['ownedDisposables'];
+      }
+    }
     this.#pool.clear();
     this.#models.clear();
     this.#modelSource?.dispose();
@@ -476,12 +530,16 @@ export class SceneLoader {
     const materialCache = new Map<string, THREE.Material>();
     const geometryCache = new Map<string, THREE.BufferGeometry>();
 
+    const owned = new Map<string, DisposableResource[]>();
+
     for (const object of scene.objects) {
       const entry = this.#resolveEntry(object, missingAssetIds);
+      const mine: DisposableResource[] = [];
       objects.set(
         object.id,
-        this.#buildObject(object, entry, geometryCache, materialCache, disposables),
+        this.#buildObject(object, entry, geometryCache, materialCache, disposables, mine),
       );
+      if (mine.length > 0) owned.set(object.id, mine);
     }
 
     const batched = this.#chooseBatched(scene);
@@ -522,6 +580,7 @@ export class SceneLoader {
       objects,
       missingAssetIds,
       disposables,
+      owned,
       added,
       instances,
     });
@@ -631,10 +690,13 @@ export class SceneLoader {
       return pooled;
     }
 
-    const disposables: DisposableResource[] = [];
+    // Both sinks are the same array here, and legitimately so: the caches are created fresh for
+    // this one call, so nothing built below is shared with any other object and all of it can be
+    // freed the moment this object is deleted.
+    const own: DisposableResource[] = [];
     const entry = this.#resolver.get(object.assetId) ?? MISSING_ASSET_ENTRY;
-    const node = this.#buildObject(object, entry, new Map(), new Map(), disposables);
-    loaded.adopt(object.id, node, disposables);
+    const node = this.#buildObject(object, entry, new Map(), new Map(), own, own);
+    loaded.adopt(object.id, node, own);
     return node;
   }
 
@@ -642,19 +704,26 @@ export class SceneLoader {
    * Takes an object out of the world and keeps its node for the next spawn of the same asset.
    *
    * The cap is what stops a wave-spawner from turning the pool into a leak: past it, the node is
-   * simply dropped and collected normally. Its geometry and materials are shared with the rest of
-   * the scene either way, so nothing is disposed here.
+   * dropped — and anything it exclusively owned is freed here, because a dropped node is the one
+   * path where nobody else will ever get the chance to.
    */
   recycle(loaded: LoadedScene, objectId: string): void {
     const node = loaded.objects.get(objectId);
-    loaded.release(objectId);
+    // `keepResources` because a pooled node is going to be spawned again: freeing its geometry
+    // here would hand the next spawn a node with nothing left to draw. `release` parks them on the
+    // node, and `adopt` picks them back up when it is reused.
+    loaded.release(objectId, { keepResources: true });
     if (!node) return;
 
     const assetId = String(node.userData['assetId'] ?? '');
-    if (!assetId) return;
+    const pool = assetId === '' ? null : (this.#pool.get(assetId) ?? []);
 
-    const pool = this.#pool.get(assetId) ?? [];
-    if (pool.length >= POOL_LIMIT_PER_ASSET) return;
+    if (!pool || pool.length >= POOL_LIMIT_PER_ASSET) {
+      const parked = node.userData['ownedDisposables'] as DisposableResource[] | undefined;
+      for (const disposable of parked ?? []) disposable.dispose();
+      delete node.userData['ownedDisposables'];
+      return;
+    }
 
     node.visible = false;
     pool.push(node);
@@ -669,17 +738,26 @@ export class SceneLoader {
     return total;
   }
 
+  /**
+   * Builds one object's node.
+   *
+   * Two sinks rather than one, and which resource goes where is the whole leak story: `disposables`
+   * takes the *shared* things — the placeholder geometry and material caches, keyed by asset, used
+   * by every object of that asset — and `owned` takes what belongs to this object alone. Only the
+   * second can be freed when the object is deleted.
+   */
   #buildObject(
     object: SceneObject,
     entry: AssetManifestEntry,
     geometryCache: Map<string, THREE.BufferGeometry>,
     materialCache: Map<string, THREE.Material>,
     disposables: DisposableResource[],
+    owned: DisposableResource[],
   ): THREE.Object3D {
     // A trigger is not a thing you look at, so it gets an outline instead of a model.
     const model = object.trigger ? undefined : this.#models.get(entry.id);
     const visual = object.trigger
-      ? buildTriggerVisual(object.trigger.shape, disposables)
+      ? buildTriggerVisual(object.trigger.shape, owned)
       : model
         ? model.clone(true)
         : new THREE.Mesh(
