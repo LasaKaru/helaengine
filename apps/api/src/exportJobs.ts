@@ -130,13 +130,25 @@ export async function createExportJob(
       input.organizationId,
     ]);
 
-    const tierRow = await client.query<{ plan_tier: PlanTier }>(
-      'select plan_tier from organizations where id = $1',
+    /**
+     * The tier comes from the subscription now (Sprint 35), inside the same transaction.
+     *
+     * Same query the guards use, so there is one answer to "what may this organisation do" rather
+     * than an export-shaped copy of it. Left join, because no subscription row means the free tier
+     * or whatever an operator set by hand — see `loadSubscription`.
+     */
+    const tierRow = await client.query<{ tier: PlanTier; status: string }>(
+      `select coalesce(s.tier, o.plan_tier) as tier,
+              coalesce(s.status, case when o.plan_tier = 'free' then 'none' else 'active' end) as status
+         from organizations o
+         left join subscriptions s on s.organization_id = o.id
+        where o.id = $1`,
       [input.organizationId],
     );
-    const tier = tierRow.rows[0]?.plan_tier;
-    if (!tier) throw new NotFound('no such organization');
+    const row = tierRow.rows[0];
+    if (!row) throw new NotFound('no such organization');
 
+    const tier = row.status === 'none' ? 'free' : row.tier;
     const limit = EXPORTS_PER_PERIOD[tier];
     const since = new Date(Date.now() - QUOTA_PERIOD_MS);
 

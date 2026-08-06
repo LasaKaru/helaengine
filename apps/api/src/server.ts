@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import { timingSafeEqual } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { trace } from '@opentelemetry/api';
 import { ZodError } from 'zod';
 import {
@@ -12,11 +12,32 @@ import {
   traceCarrier,
 } from '@helaengine/telemetry';
 import { audit, listAudit } from './audit.js';
+import {
+  applySubscription,
+  claimEvent,
+  LimitReached,
+  loadSubscription,
+  organizationForCustomer,
+  requireCustomAssets,
+  requireSeat,
+  requireStorage,
+  usageOf,
+} from './billing.js';
+import {
+  createBillingProvider,
+  InvalidSignature,
+  LocalBilling,
+  type BillingProvider,
+} from './billingProvider.js';
 import { clientAddress, Throttle } from './throttle.js';
 import { createObserver, type ApiTelemetry } from './observability.js';
 import {
   AssetCategorySchema,
+  entitledTier,
   EXPORTS_PER_PERIOD,
+  PLAN_LIMITS,
+  PlanTierSchema,
+  type BillingSummary,
   InviteRequestSchema,
   remainingExports,
   LoginRequestSchema,
@@ -116,6 +137,13 @@ export interface ApiOptions {
    */
   telemetry?: ApiTelemetry;
   /**
+   * Who takes the money.
+   *
+   * Absent means `NoBilling` — enforcement still real, payment simply impossible, which is what a
+   * self-hosted install wants. See `billingProvider.ts`.
+   */
+  billing?: BillingProvider;
+  /**
    * Rate limiters, overridable so tests can drive the *boundary* rather than sit through a minute.
    *
    * Injected rather than configured by numbers, because what a test needs is a clock it controls,
@@ -156,6 +184,7 @@ export function createApiServer(options: ApiOptions): Server {
     log: createLogger({ service: 'api', level: 'warn' }),
   };
   const observer = createObserver(telemetry, db);
+  const billing = options.billing ?? createBillingProvider();
 
   /**
    * Guessing costs something now (Sprint 34).
@@ -212,9 +241,40 @@ export function createApiServer(options: ApiOptions): Server {
     void observer
       .observe(request, response, () => handle(request, response))
       .catch((error: unknown) => {
+        /**
+         * The richest handler first.
+         *
+         * This ordering is load-bearing and was wrong once: the generic "does it carry a status"
+         * branch below matched `LimitReached` — which does carry one — and answered 402 with only
+         * a sentence, throwing away the machine-readable part the editor needs to show an upgrade.
+         * The status was right and the body was useless, which is the sort of bug that passes a
+         * casual test.
+         */
+        if (error instanceof LimitReached) {
+          send(response, error.status, error.detail);
+          return;
+        }
+
         const status = (error as { status?: number }).status;
         if (typeof status === 'number') {
           send(response, status, { error: (error as Error).message });
+          return;
+        }
+        /**
+         * A limit is 402, not 403, and carries what was hit.
+         *
+         * 403 means "you may not", which is a wall. 402 Payment Required means "not on this plan",
+         * which is a door — and the body says which limit, what the allowance is, and the cheapest
+         * plan that lifts it, so the editor can show an upgrade rather than a toast.
+         */
+        if (error instanceof InvalidSignature) {
+          // 400 rather than 401: there is no session to be unauthorised for, and a provider reading
+          // this is a machine that needs to know the request was malformed, not to log in.
+          send(response, error.status, { error: error.message });
+          return;
+        }
+        if (error instanceof LimitReached) {
+          send(response, error.status, error.detail);
           return;
         }
         if (error instanceof ZodError) {
@@ -380,6 +440,149 @@ export function createApiServer(options: ApiOptions): Server {
       return;
     }
 
+    /**
+     * The webhook, where money becomes entitlement.
+     *
+     * Before `identify`, and it has to be: a payment provider holds no session. What authorises it
+     * is the signature over the raw body, which is why the body is read as text and verified before
+     * anything is parsed — verifying a *re-serialised* object is the classic way to make a
+     * signature check that passes for payloads it should not.
+     *
+     * Every event is claimed by id first. Providers deliver at least once and mean it, so a
+     * redelivered `invoice.paid` is a second upgrade and a redelivered deletion arriving after an
+     * upgrade would undo it.
+     */
+    /**
+     * The local provider's checkout page.
+     *
+     * A real page a browser lands on, with a button that completes the purchase — served by this
+     * API because `LocalBilling` has no hosted one. It exists so the *whole* flow can be walked and
+     * tested: press upgrade in the editor, land here, pay, get a webhook, watch the entitlement
+     * change. A mock that returned a canned session would skip every part where this goes wrong.
+     *
+     * Only reachable when `BILLING_LOCAL_SECRET` is set, which is opt-in precisely because a
+     * deployment that accepted pretend payments by accident would be a very bad surprise.
+     */
+    if (path === '/billing/checkout' && method === 'GET') {
+      if (!(billing instanceof LocalBilling)) return void response.writeHead(404).end();
+
+      const organizationId = url.searchParams.get('organizationId') ?? '';
+      const tier = PlanTierSchema.safeParse(url.searchParams.get('tier'));
+      const back = url.searchParams.get('successUrl') ?? '/';
+      if (!organizationId || !tier.success) {
+        return send(response, 400, { error: 'that checkout link is not valid' });
+      }
+
+      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      response.end(localCheckoutPage(organizationId, tier.data, back));
+      return;
+    }
+
+    if (path === '/billing/checkout' && method === 'POST') {
+      if (!(billing instanceof LocalBilling)) return void response.writeHead(404).end();
+
+      const body = JSON.parse(await readBody(request)) as {
+        organizationId?: unknown;
+        tier?: unknown;
+      };
+      const organizationId = typeof body.organizationId === 'string' ? body.organizationId : '';
+      const tier = PlanTierSchema.safeParse(body.tier);
+      if (!organizationId || !tier.success) {
+        return send(response, 400, { error: 'that checkout is not valid' });
+      }
+
+      /**
+       * The payment "succeeds", and then this posts itself a webhook.
+       *
+       * Deliberately the long way round rather than writing the subscription directly: the webhook
+       * is how entitlement changes in production, so making the local flow take the same path means
+       * the signature check, the idempotency claim and the audit entry are all exercised by an
+       * ordinary upgrade rather than only by a test that targets them.
+       */
+      const payload = JSON.stringify({
+        id: `evt_local_${randomUUID()}`,
+        type: 'checkout.session.completed',
+        organizationId,
+        customer: organizationId,
+        subscription: `sub_local_${organizationId.slice(0, 8)}`,
+        tier: tier.data,
+        status: 'active',
+        currentPeriodEnd: Date.now() + 30 * 24 * 60 * 60 * 1000,
+      });
+
+      const delivered = await fetch(`${selfOrigin(request)}/billing/webhook`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-billing-signature': billing.sign(payload),
+        },
+        body: payload,
+      });
+
+      return send(response, delivered.ok ? 200 : 502, { ok: delivered.ok });
+    }
+
+    if (path === '/billing/webhook' && method === 'POST') {
+      const raw = await readBody(request);
+      const event = billing.interpret(
+        raw,
+        headerValue(request, 'stripe-signature') ?? headerValue(request, 'x-billing-signature'),
+      );
+
+      if (!(await claimEvent(db, event.id, event.type))) {
+        // Already handled. 200, because a provider that gets anything else retries for hours.
+        return send(response, 200, { ok: true, duplicate: true });
+      }
+
+      if (!event.change) return send(response, 200, { ok: true, ignored: event.type });
+
+      const organizationId =
+        event.change.organizationId ??
+        (await organizationForCustomer(db, event.change.externalCustomer));
+
+      if (!organizationId) {
+        // A paid subscription this system cannot attribute. 200 so the provider stops retrying,
+        // and loud in the log because it means somebody is paying for nothing.
+        telemetry.log.error('billing event names no organisation this system knows', {
+          event: event.id,
+          type: event.type,
+          customer: event.change.externalCustomer,
+        });
+        return send(response, 200, { ok: true, unattributed: true });
+      }
+
+      const before = await loadSubscription(db, organizationId);
+      const after = await applySubscription(db, {
+        organizationId,
+        tier: event.change.tier,
+        status: event.change.status,
+        externalId: event.change.externalId,
+        externalCustomer: event.change.externalCustomer || organizationId,
+        currentPeriodEnd: event.change.currentPeriodEnd,
+        cancelAt: event.change.cancelAt,
+      });
+
+      await audit(
+        db,
+        {
+          organizationId,
+          // No actor: this is the provider talking, not a person. A user id here would be a lie
+          // about who did it.
+          actorUserId: null,
+          action: 'billing.changed',
+          subject: event.change.externalId,
+          detail: {
+            from: `${before.tier}/${before.status}`,
+            to: `${after.tier}/${after.status}`,
+            event: event.type,
+          },
+        },
+        telemetry.log,
+      );
+
+      return send(response, 200, { ok: true });
+    }
+
     const uploadMatch = new RegExp(`^/uploads/(${UUID})/([a-z0-9_]+)$`).exec(path);
     if (uploadMatch && method === 'PUT') {
       // Deliberately before `identify`. The ticket *is* the authorisation — that is what makes a
@@ -394,6 +597,11 @@ export function createApiServer(options: ApiOptions): Server {
       verifyTicket(uploadSecret, ticket);
 
       const bytes = await readBytes(request);
+      // Checked once the size is known, which is the only moment it can be: a ticket is issued
+      // before anybody knows how big the file is. Refusing here costs the upload, which is why the
+      // *feature* gate above happens at ticket time — a free-tier user never gets this far.
+      await requireStorage(db, ticket.organizationId, bytes.byteLength);
+
       const asset = await completeUpload(db, storage, {
         organizationId: ticket.organizationId,
         assetId: ticket.assetId,
@@ -552,6 +760,9 @@ export function createApiServer(options: ApiOptions): Server {
       await requireRole(db, organizationId, userId, 'admin');
 
       const body = InviteRequestSchema.parse(JSON.parse(await readBody(request)));
+      // Before the invite is written, not after: a limit enforced afterwards is a limit that has
+      // already been exceeded. Outstanding invitations count as seats — see `requireSeat`.
+      await requireSeat(db, organizationId);
       const held = await roleIn(db, organizationId, userId);
       // Nobody may invite somebody more powerful than themselves. Without this, an admin promotes a
       // friend to owner and the privilege ladder has a rung that goes upwards.
@@ -723,6 +934,78 @@ export function createApiServer(options: ApiOptions): Server {
      * disgruntled member should not be able to read on their way out. And it is per organisation,
      * because there is no such thing as a global view of it in a multi-tenant product.
      */
+    /**
+     * The billing screen, in one response.
+     *
+     * Viewer rather than admin: everybody in an organisation benefits from knowing that four of
+     * five exports are spent, and a meter only the owner can see is a meter nobody looks at until
+     * it is empty. Changing the plan is a different matter — see the checkout route.
+     */
+    const billingMatch = new RegExp(`^/orgs/(${UUID})/billing$`).exec(path);
+    if (billingMatch && method === 'GET') {
+      const organizationId = billingMatch[1]!;
+      await requireRole(db, organizationId, userId, 'viewer');
+
+      const subscription = await loadSubscription(db, organizationId);
+      return send(response, 200, {
+        subscription,
+        limits: PLAN_LIMITS[entitledTier(subscription)],
+        usage: await usageOf(db, organizationId),
+        // False on a self-hosted install, and the editor shows the plan without an upgrade button
+        // rather than a button that fails.
+        checkoutAvailable: billing.available,
+      } satisfies BillingSummary);
+    }
+
+    const checkoutMatch = new RegExp(`^/orgs/(${UUID})/billing/checkout$`).exec(path);
+    if (checkoutMatch && method === 'POST') {
+      const organizationId = checkoutMatch[1]!;
+      // Owner. Changing what an organisation pays is not day-to-day work, and an admin who can
+      // invite people should not also be able to commit the owner to a larger monthly bill.
+      await requireRole(db, organizationId, userId, 'owner');
+
+      const body = JSON.parse(await readBody(request)) as { tier?: unknown; returnUrl?: unknown };
+      const tier = PlanTierSchema.safeParse(body.tier);
+      if (!tier.success) {
+        return send(response, 400, {
+          error: `tier: must be one of ${PlanTierSchema.options.join(', ')}`,
+        });
+      }
+      if (tier.data === 'free') {
+        return send(response, 400, {
+          error: 'To move down to Free, cancel from the billing portal.',
+        });
+      }
+
+      const returnUrl = typeof body.returnUrl === 'string' ? body.returnUrl : '/';
+      const subscription = await loadSubscription(db, organizationId);
+      const session = await billing.checkout({
+        organizationId,
+        tier: tier.data,
+        successUrl: returnUrl,
+        cancelUrl: returnUrl,
+        externalCustomer: subscription.externalId === null ? null : organizationId,
+      });
+
+      return send(response, 200, { url: session.url });
+    }
+
+    const portalMatch = new RegExp(`^/orgs/(${UUID})/billing/portal$`).exec(path);
+    if (portalMatch && method === 'POST') {
+      const organizationId = portalMatch[1]!;
+      await requireRole(db, organizationId, userId, 'owner');
+
+      const body = JSON.parse(await readBody(request)) as { returnUrl?: unknown };
+      const portal = await billing.portal(
+        organizationId,
+        typeof body.returnUrl === 'string' ? body.returnUrl : '/',
+      );
+      if (!portal) {
+        return send(response, 409, { error: 'there is no subscription to manage yet' });
+      }
+      return send(response, 200, { url: portal.url });
+    }
+
     const auditMatch = new RegExp(`^/orgs/(${UUID})/audit$`).exec(path);
     if (auditMatch && method === 'GET') {
       const organizationId = auditMatch[1]!;
@@ -1002,6 +1285,9 @@ export function createApiServer(options: ApiOptions): Server {
       const organizationId = assetsMatch[1]!;
       // Editor: uploading an asset is making something, which is what the role is for.
       await requireRole(db, organizationId, userId, 'editor');
+      // The one hard feature gate. Refused here, before a ticket is issued, so a free-tier user is
+      // told why at the moment they press the button rather than after uploading 20 MB.
+      await requireCustomAssets(db, organizationId);
 
       const body = JSON.parse(await readBody(request)) as {
         assetId?: unknown;
@@ -1082,6 +1368,54 @@ export function createApiServer(options: ApiOptions): Server {
  * against a scrape token and a real one against anything else, and the habit is worth more than the
  * argument about whether this particular token is worth defending.
  */
+/**
+ * The local checkout page.
+ *
+ * Plain HTML with no framework and no styling to speak of, because it is a stand-in for a hosted
+ * page that a payment provider would render — making it pretty would be effort spent on the part
+ * that gets deleted the day a Stripe key appears.
+ */
+function localCheckoutPage(organizationId: string, tier: string, back: string): string {
+  const escaped = (value: string): string =>
+    value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+
+  return `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Upgrade to ${escaped(tier)}</title></head>
+<body style="font-family: system-ui; max-width: 32rem; margin: 4rem auto; line-height: 1.5">
+  <h1>Upgrade to ${escaped(tier)}</h1>
+  <p><strong>This deployment is not connected to a payment provider.</strong> No card is taken and
+  no money moves. Pressing the button below does exactly what a completed payment would do: it
+  delivers a signed webhook, and your plan changes.</p>
+  <button id="pay" style="font-size: 1rem; padding: 0.6rem 1.2rem">Complete the upgrade</button>
+  <p id="state" role="status"></p>
+  <script>
+    document.getElementById('pay').addEventListener('click', async () => {
+      document.getElementById('state').textContent = 'Working…';
+      const response = await fetch('/billing/checkout', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ organizationId: ${JSON.stringify(organizationId)}, tier: ${JSON.stringify(tier)} }),
+      });
+      document.getElementById('state').textContent = response.ok ? 'Done. Returning…' : 'That failed.';
+      if (response.ok) setTimeout(() => { window.location.href = ${JSON.stringify(back)}; }, 600);
+    });
+  </script>
+</body>
+</html>`;
+}
+
+/** Where this server is reachable from, for the local provider posting itself a webhook. */
+function selfOrigin(request: IncomingMessage): string {
+  return `http://${request.headers.host ?? 'localhost'}`;
+}
+
+/** One header value, since Node hands back `string | string[]`. */
+function headerValue(request: IncomingMessage, name: string): string | undefined {
+  const value = request.headers[name];
+  return Array.isArray(value) ? value[0] : value;
+}
+
 function bearerMatches(request: IncomingMessage, expected: string): boolean {
   const header = request.headers.authorization ?? '';
   const offered = header.startsWith('Bearer ') ? header.slice('Bearer '.length) : '';

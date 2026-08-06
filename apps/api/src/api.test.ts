@@ -18,6 +18,7 @@ import { hashToken, pruneExpiredCredentials } from './auth.js';
 import { expiredArtifacts, forgetArtifact } from './exportJobs.js';
 import { createApiServer } from './server.js';
 import { Throttle } from './throttle.js';
+import { LocalBilling } from './billingProvider.js';
 import { routePattern } from './observability.js';
 
 /**
@@ -174,6 +175,25 @@ async function signup(
     token: created.body.session.token,
     personalOrganizationId: created.body.personalOrganizationId,
   };
+}
+
+/**
+ * Puts an organisation on a paid plan, the way an operator or a completed checkout would.
+ *
+ * Sprint 35 made several things paid features — custom asset uploads most visibly — so tests that
+ * exercise them have to say which plan they are on. That is not test scaffolding around an
+ * inconvenience; it is the product being explicit about what a free account can do, and the tests
+ * saying so out loud is an improvement on them silently assuming everything was free.
+ */
+async function upgrade(organizationId: string, tier = 'pro'): Promise<void> {
+  await db.query(
+    // Three parameters rather than reusing one: Postgres cannot deduce a single parameter used as
+    // both a uuid and text, and says so in one of its more cryptic messages.
+    `insert into subscriptions (organization_id, tier, status, external_customer)
+     values ($1, $2, 'active', $3)
+     on conflict (organization_id) do update set tier = excluded.tier, status = 'active'`,
+    [organizationId, tier, organizationId],
+  );
 }
 
 describe('session tokens', () => {
@@ -363,6 +383,9 @@ describe('organisations and invites', () => {
       body: { name: 'Ladder' },
     });
     const organizationId = org.body.organization.id;
+    // Three people are involved before the rule under test comes into play, and Free seats two.
+    // The rank rule is what this is about, not the seat limit — which has its own tests.
+    await upgrade(organizationId);
 
     await call('POST', `/orgs/${organizationId}/invites`, {
       token: owner.token,
@@ -734,6 +757,9 @@ describe('assets', () => {
     userId: string;
   }> {
     const owner = await signup(`uploader-${Math.random().toString(36).slice(2)}@example.com`);
+    // Uploading your own models is a Pro feature now. These tests are about what happens *after*
+    // that gate, which has its own tests below.
+    await upgrade(owner.personalOrganizationId);
     return {
       token: owner.token,
       organizationId: owner.personalOrganizationId,
@@ -1611,6 +1637,9 @@ describe('one organisation cannot reach another', () => {
 
   async function tenant(label: string): Promise<Tenant> {
     const owner = await signup(`${label}-${Math.random().toString(36).slice(2)}@example.com`);
+    // On a paid plan so it owns one of everything worth stealing — an upload is a Pro feature, and
+    // a tenant with no assets would leave the asset routes untested for isolation.
+    await upgrade(owner.personalOrganizationId);
 
     const created = await call<{ project: { id: string } }>(
       'POST',
@@ -1919,6 +1948,7 @@ describe('the audit trail', () => {
   it('records an asset deletion', async () => {
     const owner = await signup('audit-assets@example.com');
     const org = owner.personalOrganizationId;
+    await upgrade(org);
 
     await call('POST', `/orgs/${org}/assets`, {
       token: owner.token,
@@ -2287,5 +2317,318 @@ describe('CORS', () => {
     // never offer. Auth here is a bearer token, so nothing ambient is ever attached.
     expect(response.headers.get('access-control-allow-credentials')).toBeNull();
     expect(response.headers.get('access-control-allow-origin')).toBe('*');
+  });
+});
+
+/**
+ * Sprint 35 — the business model, enforced.
+ *
+ * Driven through the local provider, which is a real implementation of the billing port with the
+ * network removed rather than a mock: pressing "upgrade" produces a checkout URL, the checkout
+ * posts a *signed webhook* to this API, and the webhook is what changes the entitlement. Every part
+ * of that path — signature, idempotency, attribution, audit — is the same code a Stripe deployment
+ * runs. What is not exercised is Stripe itself, and no test here pretends otherwise.
+ */
+describe('plans, limits and money', () => {
+  let paid: Server;
+  let paidOrigin: string;
+  let provider: LocalBilling;
+
+  beforeAll(async () => {
+    provider = new LocalBilling({ secret: 'test-billing-secret', origin: 'http://127.0.0.1:0' });
+    paid = createApiServer({
+      db,
+      storage,
+      exportStorage,
+      billing: provider,
+      // This server needs the same invite capture as the main one — without it an invitation goes
+      // to the logger and a test reaching for `invites.at(-1)` finds nothing.
+      sendInvite: (invite) => invites.push({ email: invite.email, token: invite.token }),
+      throttles: {
+        signupByAddress: new Throttle({ limit: 100_000, windowMs: 1000 }),
+        loginByAddress: new Throttle({ limit: 100_000, windowMs: 1000 }),
+        loginByAccount: new Throttle({ limit: 100_000, windowMs: 1000 }),
+        inviteByAddress: new Throttle({ limit: 100_000, windowMs: 1000 }),
+      },
+      telemetry: {
+        tracer: telemetry.tracer,
+        metrics,
+        log: createLogger({ service: 'api', level: 'error', write: () => {} }),
+      },
+    });
+    await new Promise<void>((done) => paid.listen(0, '127.0.0.1', done));
+    paidOrigin = `http://127.0.0.1:${(paid.address() as { port: number }).port}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((done) => paid.close(() => done()));
+  });
+
+  async function on<T = Record<string, unknown>>(
+    method: string,
+    path: string,
+    options: { token?: string; body?: unknown } = {},
+  ): Promise<{ status: number; body: T }> {
+    const response = await fetch(`${paidOrigin}${path}`, {
+      method,
+      headers: {
+        'content-type': 'application/json',
+        ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
+      },
+      ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
+    });
+    const text = await response.text();
+    return { status: response.status, body: (text ? JSON.parse(text) : {}) as T };
+  }
+
+  /** Delivers a signed webhook the way the provider would. */
+  async function webhook(event: Record<string, unknown>): Promise<number> {
+    const payload = JSON.stringify(event);
+    const response = await fetch(`${paidOrigin}/billing/webhook`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-billing-signature': provider.sign(payload),
+      },
+      body: payload,
+    });
+    return response.status;
+  }
+
+  it('refuses a custom asset upload on the free plan, with the way out attached', async () => {
+    const owner = await signup('free-uploader@example.com');
+
+    const refused = await on<{ error: string; kind: string; upgradeTo: string }>(
+      'POST',
+      `/orgs/${owner.personalOrganizationId}/assets`,
+      { token: owner.token, body: { assetId: 'my_prop', name: 'Mine', category: 'props' } },
+    );
+
+    // 402, not 403. "You may not" is a wall; "not on this plan" is a door, and the body carries
+    // enough for the editor to show the door rather than parse a sentence.
+    expect(refused.status).toBe(402);
+    expect(refused.body.kind).toBe('customAssets');
+    expect(refused.body.upgradeTo).toBe('pro');
+    expect(refused.body.error).toContain('Pro');
+  });
+
+  it('unlocks it after a checkout, with no manual step in between', async () => {
+    const owner = await signup('upgrader@example.com');
+    const org = owner.personalOrganizationId;
+
+    const checkout = await on<{ url: string }>('POST', `/orgs/${org}/billing/checkout`, {
+      token: owner.token,
+      body: { tier: 'pro', returnUrl: '/' },
+    });
+    expect(checkout.status).toBe(200);
+    expect(checkout.body.url).toContain('/billing/checkout?');
+
+    // What the checkout page's button does when the payment clears.
+    expect(
+      await webhook({
+        id: `evt_${Math.random().toString(36).slice(2)}`,
+        type: 'checkout.session.completed',
+        organizationId: org,
+        customer: org,
+        subscription: 'sub_test_1',
+        tier: 'pro',
+        status: 'active',
+        currentPeriodEnd: Date.now() + 30 * 24 * 60 * 60 * 1000,
+      }),
+    ).toBe(200);
+
+    // The definition of done: the feature is available immediately, with nobody touching a database.
+    const allowed = await on('POST', `/orgs/${org}/assets`, {
+      token: owner.token,
+      body: { assetId: 'my_prop', name: 'Mine', category: 'props' },
+    });
+    expect(allowed.status).toBe(201);
+  });
+
+  it('acts on a redelivered webhook exactly once', async () => {
+    const owner = await signup('redelivered@example.com');
+    const org = owner.personalOrganizationId;
+    const event = {
+      id: 'evt_redelivered_once',
+      type: 'checkout.session.completed',
+      organizationId: org,
+      customer: org,
+      subscription: 'sub_test_2',
+      tier: 'pro',
+      status: 'active',
+    };
+
+    expect(await webhook(event)).toBe(200);
+    // Providers deliver at least once and mean it. Without the claim, this second delivery is a
+    // second upgrade — and a redelivered *deletion* would undo an upgrade that happened between.
+    expect(await webhook(event)).toBe(200);
+
+    const trail = await on<{ entries: Array<{ action: string }> }>('GET', `/orgs/${org}/audit`, {
+      token: owner.token,
+    });
+    expect(trail.body.entries.filter((entry) => entry.action === 'billing.changed')).toHaveLength(
+      1,
+    );
+  });
+
+  it('refuses a webhook nobody signed', async () => {
+    const forged = await fetch(`${paidOrigin}/billing/webhook`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-billing-signature': 'nonsense' },
+      body: JSON.stringify({
+        id: 'evt_forged',
+        type: 'checkout.session.completed',
+        tier: 'enterprise',
+      }),
+    });
+    // The one place where getting it wrong lets anybody on the internet upgrade themselves free.
+    expect(forged.status).toBe(400);
+  });
+
+  it('keeps entitlement while a payment is being retried, and drops it when it is over', async () => {
+    const owner = await signup('past-due@example.com');
+    const org = owner.personalOrganizationId;
+
+    await webhook({
+      id: `evt_${Math.random().toString(36).slice(2)}`,
+      type: 'checkout.session.completed',
+      organizationId: org,
+      customer: org,
+      subscription: 'sub_test_3',
+      tier: 'pro',
+      status: 'active',
+    });
+
+    await webhook({
+      id: `evt_${Math.random().toString(36).slice(2)}`,
+      type: 'customer.subscription.updated',
+      organizationId: org,
+      customer: org,
+      subscription: 'sub_test_3',
+      tier: 'pro',
+      status: 'past_due',
+    });
+
+    // A customer whose card expired is a customer, not an intruder: they keep working while the
+    // provider retries, which it does for days.
+    expect(
+      (
+        await on('POST', `/orgs/${org}/assets`, {
+          token: owner.token,
+          body: { assetId: 'still_works', name: 'Still works', category: 'props' },
+        })
+      ).status,
+    ).toBe(201);
+
+    await webhook({
+      id: `evt_${Math.random().toString(36).slice(2)}`,
+      type: 'customer.subscription.deleted',
+      organizationId: org,
+      customer: org,
+      subscription: 'sub_test_3',
+      tier: 'free',
+      status: 'none',
+    });
+
+    expect(
+      (
+        await on('POST', `/orgs/${org}/assets`, {
+          token: owner.token,
+          body: { assetId: 'no_longer', name: 'No longer', category: 'props' },
+        })
+      ).status,
+    ).toBe(402);
+  });
+
+  it('counts a seat before it is taken, invitations included', async () => {
+    const owner = await signup('seat-counter@example.com');
+    const org = owner.personalOrganizationId;
+
+    // Free seats two: the owner, and one more.
+    const first = await on('POST', `/orgs/${org}/invites`, {
+      token: owner.token,
+      body: { email: 'friend@example.com', role: 'editor' },
+    });
+    expect(first.status).toBe(201);
+
+    const second = await on<{ kind: string; used: number; limit: number }>(
+      'POST',
+      `/orgs/${org}/invites`,
+      { token: owner.token, body: { email: 'another@example.com', role: 'editor' } },
+    );
+
+    // The invitation counts even though nobody has accepted it. Otherwise fifty invitations to a
+    // one-seat plan are fifty members, each individually within the limit when it was checked.
+    expect(second.status).toBe(402);
+    expect(second.body.kind).toBe('seats');
+    expect(second.body.limit).toBe(2);
+  });
+
+  it('reports usage the server itself counts', async () => {
+    const owner = await signup('meter-reader@example.com');
+    const org = owner.personalOrganizationId;
+
+    const created = await on<{ project: { id: string } }>('POST', `/orgs/${org}/projects`, {
+      token: owner.token,
+      body: { name: 'Metered', scene: { sceneId: 's', version: 1, name: 'Metered', objects: [] } },
+    });
+    await on('POST', `/projects/${created.body.project.id}/exports`, { token: owner.token });
+
+    const summary = await on<{
+      usage: { exports: number; seats: number; storageBytes: number };
+      limits: { exportsPerPeriod: number };
+      subscription: { tier: string };
+      checkoutAvailable: boolean;
+    }>('GET', `/orgs/${org}/billing`, { token: owner.token });
+
+    expect(summary.status).toBe(200);
+    // Derived from `export_jobs`, not from a counter this code maintains — which is why it cannot
+    // disagree with what the quota enforces.
+    expect(summary.body.usage.exports).toBe(1);
+    expect(summary.body.usage.seats).toBe(1);
+    expect(summary.body.subscription.tier).toBe('free');
+    expect(summary.body.limits.exportsPerPeriod).toBe(5);
+    expect(summary.body.checkoutAvailable).toBe(true);
+  });
+
+  it('lets only an owner change what the organisation pays', async () => {
+    const owner = await signup('billing-owner@example.com');
+    const member = await signup('billing-member@example.com');
+    const org = owner.personalOrganizationId;
+
+    await on('POST', `/orgs/${org}/invites`, {
+      token: owner.token,
+      body: { email: 'billing-member@example.com', role: 'admin' },
+    });
+    await on('POST', '/invites/accept', {
+      token: member.token,
+      body: { token: invites.at(-1)!.token },
+    });
+
+    // An admin can invite people; committing the owner to a larger monthly bill is a different
+    // kind of act.
+    expect(
+      (
+        await on('POST', `/orgs/${org}/billing/checkout`, {
+          token: member.token,
+          body: { tier: 'pro' },
+        })
+      ).status,
+    ).toBe(403);
+
+    // But they can see the meters — a usage bar only the owner can read is one nobody looks at
+    // until it is empty.
+    expect((await on('GET', `/orgs/${org}/billing`, { token: member.token })).status).toBe(200);
+  });
+
+  it('sends somebody moving down to Free through the portal rather than checkout', async () => {
+    const owner = await signup('downgrader@example.com');
+    const refused = await on<{ error: string }>(
+      'POST',
+      `/orgs/${owner.personalOrganizationId}/billing/checkout`,
+      { token: owner.token, body: { tier: 'free' } },
+    );
+    expect(refused.status).toBe(400);
+    expect(refused.body.error).toMatch(/cancel/i);
   });
 });

@@ -26,6 +26,8 @@ export const AUDIT_ACTIONS = [
   'asset.deleted',
   'export.requested',
   'export.downloaded',
+  // No actor on these: the provider is talking, not a person (Sprint 35).
+  'billing.changed',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

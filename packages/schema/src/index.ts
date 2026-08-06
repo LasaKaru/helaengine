@@ -20,3 +20,4 @@ export * from './share.js';
 export * from './account.js';
 export * from './collab.js';
 export * from './exportJob.js';
+export * from './billing.js';
