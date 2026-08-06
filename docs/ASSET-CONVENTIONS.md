@@ -110,7 +110,41 @@ the answer usually belongs.
   and re-compressible as the pipeline improves
 - Animation: only if the asset is animated; bake all keyframes
 
-## 9. Ingest
+## 9. Importing a third-party pack
+
+Most of the library came from CC0 packs rather than being modelled here. `pnpm import-pack` is the
+path in:
+
+```bash
+pnpm import-pack -- --from /tmp/nature --pack nature-kit \
+  --author Kenney --license CC0-1.0 --url https://kenney.nl/assets/nature-kit
+pnpm ingest-assets
+```
+
+It **refuses to run without `--author`, `--license` and `--url`**, and stamps everything it writes
+`origin: 'third-party'`. That is not paperwork: an export reads these fields to write its
+`CREDITS.md`, so a pack imported without them ships somebody else's art uncredited in every game
+built from it. Check the licence yourself against the file bundled in the pack — not against what
+you remember about the publisher.
+
+Three behaviours worth knowing before you run it:
+
+- **Existing ids are never overwritten.** Several Kenney names collide with the hand-tuned starter
+  assets (`grass`, `tree_log`, `tree_small`), whose bounds and colliders were set deliberately. The
+  import skips them and says so.
+- **Filenames become snake_case ids.** `tree_pineDefaultA.glb` → `tree_pine_default_a`, matching the
+  `^[a-z0-9_]{3,60}$` the upload route already enforces on customers.
+- **Models are re-encoded, not copied.** Some packs reference a sibling `Textures/colormap.png`
+  rather than embedding it. Copying such a file produces a model that cannot be opened, and copying
+  the texture alongside is worse — different packs ship *different* atlases under that same name, so
+  one shared path silently repaints one pack with another's textures. The import reads each model
+  and rewrites it self-contained.
+
+Category is guessed from the filename prefix (`tree_`, `cliff_`, `wall_`…) and anything unrecognised
+becomes a prop. Fix any that land wrong by editing `asset-metadata.json` afterwards; the import will
+not touch them again.
+
+## 10. Ingest
 
 Drop finished `.glb` files into `raw-assets/` and run:
 
