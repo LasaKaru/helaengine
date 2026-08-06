@@ -268,7 +268,22 @@ export async function hideEditorOverlays(page: Page): Promise<void> {
    * CI for as long as the grid has existed. The failure looked like a rendering bug and was a test
    * comparing two things that are supposed to differ.
    */
-  await page.evaluate(() => window.helaengine?.hideEditorFurniture());
+  const hidden = await page.evaluate(() => window.helaengine?.hideEditorFurniture());
+
+  /**
+   * Asserted, not assumed.
+   *
+   * The first version of this called a function that looked the grid up by name, found nothing
+   * because drei does not forward one, hid nothing, and returned a truthy value anyway. That
+   * survived a sixteen-minute run and a confident report that the problem was fixed. A helper
+   * whose whole job is to change what is on screen has to say whether it did.
+   */
+  if (!hidden?.gridHidden) {
+    throw new Error('hideEditorFurniture did not hide the grid — the comparison would be invalid');
+  }
+
+  // One frame for React to unmount the grid before anything screenshots the canvas.
+  await page.waitForTimeout(120);
 }
 
 /** Asserts a screenshot pair matches, with a readable message when it does not. */

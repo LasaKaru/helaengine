@@ -98,6 +98,8 @@ export function Viewport({ loader, resolver }: ViewportProps): React.JSX.Element
   const tool = useEditorStore((state) => state.tool);
   const playing = useEditorStore((state) => state.playing);
   const walking = useEditorStore((state) => state.walking);
+  // Set by the export QA suite before it screenshots, so the comparison is scene against scene.
+  const furnitureHidden = useEditorStore((state) => state.furnitureHidden);
   const editingWaypoints = useEditorStore((state) => state.editingWaypoints);
   const playerHealth = useEditorStore((state) => state.playerHealth);
   const maxHealth = useSceneStore((state) => state.scene.player.health);
@@ -140,7 +142,7 @@ export function Viewport({ loader, resolver }: ViewportProps): React.JSX.Element
             <TransformGizmo />
           </>
         )}
-        {!walking && (
+        {!walking && !furnitureHidden && (
           <Grid
             // Named so it can be found and hidden. The export QA suite compares an editor
             // screenshot against an export of the same scene, and the grid is editor furniture that

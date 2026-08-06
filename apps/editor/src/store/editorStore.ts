@@ -68,6 +68,16 @@ export interface EditorState {
   walking: boolean;
   /** Rapier is WASM and loads asynchronously; the Walk button reflects this. */
   physicsStatus: PhysicsStatus;
+  /**
+   * Hides the editor's own furniture — the reference grid — so a screenshot can be compared
+   * against an export that correctly has none.
+   *
+   * A store flag rather than reaching into the scene graph, because the first attempt did exactly
+   * that: it looked the grid up by name, drei's `<Grid>` does not forward one to the mesh it
+   * renders, and the call hid nothing while reporting success. React knows whether it rendered a
+   * grid; a `getObjectByName` guess does not.
+   */
+  furnitureHidden: boolean;
   /** Player health while walking, mirrored out of the runtime so the HUD can render it. */
   playerHealth: number | null;
   /** Camera rig currently driving the view, or null when not walking. */
@@ -92,6 +102,7 @@ export interface EditorState {
   setPlaying(playing: boolean): void;
   setWalking(walking: boolean): void;
   setPhysicsStatus(status: PhysicsStatus): void;
+  setFurnitureHidden(hidden: boolean): void;
   setPlayerHealth(health: number | null): void;
   setCameraMode(mode: CameraMode | null): void;
   setUiScreen(screen: UiScreen | null): void;
@@ -114,6 +125,7 @@ export const useEditorStore = create<EditorState>()(
       playing: false,
       walking: false,
       physicsStatus: 'idle',
+      furnitureHidden: false,
       playerHealth: null,
       cameraMode: null,
       uiScreen: null,
@@ -167,6 +179,9 @@ export const useEditorStore = create<EditorState>()(
           'walk/set',
         ),
       setPhysicsStatus: (physicsStatus) => set({ physicsStatus }, false, 'physics/status'),
+
+      setFurnitureHidden: (furnitureHidden) =>
+        set({ furnitureHidden }, false, 'editor/furnitureHidden'),
       setPlayerHealth: (playerHealth) => set({ playerHealth }, false, 'play/health'),
       setCameraMode: (cameraMode) => set({ cameraMode }, false, 'play/cameraMode'),
       setUiScreen: (uiScreen) => set({ uiScreen }, false, 'play/uiScreen'),

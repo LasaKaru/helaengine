@@ -36,8 +36,8 @@ export interface DevApi {
   addObject(assetId: string, position?: Vec3, rotationY?: number): string;
   clear(): void;
   /** Object ids currently instantiated in the Three.js scene, not merely present in the store. */
-  /** Hides the editor's in-scene furniture (the reference grid). True when it found something. */
-  hideEditorFurniture(): boolean;
+  /** Hides the editor's own furniture before a screenshot. Reports what it actually hid. */
+  hideEditorFurniture(): { gridHidden: boolean; triggersHidden: number };
   viewportObjectIds(): string[];
   /** Per-object view of what the engine actually built, including whether a GLB or a placeholder. */
   viewportObjects(): Array<{ id: string; assetId: string; isModel: boolean }>;
@@ -431,24 +431,19 @@ export function exposeDevApi(library: AssetLibrary): void {
      * test comparing two things that are supposed to differ rather than a rendering bug.
      */
     hideEditorFurniture: () => {
-      const scene = currentLoadedScene?.threeScene;
-      if (!scene) return false;
-      const grid = scene.getObjectByName('editor-grid');
-      if (grid) grid.visible = false;
+      // The grid is React's to draw, so it is React that stops drawing it. The first version looked
+      // the mesh up by name; drei's `<Grid>` does not forward one, so it hid nothing and reported
+      // success — which survived a sixteen-minute run and a confident claim that it was fixed.
+      useEditorStore.getState().setFurnitureHidden(true);
 
       /**
-       * Trigger volumes, which are the same class of thing as the grid.
+       * Trigger volumes, which are ours and therefore findable.
        *
-       * A trigger is a yellow wireframe box the editor draws so you can see where the volume is.
-       * An export never renders one — `PhysicsPreview` hides them the moment play starts, for
-       * exactly this reason. Leaving them visible in the editor screenshot is comparing a level
-       * with wireframes against the same level without.
-       *
-       * Hiding the grid alone took Empty field and Forest clearing under budget and left Skirmish
-       * and Stress test over it, which is what pointed here: the ones still failing were the ones
-       * with triggers in them.
+       * A trigger is a yellow wireframe the editor draws so you can see where the volume is, and an
+       * export never renders one — `PhysicsPreview` already hides them when play starts, for
+       * exactly this reason.
        */
-      let hidden = grid === undefined ? 0 : 1;
+      let hidden = 0;
       for (const node of currentLoadedScene?.objects.values() ?? []) {
         if (node.userData['isTrigger']) {
           node.visible = false;
@@ -456,7 +451,7 @@ export function exposeDevApi(library: AssetLibrary): void {
         }
       }
 
-      return hidden > 0;
+      return { gridHidden: true, triggersHidden: hidden };
     },
 
     viewportObjectIds: () => [...(currentLoadedScene?.objects.keys() ?? [])],
