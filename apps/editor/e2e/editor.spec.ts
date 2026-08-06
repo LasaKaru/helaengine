@@ -3264,6 +3264,28 @@ test.describe('cloud save', () => {
  * in a unit test and wrong by one `./assets/` prefix in practice looks identical until something
  * tries to draw it.
  */
+/**
+ * Takes an account to Pro, the way a customer would (Sprint 35).
+ *
+ * Through the plan panel and the provider's checkout page rather than by writing a row: uploading
+ * your own models is a paid feature now, and a test that reached into the database to grant itself
+ * one would stop exercising the thing that makes the feature work — the checkout, the signed
+ * webhook, and the entitlement change that follows it.
+ *
+ * Called from the projects screen, and returns there.
+ */
+async function upgradeToPro(page: Page): Promise<void> {
+  const plan = page.getByRole('region', { name: 'Plan' });
+  await expect(plan).toBeVisible({ timeout: 30_000 });
+
+  await plan.getByRole('button', { name: /Upgrade to Pro/ }).click();
+  await page.waitForURL(/\/billing\/checkout/, { timeout: 30_000 });
+  await page.getByRole('button', { name: 'Complete the upgrade' }).click();
+  await page.waitForURL((url) => !url.pathname.startsWith('/billing'), { timeout: 30_000 });
+
+  await expect(page.getByTestId('billing-plan')).toHaveText(/Pro/, { timeout: 30_000 });
+}
+
 test.describe('uploaded assets', () => {
   function newEmail(): string {
     return `upload-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}@example.com`;
@@ -3279,6 +3301,9 @@ test.describe('uploaded assets', () => {
     await page.getByLabel('Password').fill('a-long-enough-password');
     await page.getByRole('button', { name: 'Create account' }).click();
     await expect(page.getByText('Signed in as')).toBeVisible({ timeout: 30_000 });
+
+    // Uploading your own models is a Pro feature (Sprint 35), so this account buys one first.
+    await upgradeToPro(page);
 
     await page.getByRole('button', { name: /Forest clearing/ }).click();
     await editorOpen(page);
@@ -3365,6 +3390,10 @@ test.describe('uploaded assets', () => {
     await page.getByLabel('Password').fill('a-long-enough-password');
     await page.getByRole('button', { name: 'Create account' }).click();
     await expect(page.getByText('Signed in as')).toBeVisible({ timeout: 30_000 });
+
+    // Same as above: this test is about shadowing a curated id, which needs an upload, which needs
+    // a plan that allows one.
+    await upgradeToPro(page);
 
     await page.getByRole('button', { name: /Forest clearing/ }).click();
     await editorOpen(page);
