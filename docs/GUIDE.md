@@ -357,10 +357,12 @@ schema-validated auto-repair loop, and whatever was changed is disclosed. Detail
 
 **Sprint 36: Performance & load testing**
 
-- [ ] k6 or Artillery load tests against API (target concurrent editors, export throughput)
-- [ ] Editor performance budget audit (bundle size, Three.js draw calls, memory leaks on long sessions — use Chrome perf/memory profiler on a 2-hour editing session)
-- [ ] CDN cache hit-rate tuning for asset delivery
-- **DoD:** API sustains target concurrent load (define number, e.g., 500 concurrent editing sessions) with p95 latency under agreed SLA (e.g., 300ms for CRUD ops).
+- [x] Load tests against the API with explicit targets — `tools/load`, **not k6**, which is a Go binary this npm-only environment cannot install; the trade is recorded rather than glossed. One process meets all four targets at **50 concurrent** and misses autosave at 100, where throughput goes flat at ~130/s — the signature of a saturated process, so the next step is more processes, not a faster query
+- [x] Memory leaks on long sessions, asked deterministically instead of watched in a profiler. Counting disposals across add/delete cycles **found the pitfall the plan names**: deleting an object left its geometries and materials alive until the project closed. Fixed as an ownership split, because freeing everything would have blanked every other object sharing a cached material
+- [x] Editor bundle budget, enforced in CI. **559 KiB → 311 KiB** of initial JavaScript: signing in to read a project list was downloading a 3D engine
+- [x] Collaboration server connection scaling, which is a different question from the API's — long-lived sockets, one document per open project. **Found a dropped sync message on the first join to a cold room**, hanging roughly one join in six, invisible to the Sprint 31 suite because its in-memory store was too fast to lose a message in
+- [~] CDN cache hit-rate tuning. Headers are now verified against a **running origin**, which found HEAD on the CDN-facing asset path answering 401. There is no CDN here, so the hit-ratio half is not done
+- **DoD: partly met, and the gap is the environment.** The targets are documented, the suite runs, and every service meets its bar at 50 concurrent — but the plan says "against staging" and there is no staging: this is loopback on one container. The collaboration server's ceiling is also unmeasured, because the load generator saturates before the server does — the tool detects that and refuses to report it as a server failure. Numbers, method and every gap in `docs/LOAD-TESTING.md`.
 
 ---
 

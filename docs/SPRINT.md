@@ -1226,12 +1226,12 @@ than left as a test that quietly avoids it.
 
 **Tasks:**
 
-- [ ] Write k6 (or Artillery) load test scripts simulating realistic usage patterns: concurrent project CRUD, concurrent autosave bursts, concurrent export job submission
-- [ ] Define and test against explicit target numbers (pick numbers appropriate to your actual go-to-market scale expectation, e.g., "500 concurrent editing sessions, p95 API latency under 300ms for CRUD operations")
-- [ ] Run the Sprint 12 engine-side stress-test scene (500 props/20 enemies) through a long-session memory leak check (2+ hour continuous Play Preview session, watch Chrome memory profiler for unbounded growth — a common r3f/Three.js pitfall is un-disposed geometries/materials on object deletion)
-- [ ] Audit and fix any editor bundle-size or initial-load performance issues (Lighthouse audit, code-splitting heavy panels like the Asset Library if it's not already lazy-loaded)
-- [ ] Tune CDN cache hit-rate for asset delivery (verify cache headers from Sprint 30 are actually effective, check Cloudflare analytics for hit ratio)
-- [ ] Load-test the collab server (Sprint 31) specifically for connection-count scaling, since it has a different scaling profile (long-lived connections) than the stateless API
+- [x] Write k6 (or Artillery) load test scripts simulating realistic usage patterns: concurrent project CRUD, concurrent autosave bursts, concurrent export job submission — `tools/load`, not k6 (a Go binary, unavailable here); see `docs/LOAD-TESTING.md` for what that trade costs
+- [x] Define and test against explicit target numbers — 300 ms p95 reads, 500 ms saves, 800 ms export submission. One API process meets all four at **50 concurrent** and misses autosave at 100
+- [x] Run the Sprint 12 engine-side stress-test scene through a long-session memory leak check — replaced the profiler session with a deterministic leak test (`packages/engine/src/leaks.test.ts`), which **found the named pitfall**: `release` left an object's geometries and materials undisposed until the project closed
+- [x] Audit and fix any editor bundle-size or initial-load performance issues — `pnpm budget`, enforced in CI. Initial JS 559 KiB → **311 KiB** by moving the editor workspace behind a dynamic import
+- [~] Tune CDN cache hit-rate for asset delivery — headers verified against a running origin (`pnpm headers`), which **found HEAD on `/assets/*` answering 401**. No CDN exists here, so the hit-ratio half is not done
+- [x] Load-test the collab server for connection-count scaling — `pnpm load:collab`. **Found and fixed a dropped sync message on the first join to a cold room** (hung ~1 in 6). At 50 editors in one room the server uses under 1% of a core; its ceiling is not visible from one generator process
 
 **Deliverables:** Documented, tested performance targets across API, engine runtime, and collab server.
 

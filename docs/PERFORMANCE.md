@@ -2,6 +2,10 @@
 
 The acceptance bar for Phase 2, the scene it is measured against, and what the numbers mean.
 
+This document is about the **engine's frame rate**. For the platform under concurrent use — API
+latency targets, collaboration-server connection scaling, the editor's initial download and cache
+headers — see [`LOAD-TESTING.md`](LOAD-TESTING.md).
+
 Run it:
 
 ```bash
