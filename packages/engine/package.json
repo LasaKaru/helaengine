@@ -34,13 +34,13 @@
     "@dimforge/rapier3d-compat": "0.19.3",
     "@helaengine/schema": "workspace:*",
     "howler": "2.2.4",
-    "three": "^0.172.0",
+    "three": "^0.185.1",
     "yuka": "0.7.8",
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@types/howler": "2.2.12",
-    "@types/three": "^0.172.0",
+    "@types/howler": "2.2.13",
+    "@types/three": "^0.185.3",
     "@types/yuka": "0.7.4",
     "jsdom": "^25.0.1",
     "tsup": "^8.3.5",

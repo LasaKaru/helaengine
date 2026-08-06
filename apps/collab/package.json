@@ -23,7 +23,7 @@
     "@types/node": "^22.10.5",
     "@types/pg": "^8.11.10",
     "@types/ws": "^8.5.13",
-    "tsx": "^4.23.1",
+    "tsx": "^4.23.5",
     "typescript": "^5.9.3",
     "vitest": "^2.1.9",
     "y-websocket": "^3.0.0"
