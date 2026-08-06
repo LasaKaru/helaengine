@@ -4104,6 +4104,11 @@ test.describe('plans and upgrading', () => {
     await serverExport.getByRole('button', { name: 'Build on the server' }).click();
     await expect(serverExport.getByTestId('export-ready')).toBeVisible({ timeout: 180_000 });
 
+    // The wizard has to be closed first: its backdrop covers the toolbar, and Playwright reports
+    // that faithfully — "element intercepts pointer events" is the same thing a user would find.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.modal-backdrop')).toBeHidden();
+
     // Back to the projects screen, where the meter is read from the server's own count of
     // `export_jobs` — not from anything this browser remembered.
     await page.getByRole('button', { name: 'Projects' }).click();
