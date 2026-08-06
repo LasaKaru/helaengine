@@ -370,10 +370,12 @@ schema-validated auto-repair loop, and whatever was changed is disclosed. Detail
 
 **Sprint 37: Template & asset library expansion**
 
-- [ ] Commission/produce 50–100 production-quality low-poly assets across categories (trees, rocks, buildings, enemies, props, terrain sets)
-- [ ] 5–10 polished starter templates (village, dungeon, island, forest, arena) showcasing full feature set
-- [ ] Asset marketplace groundwork if you want third-party creators later (license model, revenue share schema in DB already — Sprint 28's `License` table)
-- **DoD:** New user can go from signup → pick template → make meaningful edits → export in under 10 minutes (usability test with 5 real users, not just internal team).
+- [ ] **Not done, blocked on art.** 50–100 production-quality low-poly assets. The library has 10 visual and 10 audio; this needs an artist or a licensed pack and cannot be written. The pipeline is ready for them and now carries attribution per asset
+- [ ] **Not done, same blocker.** 5–10 polished starter templates. There are 5, and more built from the same ten models would be padding rather than a showcase
+- [x] Marketplace groundwork — **verified and found broken.** Not one of the twenty shipped assets had a licence recorded, so every exported game wrote "licence not recorded" twenty times, and uploaded assets had nowhere to record terms at all. Fixed along the whole chain, with an `origin` column so "is this ours?" is a stated fact rather than inferred from whether a row happens to have an organisation
+- [x] Accessibility pass, **as five tests that run in CI** rather than a review that decays. Found a critical `aria-required-children` — `react-window` wraps every cell in `role="row"` and ours were plain `div`s, so the asset library was a grid containing no cells — and category counts at 3.73:1, under the 4.5:1 that 11px text needs. Two dimmings had stacked
+- [x] Onboarding-critical states. The three empty states the plan names already existed and read well; the gap was next to them. `projects: []` meant both "you have none" and "we have not looked yet", so a signed-in user was told **"Nothing saved yet"** while their projects were loading — and permanently if the fetch failed, which also produced an unhandled rejection
+- **DoD: not met, and not meetable here.** It asks for a usability test with five people unfamiliar with the product; there are no people in this environment, and two of the five tasks need art that has to be commissioned. The three engineering tasks are done, each with checks that keep them done.
 
 **Sprint 38: Docs, onboarding, beta launch**
 

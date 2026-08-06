@@ -1251,15 +1251,15 @@ than left as a test that quietly avoids it.
 
 **Tasks:**
 
-- [ ] Commission or model 50-100 production-quality low-poly assets across all categories (trees/foliage variants, rocks/terrain scatter, multiple building styles, several enemy types with basic animations, props/decorations, weapons/interactables) — run every asset through the Sprint 2/18 ingest pipeline
-- [ ] Build 5-10 polished starter templates showcasing the full feature set (e.g., "Village," "Forest Clearing," "Dungeon Arena," "Island Outpost," "Combat Arena") — each should demonstrate terrain sculpting, varied props, at least one enemy with behaviors, and at least one trigger-based interaction
-- [ ] Lay groundwork for a future asset marketplace even if not launching it now: verify the `License` table/schema from DEVELOPMENT-PLAN.md correctly distinguishes your first-party assets from any future third-party contributions, and confirm licensing terms are clear and correctly attached per asset
-- [ ] Run a full accessibility/UX pass over the core editor flows (color contrast on UI panels, keyboard-navigable menus, clear focus states) — not full WCAG compliance necessarily, but no glaring usability barriers
-- [ ] Polish onboarding-critical UI details: empty states (empty asset library search result, empty project list), loading states, error states — these get seen constantly by new users and disproportionately shape first impressions
+- [ ] **NOT DONE — blocked on art.** Commission or model 50-100 production-quality low-poly assets. The library has **10 visual assets and 10 audio**. This needs an artist or a licensed pack; it cannot be written. The ingest pipeline is ready for them and now carries attribution, so the blocker is the art itself and nothing else
+- [ ] **NOT DONE — blocked on the same art.** 5-10 polished starter templates. There are 5, and more built from the same ten models would be padding rather than a showcase: the plan asks each to demonstrate varied props, and there is not enough variety to vary
+- [x] Lay groundwork for a future asset marketplace — **verified, and it failed verification.** Not one of the twenty shipped assets had a licence recorded, so every export wrote "licence not recorded" twenty times; uploaded assets had no licence columns at all. Fixed end to end, plus an `origin` column (`first-party`/`customer`/`third-party`) so ownership is a stated fact rather than inferred from whether a row has an organisation
+- [x] Full accessibility/UX pass over the core editor flows — written as **five tests that run in CI**, not a one-off review. Found a *critical* `aria-required-children` (react-window wraps cells in `role="row"`; ours were plain divs, so the asset library was a grid with no cells) and a contrast failure at 3.73:1 on the category counts
+- [x] Polish onboarding-critical UI details — the three named empty states already existed; the real gap was beside them. `projects: []` meant both "you have none" and "we have not looked", so a signed-in user was told **"Nothing saved yet"** while their projects loaded, and permanently if the fetch failed
 
-**Deliverables:** Rich, production-quality asset library and template set.
+**Deliverables:** Rich, production-quality asset library and template set. **Not delivered** — see the two blocked tasks above. What *was* delivered is the surrounding quality work: attribution, accessibility and the first-run states.
 
-**Definition of Done:** A usability test with 5 people unfamiliar with the product: each successfully goes from signup → pick a template → make a recognizable, personalized edit (add/remove/rearrange objects, sculpt terrain) → export, within 10 minutes, without needing help.
+**Definition of Done: not met, and not meetable here.** It asks for a usability test with 5 people unfamiliar with the product. There are no people in this environment. Two of the five tasks are also blocked on art that has to be commissioned or licensed. The three tasks that were engineering are done, each with automated checks that keep them done.
 
 ---
 

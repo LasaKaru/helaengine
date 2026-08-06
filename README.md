@@ -7,14 +7,16 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 36 — the platform has accounts, cloud save, per-organisation asset uploads,
+**Status:** Sprint 37 (partial — the asset expansion is blocked on art) — the platform has accounts, cloud save, per-organisation asset uploads,
 real-time collaborative editing, server-side export, traces and metrics tying one user action
 together across every service that touches it, a security pass that made the sandboxing
 guarantee enforceable rather than merely claimed, and plan tiers enforced in software — seats,
 storage, exports and uploads, with an upgrade path that unlocks a feature the moment it completes,
 and load, bundle-size and cache-header numbers with a pass mark rather than an assumption — which
 found a dropped websocket message that hung one collaborative session in six, an editor that
-downloaded a 3D engine to show a project list, and a CDN-facing URL that asked caches to log in.
+downloaded a 3D engine to show a project list, and a CDN-facing URL that asked caches to log in;
+and an accessibility scan and a licence audit that run in CI, which between them found a grid with
+no cells in it, text at 3.73:1, and twenty shipped assets with no attribution at all.
 Exports are playable games, checked in three browsers, played before anyone can have them, automatically repaired where a fix
 exists, refused with a reason where one does not, and shareable as a link rather than a zip; a
 project now belongs to a user in an organisation with role-gated access, and is saved to a server
