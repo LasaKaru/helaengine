@@ -43,6 +43,18 @@ export const COLLAB_TARGETS: Record<string, Target> = {
 /** Bytes of resident growth per live connection that we are willing to accept. */
 export const MEMORY_PER_CONNECTION_BUDGET = 2 * 1024 * 1024;
 
+/**
+ * Below this many connections, the per-connection memory figure is not judged.
+ *
+ * It is still printed, because a trend across the ladder is informative. But it is derived by
+ * dividing the server's RSS growth by the number of connections, and on a small step that
+ * denominator is swamped by everything else a Node process does while it happens to be running:
+ * JIT tiering up, a garbage collection that did or did not happen, a lazily-required module. The
+ * first run of a freshly started server charged 2.4 MiB per connection at five connections and
+ * 24 KiB at fifty — the same server, and the smaller number is the true one.
+ */
+export const MEMORY_JUDGED_ABOVE = 20;
+
 export interface CollabOptions extends LoadOptions {
   /** Where the collab server listens, e.g. `ws://127.0.0.1:3200`. */
   collabOrigin: string;
@@ -63,6 +75,15 @@ export interface CollabReport {
   roomsOpen: number | null;
   /** Why joining stopped short, when it did. Null when every attempted connection synced. */
   stoppedBecause: string | null;
+  /**
+   * The *server's* CPU utilisation across the run, as a percentage of one core.
+   *
+   * The most important number in this report, and the one that makes the rest trustworthy. This
+   * harness holds one `Y.Doc` per simulated editor in a single Node process, and past roughly ten
+   * editors that process — not the server — is what runs out of core. Without this figure the tool
+   * would report its own saturation as a server regression, in a format designed to be quoted.
+   */
+  serverCpuPercent: number | null;
 }
 
 interface Editor {
@@ -93,6 +114,19 @@ function joinRoom(
     WebSocketPolyfill: WebSocket as unknown as typeof globalThis.WebSocket,
   });
 
+  // `COLLAB_LOAD_DEBUG=1` narrates one connection's lifecycle. A join that times out otherwise
+  // reports only that it timed out, which does not distinguish "refused", "connected but never
+  // sent the document" and "the client never noticed" — three different bugs in three different
+  // places.
+  const debug = process.env['COLLAB_LOAD_DEBUG'] === '1';
+  if (debug) {
+    for (const event of ['status', 'connection-close', 'connection-error'] as const) {
+      provider.on(event, (payload: unknown) => {
+        console.error(`  [join] +${(performance.now() - started).toFixed(0)}ms ${event}`, payload);
+      });
+    }
+  }
+
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       provider.destroy();
@@ -101,6 +135,9 @@ function joinRoom(
     }, timeoutMs);
 
     provider.on('sync', (synced: boolean) => {
+      if (debug) {
+        console.error(`  [join] +${(performance.now() - started).toFixed(0)}ms sync=${synced}`);
+      }
       if (!synced) return;
       clearTimeout(timer);
       resolve({ editor: { doc, provider }, ms: performance.now() - started });
@@ -132,15 +169,20 @@ async function timeEdit(from: Editor, to: Editor, key: string, timeoutMs: number
   return (await arrived) - started;
 }
 
-/** The server's own view of itself: how many rooms it holds, and how much memory it is using. */
+/** The server's own view of itself: rooms held, memory used, and CPU consumed so far. */
 async function serverHealth(
   origin: string,
-): Promise<{ rooms: number; rss: number | null } | null> {
+): Promise<{ rooms: number; rss: number | null; cpuMicros: number | null; at: number } | null> {
   const url = origin.replace(/^ws/, 'http');
   const response = await fetch(`${url}/health`).catch(() => null);
   if (!response?.ok) return null;
-  const body = (await response.json()) as { rooms?: number; rss?: number };
-  return { rooms: body.rooms ?? 0, rss: typeof body.rss === 'number' ? body.rss : null };
+  const body = (await response.json()) as { rooms?: number; rss?: number; cpuMicros?: number };
+  return {
+    rooms: body.rooms ?? 0,
+    rss: typeof body.rss === 'number' ? body.rss : null,
+    cpuMicros: typeof body.cpuMicros === 'number' ? body.cpuMicros : null,
+    at: Date.now(),
+  };
 }
 
 /**
@@ -195,6 +237,12 @@ export async function runCollabLoad(
 
   const during = await serverHealth(options.collabOrigin);
 
+  const elapsedMs = before && during ? during.at - before.at : 0;
+  const serverCpuPercent =
+    before?.cpuMicros == null || during?.cpuMicros == null || elapsedMs <= 0
+      ? null
+      : ((during.cpuMicros - before.cpuMicros) / 1000 / elapsedMs) * 100;
+
   for (const editor of editors) {
     editor.provider.destroy();
     editor.doc.destroy();
@@ -221,6 +269,7 @@ export async function runCollabLoad(
     memoryPerConnection: grew === null || editors.length === 0 ? null : grew / editors.length,
     roomsOpen: during?.rooms ?? null,
     stoppedBecause,
+    serverCpuPercent,
   };
 }
 
@@ -268,10 +317,15 @@ export async function prepareRoom(
 
 export function formatCollabReport(report: CollabReport): string {
   const budget = MEMORY_PER_CONNECTION_BUDGET;
+  const cpu =
+    report.serverCpuPercent === null
+      ? 'n/a'
+      : `${report.serverCpuPercent.toFixed(0)}% of one core`;
   const memory =
     report.memoryPerConnection === null
       ? '        n/a'
-      : `${(report.memoryPerConnection / 1024).toFixed(0).padStart(7)} KiB`;
+      : `${(report.memoryPerConnection / 1024).toFixed(0).padStart(7)} KiB` +
+        (report.joined >= MEMORY_JUDGED_ABOVE ? '' : ' (too few to judge)');
 
   const lines = [
     `  connections attempted   ${String(report.connections).padStart(6)}`,
@@ -282,14 +336,46 @@ export function formatCollabReport(report: CollabReport): string {
       `p95 ${report.propagate.p95.toFixed(0).padStart(5)}ms  max ${report.propagate.max.toFixed(0)}ms`,
     `  memory / connection ${memory}   (budget ${(budget / 1024 / 1024).toFixed(0)} MiB)`,
     `  rooms open on the server ${report.roomsOpen ?? 'n/a'}`,
+    `  server CPU during the run ${cpu}`,
   ];
 
   return lines.join('\n');
 }
 
+/**
+ * The CPU below which the server cannot be the thing that was slow.
+ *
+ * Generous on purpose. A server doing real work under fifty editors would be well into double
+ * figures; one sitting at a few percent while joins take seconds is not the bottleneck, and saying
+ * it is would be a false accusation with a number attached.
+ */
+export const SERVER_BUSY_THRESHOLD_PERCENT = 25;
+
+/**
+ * Whether this run measured the server at all.
+ *
+ * Returns a sentence when the *generator* was the limit rather than the server. The harness runs
+ * every simulated editor as a `Y.Doc` in one Node process, which saturates a core somewhere around
+ * ten of them, and the joins get slower because the client cannot keep up — nothing to do with the
+ * service under test. Measured directly rather than assumed: a run where the server really is
+ * struggling shows it in the server's own CPU, and this says nothing.
+ */
+export function generatorBound(report: CollabReport): string | null {
+  if (report.serverCpuPercent === null) return null;
+  if (report.serverCpuPercent >= SERVER_BUSY_THRESHOLD_PERCENT) return null;
+  if (report.join.p95 <= COLLAB_TARGETS['join']!.p95Ms) return null;
+
+  return (
+    `joins were slow while the server used only ${report.serverCpuPercent.toFixed(0)}% of a core — ` +
+    'this measured the load generator, not the server. Split the editors across processes.'
+  );
+}
+
 /** The pass/fail verdict, as reasons rather than a boolean nobody can act on. */
 export function judgeCollab(report: CollabReport): string[] {
   const reasons: string[] = [];
+  // A tool must not report a failure it can prove it caused itself.
+  const excused = generatorBound(report) !== null;
 
   if (report.joined < report.connections) {
     reasons.push(
@@ -297,7 +383,7 @@ export function judgeCollab(report: CollabReport): string[] {
         (report.stoppedBecause === null ? '' : ` (${report.stoppedBecause})`),
     );
   }
-  if (report.join.p95 > COLLAB_TARGETS['join']!.p95Ms) {
+  if (!excused && report.join.p95 > COLLAB_TARGETS['join']!.p95Ms) {
     reasons.push(
       `join p95 ${report.join.p95.toFixed(0)}ms is over the ${COLLAB_TARGETS['join']!.p95Ms}ms target`,
     );
@@ -310,6 +396,7 @@ export function judgeCollab(report: CollabReport): string[] {
   }
   if (
     report.memoryPerConnection !== null &&
+    report.joined >= MEMORY_JUDGED_ABOVE &&
     report.memoryPerConnection > MEMORY_PER_CONNECTION_BUDGET
   ) {
     reasons.push(

@@ -60,6 +60,14 @@ export function createCollabServer(options: CollabServerOptions): {
           service: 'helaengine-collab',
           rooms: rooms.size,
           rss: process.memoryUsage().rss,
+          // Cumulative CPU microseconds. Two samples either side of a load run give the server's
+          // own utilisation, which is the only way a load tool can tell "the server is saturated"
+          // from "my load generator is" — and reporting the second as the first is how a
+          // performance number becomes a lie everybody repeats.
+          cpuMicros: (() => {
+            const usage = process.cpuUsage();
+            return usage.user + usage.system;
+          })(),
         }),
       );
       return;
@@ -94,6 +102,29 @@ export function createCollabServer(options: CollabServerOptions): {
   });
 
   async function attach(connection: WebSocket, projectId: string, userId: string): Promise<void> {
+    /**
+     * Messages that arrive before the room is ready.
+     *
+     * The listener is registered **before the first await**, and that ordering is the entire point.
+     * A `y-websocket` client sends its sync step 1 the instant the socket opens — it does not wait
+     * to be greeted — while the server still has to load and seed the room, which for a room nobody
+     * has open yet means a database round trip. Registering `on('message')` after that await left a
+     * window a few milliseconds wide in which the client's opening message arrived at a socket with
+     * no listener and was dropped on the floor. The client then waited forever for a reply to a
+     * question the server never heard.
+     *
+     * It presented as a *cold room* problem: joining a project somebody else already had open was
+     * always fine, because the room was in memory and there was no await to lose the message in.
+     * The first person to open a project got a viewport that never loaded, perhaps one time in six.
+     */
+    const pending: Uint8Array[] = [];
+    let deliver = (message: Uint8Array): void => {
+      pending.push(message);
+    };
+    connection.on('message', (data: ArrayBuffer | Buffer) => {
+      deliver(new Uint8Array(data as ArrayBuffer));
+    });
+
     const room = await rooms.join(projectId, connection);
     const awareness = awarenessFor(room.doc);
 
@@ -137,9 +168,8 @@ export function createCollabServer(options: CollabServerOptions): {
     room.doc.on('update', sendUpdate);
     awareness.on('update', sendAwareness);
 
-    connection.on('message', (data: ArrayBuffer | Buffer) => {
+    const onMessage = (message: Uint8Array): void => {
       try {
-        const message = new Uint8Array(data as ArrayBuffer);
         const decoder = decoding.createDecoder(message);
         const encoder = encoding.createEncoder();
 
@@ -168,7 +198,14 @@ export function createCollabServer(options: CollabServerOptions): {
       } catch (error) {
         console.error(`[collab] bad message in ${projectId} from ${userId}`, error);
       }
-    });
+    };
+
+    // Live from here on, and whatever arrived while the room was loading is played back in the
+    // order it was received — a CRDT tolerates reordering, but the sync handshake is a
+    // request/response protocol on top of it and does not.
+    deliver = onMessage;
+    for (const message of pending) onMessage(message);
+    pending.length = 0;
 
     const close = (): void => {
       room.doc.off('update', sendUpdate);

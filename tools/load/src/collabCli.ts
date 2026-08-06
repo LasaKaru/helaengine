@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import {
   formatCollabReport,
+  generatorBound,
   judgeCollab,
   prepareRoom,
   runCollabLoad,
@@ -61,6 +62,9 @@ for (const connections of steps) {
   );
   reports.push(report);
   console.log(formatCollabReport(report));
+
+  const bound = generatorBound(report);
+  if (bound !== null) console.log(`  NOTE — ${bound}`);
 
   const reasons = judgeCollab(report);
   if (reasons.length === 0) {

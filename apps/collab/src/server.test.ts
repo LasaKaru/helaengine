@@ -121,6 +121,61 @@ async function until(check: () => boolean, timeoutMs = 5_000): Promise<void> {
   throw new Error('condition never became true');
 }
 
+describe('joining a room that is not in memory yet', () => {
+  /**
+   * Sprint 36 — the cold-room race, made deterministic.
+   *
+   * A `y-websocket` client sends sync step 1 the instant the socket opens; the server has to load
+   * and seed the room first, which for a room nobody has open is a database round trip. The message
+   * listener used to be registered *after* that await, so the opening message arrived at a socket
+   * with no listener and was silently dropped — and the client waited forever for a reply to a
+   * question nobody heard.
+   *
+   * It only ever bit the *first* person to open a project, roughly one time in six, and only
+   * against a real database: the in-memory store used by every other test here resolves in a
+   * microtask, which is too fast for a message to land in the gap. That is why it survived the
+   * Sprint 31 suite and turned up in a load run instead. The delay below is the entire test — it
+   * makes the window wide enough that the race is not a race.
+   */
+  it('does not drop the sync message a client sends while the room is loading', async () => {
+    const slowStore: RoomStore = {
+      loadScene: async (projectId) => {
+        await wait(150);
+        return projectId === 'project_cold' ? scene('Cold Level') : null;
+      },
+      saveScene: () => Promise.resolve(),
+    };
+
+    const slow = createCollabServer({ store: slowStore, auth, saveDebounceMs: 50 });
+    await new Promise<void>((done) => slow.server.listen(0, '127.0.0.1', done));
+    const slowOrigin = `ws://127.0.0.1:${(slow.server.address() as { port: number }).port}`;
+
+    const doc = new Y.Doc();
+    const provider = new WebsocketProvider(slowOrigin, 'project_cold', doc, {
+      WebSocketPolyfill: WebSocket as unknown as typeof globalThis.WebSocket,
+      params: { token: 'good-token', project: 'project_cold' },
+    });
+
+    try {
+      await new Promise<void>((done, fail) => {
+        // Comfortably longer than the 150 ms load and far shorter than y-websocket's reconnect
+        // backoff, so a pass means the first attempt worked rather than that a retry rescued it.
+        const timer = setTimeout(() => fail(new Error('never synced')), 3_000);
+        provider.on('sync', (synced: boolean) => {
+          if (!synced) return;
+          clearTimeout(timer);
+          done();
+        });
+      });
+
+      expect(readSafely(doc)?.name).toBe('Cold Level');
+    } finally {
+      provider.destroy();
+      await new Promise<void>((done) => slow.server.close(() => done()));
+    }
+  }, 20_000);
+});
+
 describe('joining a room', () => {
   it('seeds the room from the project’s saved scene', async () => {
     store.scenes.set('project_seed', scene('Saved Level'));
