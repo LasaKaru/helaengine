@@ -45,6 +45,7 @@ const ROUTES = new Set([
   '/metrics',
   '/auth/signup',
   '/auth/login',
+  '/auth/session',
   '/me',
   '/orgs',
   '/orgs/:org/invites',

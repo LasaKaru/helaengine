@@ -16,6 +16,7 @@ import { createPool, migrate, reset, type Db } from './db.js';
 import { LocalAssetStorage } from './assets.js';
 import { hashToken } from './auth.js';
 import { createApiServer } from './server.js';
+import { Throttle } from './throttle.js';
 import { routePattern } from './observability.js';
 
 /**
@@ -81,6 +82,20 @@ beforeAll(async () => {
     storage,
     exportStorage,
     uploadSecret: UPLOAD_SECRET,
+    /**
+     * Effectively no rate limiting for the suite.
+     *
+     * The limits are real and tested — see "guessing costs something" below, which stands up its
+     * own server with strict ones. This suite signs up dozens of accounts from one address in
+     * seconds, which is exactly the shape the production limit exists to refuse, so the harness
+     * opts out rather than the product being lenient.
+     */
+    throttles: {
+      loginByAddress: new Throttle({ limit: 100_000, windowMs: 1000 }),
+      loginByAccount: new Throttle({ limit: 100_000, windowMs: 1000 }),
+      signupByAddress: new Throttle({ limit: 100_000, windowMs: 1000 }),
+      inviteByAddress: new Throttle({ limit: 100_000, windowMs: 1000 }),
+    },
     telemetry: {
       tracer: telemetry.tracer,
       metrics,
@@ -1981,5 +1996,165 @@ describe('the audit trail', () => {
     } finally {
       await db.query('alter table audit_log_hidden rename to audit_log');
     }
+  });
+});
+
+/**
+ * Sprint 34 — guessing costs something.
+ *
+ * Its own server, with strict limits, because the shared harness deliberately opts out: a suite
+ * that signs up thirty accounts in ten seconds is precisely the traffic the production limit
+ * refuses. Driving the real thing over real HTTP is the only way to know the numbers are wired to
+ * the routes rather than merely defined.
+ */
+describe('rate limiting the endpoints where guessing is the attack', () => {
+  let strict: Server;
+  let strictOrigin: string;
+
+  beforeAll(async () => {
+    strict = createApiServer({
+      db,
+      storage,
+      exportStorage,
+      throttles: {
+        loginByAddress: new Throttle({ limit: 3, windowMs: 60_000 }),
+        loginByAccount: new Throttle({ limit: 3, windowMs: 60_000 }),
+        signupByAddress: new Throttle({ limit: 2, windowMs: 60_000 }),
+        inviteByAddress: new Throttle({ limit: 2, windowMs: 60_000 }),
+      },
+      telemetry: {
+        tracer: telemetry.tracer,
+        metrics,
+        log: createLogger({ service: 'api', level: 'error', write: () => {} }),
+      },
+    });
+    await new Promise<void>((done) => strict.listen(0, '127.0.0.1', done));
+    strictOrigin = `http://127.0.0.1:${(strict.address() as { port: number }).port}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((done) => strict.close(() => done()));
+  });
+
+  async function post(path: string, body: unknown): Promise<Response> {
+    return fetch(`${strictOrigin}${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it('refuses a burst of password guesses, with a Retry-After', async () => {
+    const credentials = { email: 'victim@example.com', password: 'not-the-right-one' };
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      expect((await post('/auth/login', credentials)).status).toBe(401);
+    }
+
+    const refused = await post('/auth/login', credentials);
+    expect(refused.status).toBe(429);
+    // A client that is told to wait can obey; one that is merely refused retries immediately.
+    expect(Number(refused.headers.get('retry-after'))).toBeGreaterThan(0);
+  });
+
+  it('says the same thing whether or not the account exists', async () => {
+    // The limiter must not become the account-enumeration oracle that the login response itself
+    // carefully avoids being.
+    const unknown = await post('/auth/login', {
+      email: 'nobody-here@example.com',
+      password: 'wrong-password-here',
+    });
+    expect([401, 429]).toContain(unknown.status);
+  });
+
+  it('caps sign-ups from one address', async () => {
+    expect(
+      (
+        await post('/auth/signup', {
+          email: `burst-1-${Date.now()}@example.com`,
+          password: 'a-long-enough-password',
+          displayName: 'One',
+        })
+      ).status,
+    ).toBe(201);
+    expect(
+      (
+        await post('/auth/signup', {
+          email: `burst-2-${Date.now()}@example.com`,
+          password: 'a-long-enough-password',
+          displayName: 'Two',
+        })
+      ).status,
+    ).toBe(201);
+
+    const third = await post('/auth/signup', {
+      email: `burst-3-${Date.now()}@example.com`,
+      password: 'a-long-enough-password',
+      displayName: 'Three',
+    });
+    expect(third.status).toBe(429);
+  });
+
+  it('refuses a burst of invite-token guesses', async () => {
+    // Signed in, because accepting an invite requires an account — so the threat here is a member
+    // of the system fishing for other organisations' invite tokens, not an anonymous stranger.
+    const guesser = await signup('invite-guesser@example.com');
+    const guess = async (): Promise<number> =>
+      (
+        await fetch(`${strictOrigin}/invites/accept`, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${guesser.token}`,
+          },
+          body: JSON.stringify({ token: 'a-guessed-token' }),
+        })
+      ).status;
+
+    for (let attempt = 0; attempt < 2; attempt += 1) expect(await guess()).toBe(404);
+    expect(await guess()).toBe(429);
+  });
+});
+
+describe('signing out', () => {
+  it('revokes the token on the server, not just in the tab', async () => {
+    const person = await signup('sign-out@example.com');
+
+    expect((await call('GET', '/me', { token: person.token })).status).toBe(200);
+
+    const revoked = await fetch(`${origin}/auth/session`, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${person.token}` },
+    });
+    expect(revoked.status).toBe(204);
+
+    // The reason this exists: until now "sign out" only dropped the token from the browser, so a
+    // token copied off a shared machine stayed good for its full fourteen days.
+    expect((await call('GET', '/me', { token: person.token })).status).toBe(401);
+  });
+
+  it('leaves the user’s other sessions alone', async () => {
+    const person = await signup('two-devices@example.com');
+    const second = await call<{ session: { token: string } }>('POST', '/auth/login', {
+      body: { email: 'two-devices@example.com', password: 'a-long-enough-password' },
+    });
+    const phone = second.body.session.token;
+
+    await fetch(`${origin}/auth/session`, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${person.token}` },
+    });
+
+    // Signing out of a library computer must not sign somebody out of their phone.
+    expect((await call('GET', '/me', { token: phone })).status).toBe(200);
+  });
+
+  it('answers the same for a token it has never seen', async () => {
+    // An endpoint that distinguishes them is an oracle for testing stolen tokens.
+    const response = await fetch(`${origin}/auth/session`, {
+      method: 'DELETE',
+      headers: { authorization: 'Bearer not-a-real-token' },
+    });
+    expect(response.status).toBe(204);
   });
 });

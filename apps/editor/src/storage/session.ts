@@ -95,8 +95,37 @@ export async function signIn(input: { email: string; password: string }): Promis
 }
 
 export function signOut(): void {
+  // Read defensively: signing out is the one action that must work no matter what is in storage,
+  // and a corrupt entry throwing here would leave somebody unable to sign out at all.
+  let stored: CloudSession | null = null;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw !== null) stored = JSON.parse(raw) as CloudSession;
+  } catch {
+    stored = null;
+  }
+
+  // Cleared locally first, and unconditionally. Whether the server hears about it or not, this
+  // browser is signed out the moment the button is pressed — a sign-out that could fail because
+  // the network is down is not a sign-out.
   localStorage.removeItem(STORAGE_KEY);
   clearSession();
+
+  if (!stored) return;
+
+  /**
+   * Revoked on the server too (Sprint 34).
+   *
+   * Until this, signing out only forgot the token here, so a token copied from a shared machine
+   * stayed valid for the whole fourteen days a session lasts. Fire-and-forget with `keepalive`,
+   * because the request must survive the tab being closed a moment later — which is exactly when
+   * somebody signs out.
+   */
+  void fetch(`${stored.origin}/auth/session`, {
+    method: 'DELETE',
+    headers: { authorization: `Bearer ${stored.token}` },
+    keepalive: true,
+  }).catch(() => {});
 }
 
 function remember(session: CloudSession, who: { email: string; displayName: string }): SignedIn {

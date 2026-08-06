@@ -11,6 +11,7 @@ import {
   traceCarrier,
 } from '@helaengine/telemetry';
 import { audit, listAudit } from './audit.js';
+import { clientAddress, Throttle } from './throttle.js';
 import { createObserver, type ApiTelemetry } from './observability.js';
 import {
   AssetCategorySchema,
@@ -113,6 +114,18 @@ export interface ApiOptions {
    * `createApiServer`. The service is instrumented either way; only the destination changes.
    */
   telemetry?: ApiTelemetry;
+  /**
+   * Rate limiters, overridable so tests can drive the *boundary* rather than sit through a minute.
+   *
+   * Injected rather than configured by numbers, because what a test needs is a clock it controls,
+   * and `Throttle` already takes one.
+   */
+  throttles?: {
+    loginByAddress?: Throttle;
+    loginByAccount?: Throttle;
+    signupByAddress?: Throttle;
+    inviteByAddress?: Throttle;
+  };
   /** Where invite emails would go. Absent means they are logged instead — see `sendInvite`. */
   sendInvite?: (invite: { email: string; token: string; organizationName: string }) => void;
 }
@@ -142,6 +155,41 @@ export function createApiServer(options: ApiOptions): Server {
     log: createLogger({ service: 'api', level: 'warn' }),
   };
   const observer = createObserver(telemetry, db);
+
+  /**
+   * Guessing costs something now (Sprint 34).
+   *
+   * Two limiters, because they answer different questions. The per-address one stops a single
+   * source hammering the endpoint; the per-account one stops a distributed attempt at *one*
+   * person's password, which the address limit would never see. Credential stuffing needs both.
+   *
+   * The numbers are deliberately generous for a human and hopeless for a script: ten logins a
+   * minute is more than anybody types, and five accounts an hour from one address is more than
+   * anybody signs up for.
+   */
+  const loginByAddress =
+    options.throttles?.loginByAddress ?? new Throttle({ limit: 10, windowMs: 60_000 });
+  const loginByAccount =
+    options.throttles?.loginByAccount ?? new Throttle({ limit: 10, windowMs: 15 * 60_000 });
+  const signupByAddress =
+    options.throttles?.signupByAddress ?? new Throttle({ limit: 5, windowMs: 60 * 60_000 });
+  const inviteByAddress =
+    options.throttles?.inviteByAddress ?? new Throttle({ limit: 20, windowMs: 60 * 60_000 });
+
+  function refuseIfThrottled(
+    response: ServerResponse,
+    ...results: Array<{ allowed: boolean; retryAfterSeconds: number }>
+  ): boolean {
+    const blocked = results.find((result) => !result.allowed);
+    if (!blocked) return false;
+    response.setHeader('retry-after', String(blocked.retryAfterSeconds));
+    // A count is deliberately not given back. "You have three attempts left" is a gift to a script
+    // and means nothing to a person who mistyped their password.
+    send(response, 429, {
+      error: 'too many attempts — wait a moment and try again',
+    });
+    return true;
+  }
 
   return createServer((request, response) => {
     void observer
@@ -207,6 +255,8 @@ export function createApiServer(options: ApiOptions): Server {
     }
 
     if (path === '/auth/signup' && method === 'POST') {
+      if (refuseIfThrottled(response, signupByAddress.check(clientAddress(request)))) return;
+
       const body = SignupRequestSchema.parse(JSON.parse(await readBody(request)));
       const existing = await db.query('select 1 from users where email = $1', [
         body.email.trim().toLowerCase(),
@@ -226,9 +276,21 @@ export function createApiServer(options: ApiOptions): Server {
 
     if (path === '/auth/login' && method === 'POST') {
       const body = LoginRequestSchema.parse(JSON.parse(await readBody(request)));
+      const email = body.email.trim().toLowerCase();
+      // Checked before the password is verified, so a throttled attempt costs no scrypt — the point
+      // of the limit is that guessing is expensive for the attacker and cheap for the server.
+      if (
+        refuseIfThrottled(
+          response,
+          loginByAddress.check(clientAddress(request)),
+          loginByAccount.check(email),
+        )
+      ) {
+        return;
+      }
       const found = await db.query<{ id: string; password_hash: string | null }>(
         'select id, password_hash from users where email = $1',
-        [body.email.trim().toLowerCase()],
+        [email],
       );
 
       const row = found.rows[0];
@@ -237,10 +299,34 @@ export function createApiServer(options: ApiOptions): Server {
       const ok = await verifyPassword(body.password, row?.password_hash ?? null);
       if (!row || !ok) return send(response, 401, { error: 'those credentials are not valid' });
 
+      // Forgotten on success: somebody who mistypes twice and then gets it right should not be
+      // one attempt from a lockout for the next quarter of an hour.
+      loginByAccount.clear(email);
+
       const session = await createSession(db, row.id);
       return send(response, 200, {
         session: { token: session.token, expiresAt: session.expiresAt.toISOString() },
       });
+    }
+
+    /**
+     * Signing out, on the server as well as in the tab.
+     *
+     * Until now "sign out" only dropped the token from the browser, which means a token copied from
+     * a shared machine stayed valid for its full fourteen days. Revoking the row is the difference
+     * between a session ending and a session being forgotten about.
+     *
+     * Only the presented token is revoked, not every session the user has: signing out of a library
+     * computer should not log somebody out of their phone.
+     */
+    if (path === '/auth/session' && method === 'DELETE') {
+      const header = request.headers.authorization;
+      const token = header?.startsWith('Bearer ') ? header.slice('Bearer '.length) : null;
+      if (token) await db.query('delete from sessions where token_hash = $1', [hashToken(token)]);
+      // 204 whether or not the token was real: an endpoint that says "no such session" is an
+      // oracle for testing stolen tokens, and there is nothing useful for a caller to do with it.
+      response.writeHead(204).end();
+      return;
     }
 
     const uploadMatch = new RegExp(`^/uploads/(${UUID})/([a-z0-9_]+)$`).exec(path);
@@ -470,6 +556,10 @@ export function createApiServer(options: ApiOptions): Server {
     }
 
     if (path === '/invites/accept' && method === 'POST') {
+      // An invite token is 256 bits of randomness, so this is not what stops it being guessed —
+      // it stops somebody trying to, which is also what makes the attempt visible in the metrics.
+      if (refuseIfThrottled(response, inviteByAddress.check(clientAddress(request)))) return;
+
       const body = JSON.parse(await readBody(request)) as { token?: unknown };
       if (typeof body.token !== 'string') {
         return send(response, 400, { error: 'token: an invite token is required' });
