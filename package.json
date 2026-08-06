@@ -21,6 +21,7 @@
     "editor": "pnpm --filter @helaengine/editor dev",
     "e2e": "pnpm --filter @helaengine/editor e2e",
     "bench": "node tools/benchmark/run.mjs",
+    "load": "pnpm --filter @helaengine/load load",
     "smoke": "pnpm --filter @helaengine/smoke smoke",
     "smoke:test": "pnpm --filter @helaengine/smoke smoke:test",
     "trace": "pnpm --filter @helaengine/trace trace",

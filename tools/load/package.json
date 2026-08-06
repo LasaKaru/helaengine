@@ -1,0 +1,21 @@
+{
+  "name": "@helaengine/load",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Load tests against the real API: concurrent editing, autosave bursts, export submission. Numbers with a pass mark, not a graph.",
+  "scripts": {
+    "load": "tsx src/cli.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@helaengine/schema": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}
