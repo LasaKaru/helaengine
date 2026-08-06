@@ -1,0 +1,23 @@
+{
+  "name": "@helaengine/docs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Generates the behaviour reference from the engine's own schemas, so documentation cannot drift from code.",
+  "scripts": {
+    "docs": "tsx src/cli.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@helaengine/engine": "workspace:*",
+    "@helaengine/schema": "workspace:*",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

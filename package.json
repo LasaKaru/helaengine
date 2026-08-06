@@ -19,6 +19,7 @@
     "generate-assets": "pnpm --filter @helaengine/asset-pipeline generate-raw",
     "ingest-assets": "pnpm --filter @helaengine/asset-pipeline ingest",
     "import-pack": "pnpm --filter @helaengine/asset-pipeline import-pack",
+    "gen-docs": "pnpm --filter @helaengine/docs docs",
     "editor": "pnpm --filter @helaengine/editor dev",
     "e2e": "pnpm --filter @helaengine/editor e2e",
     "bench": "node tools/benchmark/run.mjs",

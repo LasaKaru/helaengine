@@ -318,9 +318,7 @@ export async function prepareRoom(
 export function formatCollabReport(report: CollabReport): string {
   const budget = MEMORY_PER_CONNECTION_BUDGET;
   const cpu =
-    report.serverCpuPercent === null
-      ? 'n/a'
-      : `${report.serverCpuPercent.toFixed(0)}% of one core`;
+    report.serverCpuPercent === null ? 'n/a' : `${report.serverCpuPercent.toFixed(0)}% of one core`;
   const memory =
     report.memoryPerConnection === null
       ? '        n/a'

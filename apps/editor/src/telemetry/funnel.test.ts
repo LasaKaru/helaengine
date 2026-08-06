@@ -98,7 +98,6 @@ describe('the drop-off table', () => {
     expect(worst?.conversion).toBe(0);
   });
 
-
   it('does not divide by zero when a step nobody reached is followed by another', () => {
     const steps = funnelFrom([record('signup', 'a')]);
     expect(steps.every((step) => Number.isFinite(step.conversion))).toBe(true);
@@ -128,9 +127,7 @@ describe('recording', () => {
 
     // Analytics must never be able to break the editor — a save that throws because a funnel event
     // was malformed is a data-loss bug caused by a metric.
-    expect(() =>
-      track('not_a_real_event' as Parameters<typeof track>[0], {}),
-    ).not.toThrow();
+    expect(() => track('not_a_real_event' as Parameters<typeof track>[0], {})).not.toThrow();
     expect(sink.all()).toHaveLength(0);
   });
 

@@ -136,7 +136,7 @@ Three behaviours worth knowing before you run it:
   `^[a-z0-9_]{3,60}$` the upload route already enforces on customers.
 - **Models are re-encoded, not copied.** Some packs reference a sibling `Textures/colormap.png`
   rather than embedding it. Copying such a file produces a model that cannot be opened, and copying
-  the texture alongside is worse — different packs ship *different* atlases under that same name, so
+  the texture alongside is worse — different packs ship _different_ atlases under that same name, so
   one shared path silently repaints one pack with another's textures. The import reads each model
   and rewrites it self-contained.
 

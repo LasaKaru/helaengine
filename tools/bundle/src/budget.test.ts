@@ -44,8 +44,10 @@ describe('the budget verdict', () => {
   });
 
   it('names every budget that was exceeded, not only the first', () => {
-    const over = checkBudget({ ...measured, initialJs: 500 * 1024, initialCss: 40 * 1024 }, budget)
-      .over;
+    const over = checkBudget(
+      { ...measured, initialJs: 500 * 1024, initialCss: 40 * 1024 },
+      budget,
+    ).over;
     // Reporting one at a time turns a single fix into three round trips through CI.
     expect(over).toHaveLength(2);
     expect(over[0]).toContain('initial JS');

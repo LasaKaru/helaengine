@@ -54,8 +54,7 @@ function flag(name: string, fallback: string): string {
 }
 
 const given = flag('dist', '');
-const dist =
-  given === '' ? resolve(REPO_ROOT, 'apps/editor/dist') : resolve(process.cwd(), given);
+const dist = given === '' ? resolve(REPO_ROOT, 'apps/editor/dist') : resolve(process.cwd(), given);
 
 let result;
 try {

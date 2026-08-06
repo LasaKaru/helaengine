@@ -92,6 +92,12 @@ jobs:
         env:
           SKIP_THUMBNAILS: '1'
 
+      # The behaviour reference is generated from the engine's schemas (Sprint 38). A generator
+      # nobody runs produces a stale page wearing a "generated" header, which is worse than a
+      # hand-written one — the header invites trust the content has not earned.
+      - name: Behaviour reference is up to date
+        run: pnpm gen-docs -- --check
+
       # The bundle budget (Sprint 36). A budget that only prints is a budget that gets exceeded on
       # a Tuesday and noticed the following quarter, so this fails the build — and it needs a real
       # production build, which nothing else in this job produces.

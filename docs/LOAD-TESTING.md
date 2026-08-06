@@ -3,7 +3,7 @@
 Sprint 36. What the system does under concurrent use, where each service stops meeting its target,
 and what is not measured.
 
-`PERFORMANCE.md` is the neighbouring document and covers a different question: the *engine's* frame
+`PERFORMANCE.md` is the neighbouring document and covers a different question: the _engine's_ frame
 rate against the stress scene. This one is about the platform — the API, the collaboration server,
 the editor's initial download — under load.
 
@@ -36,12 +36,12 @@ writes a scene document, appends a version row and bumps a project.
 Every autosave request sends a **500-object scene**, which is the point of that scenario: it is the
 one endpoint where the body is the load.
 
-| Scenario | Target p95 | 25 concurrent | 50 concurrent | 100 concurrent |
-| --- | --- | --- | --- | --- |
-| list projects | 300 ms | **40 ms** (918/s) | **52 ms** (1662/s) | **~60 ms** |
-| open a project | 300 ms | **79 ms** (402/s) | **124 ms** (472/s) | **252 ms** (437/s) |
-| autosave a scene | 500 ms | **233 ms** (128/s) | **439 ms** (132/s) | **795 ms** (137/s) — over |
-| submit an export | 800 ms | **68 ms** (436/s) | **130 ms** (445/s) | **274 ms** (437/s) |
+| Scenario         | Target p95 | 25 concurrent      | 50 concurrent      | 100 concurrent            |
+| ---------------- | ---------- | ------------------ | ------------------ | ------------------------- |
+| list projects    | 300 ms     | **40 ms** (918/s)  | **52 ms** (1662/s) | **~60 ms**                |
+| open a project   | 300 ms     | **79 ms** (402/s)  | **124 ms** (472/s) | **252 ms** (437/s)        |
+| autosave a scene | 500 ms     | **233 ms** (128/s) | **439 ms** (132/s) | **795 ms** (137/s) — over |
+| submit an export | 800 ms     | **68 ms** (436/s)  | **130 ms** (445/s) | **274 ms** (437/s)        |
 
 **One API process meets all four targets at 50 concurrent editing sessions and misses one at 100.**
 The one it misses is autosave, and the throughput column says why: autosave sits at roughly 130
@@ -81,11 +81,11 @@ All editors join **one room**, because a room is where the work is — every edi
 other socket in it.
 
 | Editors in one room | Join p95 | Edit to a peer p95 | Memory / connection | Server CPU |
-| --- | --- | --- | --- | --- |
-| 5 | 95 ms | 0 ms | (too few to judge) | 43% |
-| 10 | 255 ms | 1 ms | 26 KiB | 2% |
-| 25 | 1458 ms | 1 ms | 67 KiB | 1% |
-| 50 | 6269 ms | 4 ms | 8 KiB | 0% |
+| ------------------- | -------- | ------------------ | ------------------- | ---------- |
+| 5                   | 95 ms    | 0 ms               | (too few to judge)  | 43%        |
+| 10                  | 255 ms   | 1 ms               | 26 KiB              | 2%         |
+| 25                  | 1458 ms  | 1 ms               | 67 KiB              | 1%         |
+| 50                  | 6269 ms  | 4 ms               | 8 KiB               | 0%         |
 
 **The join column past 10 editors measures the load generator, not the server**, and the tool says
 so rather than reporting a failure. The harness holds one `Y.Doc` per simulated editor in a single
@@ -108,10 +108,10 @@ at fifty, on the same server.
 ### What was fixed to get here
 
 **The first join to a cold room hung, roughly one time in six.** A `y-websocket` client sends sync
-step 1 the instant the socket opens; the server registered its message listener *after* awaiting the
+step 1 the instant the socket opens; the server registered its message listener _after_ awaiting the
 room load, which for a room nobody has open is a database round trip. The opening message arrived at
 a socket with no listener and was dropped, and the client waited forever for a reply to a question
-nobody heard. It only affected the *first* person to open a project, and only against a real
+nobody heard. It only affected the _first_ person to open a project, and only against a real
 database — the in-memory store the Sprint 31 tests use resolves in a microtask, too fast for a
 message to land in the gap, which is why the suite was green and a load run found it.
 
@@ -122,7 +122,7 @@ message to land in the gap, which is why the suite was green and a load run foun
 The sprint plan asks for a two-hour Play Preview session watched in Chrome's memory profiler. That
 was replaced with the same question asked deterministically, in `packages/engine/src/leaks.test.ts`:
 patch `dispose` on the Three.js prototypes and count. A profiler tells you memory grew; this tells
-you *which* resource was not released, and fails a build over it.
+you _which_ resource was not released, and fails a build over it.
 
 Four checks: a whole-scene control, twenty load/dispose cycles asserting every cycle frees exactly
 the same amount, a released-object check, and a double-free check comparing resource identities
@@ -147,18 +147,18 @@ walking the entry through **static imports only** — so a lazy chunk is correct
 the critical path. A tool that adds up `dist/` and reports one total cannot tell the two apart,
 which is how "our bundle is 4 MB" becomes a sentence nobody can act on.
 
-| | Measured | Budget |
-| --- | --- | --- |
-| Initial JS (gzipped) | **311 KiB** | 400 KiB |
-| Initial CSS (gzipped) | **5 KiB** | 30 KiB |
-| Largest lazy chunk | **810 KiB** (physics) | 900 KiB |
+|                       | Measured              | Budget  |
+| --------------------- | --------------------- | ------- |
+| Initial JS (gzipped)  | **311 KiB**           | 400 KiB |
+| Initial CSS (gzipped) | **5 KiB**             | 30 KiB  |
+| Largest lazy chunk    | **810 KiB** (physics) | 900 KiB |
 
 It started at **559 KiB** of initial JS, because the whole editor — Three.js, react-three-fiber, the
 gizmos — sat in the entry chunk: signing in to read a project list downloaded a 3D engine before
 anything rendered. The workspace moved behind `React.lazy`, taking the physics init with it.
 
 **Stated precisely, because the imprecise version would be flattering:** the projects screen no
-longer *waits* on the engine — it renders from a 311 KiB entry chunk — but it does still fetch the
+longer _waits_ on the engine — it renders from a 311 KiB entry chunk — but it does still fetch the
 asset library, and therefore Three.js, shortly afterwards. That is the dev API's doing: the e2e
 suite reaches for `window.helaengine` on the projects screen, since opening a `.hela` file is a
 projects-screen gesture, so the shell publishes it from a dynamic import once it has painted. The
@@ -175,13 +175,13 @@ over time, deliberately. `pnpm budget` runs in CI and fails the build.
 `pnpm headers` checks a **running origin** rather than reading headers off the source, because the
 question is what a real response carries after every middleware and error branch has had its turn.
 
-| Route | Policy | Verified by |
-| --- | --- | --- |
-| `/assets/<hash>` (GET) | `public, max-age=31536000, immutable` | `pnpm headers` and integration test |
-| `/assets/<hash>` (HEAD) | same | `pnpm headers` and integration test, after a fix |
-| `/exports/<id>/download` | `no-store` | integration test |
-| share service, public build | `public, max-age=300` | integration test |
-| share service, unlisted build | `private, no-store` | integration test |
+| Route                         | Policy                                | Verified by                                      |
+| ----------------------------- | ------------------------------------- | ------------------------------------------------ |
+| `/assets/<hash>` (GET)        | `public, max-age=31536000, immutable` | `pnpm headers` and integration test              |
+| `/assets/<hash>` (HEAD)       | same                                  | `pnpm headers` and integration test, after a fix |
+| `/exports/<id>/download`      | `no-store`                            | integration test                                 |
+| share service, public build   | `public, max-age=300`                 | integration test                                 |
+| share service, unlisted build | `private, no-store`                   | integration test                                 |
 
 **This found one.** `/assets/*` matched `method === 'GET'`, so HEAD fell through to the
 authenticated routes and answered 401 — a deliberately public, CDN-facing URL telling a cache it

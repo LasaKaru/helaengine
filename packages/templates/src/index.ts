@@ -547,9 +547,7 @@ export const TEMPLATES: SceneTemplate[] = [
           assetId: 'chest',
           position: [-2, 0, 11],
           label: 'Supply chest',
-          behaviors: [
-            { type: 'pickup', params: { kind: 'health', amount: 50, radius: 2.5 } },
-          ],
+          behaviors: [{ type: 'pickup', params: { kind: 'health', amount: 50, radius: 2.5 } }],
         },
       ];
 
