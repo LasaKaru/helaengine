@@ -65,6 +65,7 @@ export const BUILTIN_ASSET_ENTRIES: AssetManifestEntry[] = [
     colliderType: 'none',
     bounds: [1, 1, 1],
     placeholderColor: '#f2c14e',
+    origin: 'first-party',
   },
   {
     id: 'logic_trigger_sphere',
@@ -75,6 +76,7 @@ export const BUILTIN_ASSET_ENTRIES: AssetManifestEntry[] = [
     colliderType: 'none',
     bounds: [1, 1, 1],
     placeholderColor: '#f2c14e',
+    origin: 'first-party',
   },
 ];
 
@@ -87,6 +89,7 @@ export function isBuiltinTriggerAsset(assetId: string): boolean {
 export const MISSING_ASSET_ENTRY: AssetManifestEntry = {
   id: 'missing',
   name: 'Missing asset',
+  origin: 'first-party',
   category: 'props',
   tags: [],
   defaultScale: [1, 1, 1],

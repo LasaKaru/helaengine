@@ -187,3 +187,50 @@ describe('audio ingest', () => {
     expect(isAudioFile('model.glb')).toBe(false);
   });
 });
+
+/**
+ * Sprint 37 — every shipped asset says where it came from and on what terms.
+ *
+ * The sprint plan asks to "confirm licensing terms are clear and correctly attached per asset" as
+ * groundwork for a marketplace. Confirming it once by reading the file is how it was wrong in the
+ * first place: at the start of this sprint **not one of the twenty shipped assets had a licence
+ * recorded**, so every exported game wrote a CREDITS.md that said "licence not recorded" twenty
+ * times — which reads like stripped attribution to whoever made the art and like a bug to whoever
+ * shipped the game.
+ *
+ * Asserted against the *declared metadata* rather than the generated manifest, so it fails at the
+ * moment somebody adds an asset rather than after an ingest run somebody may not have done.
+ */
+describe('asset attribution', () => {
+  it('records a licence, an author and an origin for every declared asset', async () => {
+    const lookup = await readAssetMetadata(metadataFile);
+    const declared = await readDeclaredIds();
+
+    const gaps: string[] = [];
+    for (const assetId of declared) {
+      const metadata = lookup.get(assetId);
+      if (!metadata.license) gaps.push(`${assetId}: no licence`);
+      if (!metadata.author) gaps.push(`${assetId}: no author`);
+      if (!metadata.origin) gaps.push(`${assetId}: no origin`);
+    }
+
+    expect(gaps).toEqual([]);
+  });
+
+  it('marks everything shipped in this repository as first-party', async () => {
+    const lookup = await readAssetMetadata(metadataFile);
+    const declared = await readDeclaredIds();
+
+    // Not cosmetic. `origin` is what a marketplace will filter on, and the alternative — inferring
+    // ownership from whether a row has an organisation — stops being true the day somebody else
+    // contributes, silently and with no schema change to notice.
+    const foreign = declared.filter((id) => lookup.get(id).origin !== 'first-party');
+    expect(foreign).toEqual([]);
+  });
+});
+
+async function readDeclaredIds(): Promise<string[]> {
+  const fs = await import('node:fs/promises');
+  const raw = JSON.parse(await fs.readFile(metadataFile, 'utf8')) as Record<string, unknown>;
+  return Object.keys(raw);
+}

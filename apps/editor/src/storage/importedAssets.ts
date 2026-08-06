@@ -64,6 +64,10 @@ export function registerImportedAssets(assets: AssetPayload[]): void {
       colliderType: 'box',
       bounds: [1, 1, 1],
       placeholderColor: '#8a7ca8',
+      // An asset that arrived inside somebody's project file. Whoever built that file is the
+      // authority on its terms, and this browser has no way to ask — so it is recorded as a
+      // customer asset with nothing claimed about its licence, which is the truth.
+      origin: 'customer',
     } satisfies AssetManifestEntry;
   });
 

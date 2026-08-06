@@ -35,6 +35,16 @@ export interface CloudAsset {
   /** Null for the curated library, which belongs to the product rather than to a customer. */
   organizationId: string | null;
   createdAt: string;
+  /**
+   * Attribution as the server recorded it, for the CREDITS file an export writes.
+   *
+   * Optional on the type rather than required, because an older API answers without these fields
+   * and the editor should degrade to "not recorded" instead of rendering `undefined` at somebody.
+   */
+  license?: string | null;
+  author?: string | null;
+  sourceUrl?: string | null;
+  origin?: 'first-party' | 'customer' | 'third-party';
 }
 
 export class CloudAssets {
@@ -141,6 +151,13 @@ export class CloudAssets {
       ...(asset.polyCount === null ? {} : { polyCount: asset.polyCount }),
       bounds: [1, 1, 1],
       placeholderColor: '#7c8fa8',
+      // Attribution, carried into the manifest so an export credits an uploaded asset the same way
+      // it credits a curated one. Dropping it here would mean the API recorded a licence, the
+      // panel showed it, and the game that shipped the asset said "licence not recorded".
+      ...(asset.license ? { license: asset.license } : {}),
+      ...(asset.author ? { author: asset.author } : {}),
+      ...(asset.sourceUrl ? { sourceUrl: asset.sourceUrl } : {}),
+      origin: asset.origin ?? 'customer',
     };
   }
 

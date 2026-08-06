@@ -1297,6 +1297,9 @@ export function createApiServer(options: ApiOptions): Server {
         assetId?: unknown;
         name?: unknown;
         category?: unknown;
+        license?: unknown;
+        author?: unknown;
+        sourceUrl?: unknown;
       };
       const assetId = typeof body.assetId === 'string' ? body.assetId.trim() : '';
       // The id becomes part of a storage key and of every scene that places it, so it is held to
@@ -1323,6 +1326,18 @@ export function createApiServer(options: ApiOptions): Server {
         name: typeof body.name === 'string' && body.name.trim() ? body.name.trim() : assetId,
         category: category.data,
         userId,
+        // Attribution is optional and length-capped rather than validated against a licence list:
+        // the set of licences people legitimately use is open, and an allowlist would reject the
+        // correct answer often enough that people would stop filling it in.
+        ...(typeof body.license === 'string' && body.license.trim()
+          ? { license: body.license.trim().slice(0, 120) }
+          : {}),
+        ...(typeof body.author === 'string' && body.author.trim()
+          ? { author: body.author.trim().slice(0, 200) }
+          : {}),
+        ...(typeof body.sourceUrl === 'string' && body.sourceUrl.trim()
+          ? { sourceUrl: body.sourceUrl.trim().slice(0, 500) }
+          : {}),
       });
 
       // The ticket, not the bytes. Issuing a short-lived signed permit and letting the upload go

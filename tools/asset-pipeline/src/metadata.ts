@@ -20,6 +20,20 @@ const AssetMetadataFileSchema = z.record(
     colliderType: ColliderTypeSchema.default('box'),
     defaultScale: Vec3Schema.default([1, 1, 1]),
     placeholderColor: HexColorSchema.default('#b0b0b0'),
+
+    /**
+     * Attribution. Declared here rather than defaulted silently, because the failure mode is quiet:
+     * an export credits every asset it ships, and one with nothing recorded prints "licence not
+     * recorded" — a sentence that looks like a bug to the person shipping the game and like
+     * stripped attribution to whoever made the art.
+     *
+     * `origin` defaults to `first-party` because everything in this repository is. A contributed
+     * asset has to say so, which is the point: the default is the case that needs no scrutiny.
+     */
+    license: z.string().max(120).optional(),
+    author: z.string().max(200).optional(),
+    sourceUrl: z.string().max(500).optional(),
+    origin: z.enum(['first-party', 'customer', 'third-party']).default('first-party'),
   }),
 );
 
@@ -67,6 +81,7 @@ export async function readAssetMetadata(filePath: string): Promise<AssetMetadata
         name: humanize(assetId),
         category: guessCategory(assetId),
         tags: [],
+        origin: 'first-party',
         colliderType: 'box',
         defaultScale: [1, 1, 1],
         placeholderColor: '#b0b0b0',

@@ -2,71 +2,299 @@
   "tree_pine_01": {
     "name": "Pine Tree",
     "category": "trees",
-    "tags": ["conifer", "forest", "foliage"],
+    "tags": [
+      "conifer",
+      "forest",
+      "foliage"
+    ],
     "colliderType": "capsule",
-    "placeholderColor": "#2f6f3f"
+    "placeholderColor": "#2f6f3f",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
   },
   "tree_pine_02": {
     "name": "Tall Pine",
     "category": "trees",
-    "tags": ["conifer", "forest", "foliage", "tall"],
+    "tags": [
+      "conifer",
+      "forest",
+      "foliage",
+      "tall"
+    ],
     "colliderType": "capsule",
-    "placeholderColor": "#27603a"
+    "placeholderColor": "#27603a",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
   },
   "tree_oak_01": {
     "name": "Oak Tree",
     "category": "trees",
-    "tags": ["broadleaf", "forest", "foliage"],
+    "tags": [
+      "broadleaf",
+      "forest",
+      "foliage"
+    ],
     "colliderType": "capsule",
-    "placeholderColor": "#4a8f45"
+    "placeholderColor": "#4a8f45",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
   },
   "rock_boulder_01": {
     "name": "Boulder",
     "category": "rocks",
-    "tags": ["stone", "scatter", "large"],
+    "tags": [
+      "stone",
+      "scatter",
+      "large"
+    ],
     "colliderType": "sphere",
-    "placeholderColor": "#8a8880"
+    "placeholderColor": "#8a8880",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
   },
   "rock_shard_01": {
     "name": "Rock Shard",
     "category": "rocks",
-    "tags": ["stone", "scatter", "small"],
+    "tags": [
+      "stone",
+      "scatter",
+      "small"
+    ],
     "colliderType": "sphere",
-    "placeholderColor": "#767470"
+    "placeholderColor": "#767470",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
   },
   "building_hut_01": {
     "name": "Thatched Hut",
     "category": "buildings",
-    "tags": ["village", "shelter", "wood"],
+    "tags": [
+      "village",
+      "shelter",
+      "wood"
+    ],
     "colliderType": "box",
-    "placeholderColor": "#b08a5a"
+    "placeholderColor": "#b08a5a",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
   },
   "enemy_goblin_01": {
     "name": "Goblin",
     "category": "enemies",
-    "tags": ["humanoid", "melee", "hostile"],
+    "tags": [
+      "humanoid",
+      "melee",
+      "hostile"
+    ],
     "colliderType": "capsule",
-    "placeholderColor": "#a83f3f"
+    "placeholderColor": "#a83f3f",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
   },
   "prop_barrel_01": {
     "name": "Barrel",
     "category": "props",
-    "tags": ["container", "village", "wood"],
+    "tags": [
+      "container",
+      "village",
+      "wood"
+    ],
     "colliderType": "sphere",
-    "placeholderColor": "#8a6238"
+    "placeholderColor": "#8a6238",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
   },
   "prop_crate_01": {
     "name": "Crate",
     "category": "props",
-    "tags": ["container", "village", "wood"],
+    "tags": [
+      "container",
+      "village",
+      "wood"
+    ],
     "colliderType": "box",
-    "placeholderColor": "#9a7845"
+    "placeholderColor": "#9a7845",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
   },
   "prop_fence_01": {
     "name": "Fence Section",
     "category": "props",
-    "tags": ["village", "wood", "barrier"],
+    "tags": [
+      "village",
+      "wood",
+      "barrier"
+    ],
     "colliderType": "box",
-    "placeholderColor": "#8b6f4a"
+    "placeholderColor": "#8b6f4a",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "audio_music_combat": {
+    "name": "Combat Music",
+    "category": "audio",
+    "tags": [
+      "music",
+      "combat",
+      "loop"
+    ],
+    "colliderType": "none",
+    "placeholderColor": "#7a6fd0",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "audio_music_explore": {
+    "name": "Exploration Music",
+    "category": "audio",
+    "tags": [
+      "music",
+      "ambient",
+      "loop"
+    ],
+    "colliderType": "none",
+    "placeholderColor": "#7a6fd0",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "audio_music_menu": {
+    "name": "Menu Music",
+    "category": "audio",
+    "tags": [
+      "music",
+      "menu",
+      "loop"
+    ],
+    "colliderType": "none",
+    "placeholderColor": "#7a6fd0",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "audio_sfx_checkpoint": {
+    "name": "Checkpoint Chime",
+    "category": "audio",
+    "tags": [
+      "sfx",
+      "ui",
+      "progress"
+    ],
+    "colliderType": "none",
+    "placeholderColor": "#7a6fd0",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "audio_sfx_damage": {
+    "name": "Damage Hit",
+    "category": "audio",
+    "tags": [
+      "sfx",
+      "combat",
+      "impact"
+    ],
+    "colliderType": "none",
+    "placeholderColor": "#7a6fd0",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "audio_sfx_death": {
+    "name": "Death Sting",
+    "category": "audio",
+    "tags": [
+      "sfx",
+      "combat"
+    ],
+    "colliderType": "none",
+    "placeholderColor": "#7a6fd0",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "audio_sfx_pickup": {
+    "name": "Pickup",
+    "category": "audio",
+    "tags": [
+      "sfx",
+      "item"
+    ],
+    "colliderType": "none",
+    "placeholderColor": "#7a6fd0",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "audio_sfx_reload": {
+    "name": "Weapon Reload",
+    "category": "audio",
+    "tags": [
+      "sfx",
+      "weapon"
+    ],
+    "colliderType": "none",
+    "placeholderColor": "#7a6fd0",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "audio_sfx_secret": {
+    "name": "Secret Found",
+    "category": "audio",
+    "tags": [
+      "sfx",
+      "ui",
+      "progress"
+    ],
+    "colliderType": "none",
+    "placeholderColor": "#7a6fd0",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "audio_sfx_shoot": {
+    "name": "Weapon Shot",
+    "category": "audio",
+    "tags": [
+      "sfx",
+      "weapon",
+      "combat"
+    ],
+    "colliderType": "none",
+    "placeholderColor": "#7a6fd0",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
   }
 }

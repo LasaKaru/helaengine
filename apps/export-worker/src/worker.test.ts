@@ -86,7 +86,8 @@ const manifest: AssetManifest = {
       defaultScale: [1, 1, 1],
       colliderType: 'box',
       bounds: [1, 1, 1],
-      placeholderColor: '#2d5a34',
+      origin: 'first-party' as const,
+    placeholderColor: '#2d5a34',
     },
   ],
 };

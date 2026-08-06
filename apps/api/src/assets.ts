@@ -128,6 +128,19 @@ export interface AssetRow {
   failure: string | null;
   sizeBytes: number | null;
   createdAt: string;
+  /**
+   * Attribution, carried so an export can credit the asset.
+   *
+   * Optional on the way in and nullable on the way out: an organisation uploading its own model
+   * for its own game has nobody to credit, and forcing a licence string would teach people to type
+   * "mine" into a field that later has to mean something. What must not happen is the field not
+   * existing, which is what shipped before Sprint 37 — every uploaded asset produced a CREDITS
+   * entry reading "licence not recorded".
+   */
+  license: string | null;
+  author: string | null;
+  sourceUrl: string | null;
+  origin: 'first-party' | 'customer' | 'third-party';
 }
 
 /** Reserves the row an upload will fill, so the UI has something to show a spinner against. */
@@ -139,16 +152,31 @@ export async function beginUpload(
     name: string;
     category: string;
     userId: string;
+    license?: string | undefined;
+    author?: string | undefined;
+    sourceUrl?: string | undefined;
   },
 ): Promise<AssetRow> {
   const created = await db.query<{ id: string; created_at: Date }>(
-    `insert into assets (organization_id, asset_id, name, category, uploaded_by, status)
-     values ($1, $2, $3, $4, $5, 'pending')
+    `insert into assets (organization_id, asset_id, name, category, uploaded_by, status,
+                         license, author, source_url, origin)
+     values ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, 'customer')
      on conflict (organization_id, asset_id) where organization_id is not null
      do update set name = excluded.name, category = excluded.category,
+                   license = excluded.license, author = excluded.author,
+                   source_url = excluded.source_url,
                    status = 'pending', failure = null, updated_at = now()
      returning id, created_at`,
-    [input.organizationId, input.assetId, input.name, input.category, input.userId],
+    [
+      input.organizationId,
+      input.assetId,
+      input.name,
+      input.category,
+      input.userId,
+      input.license ?? null,
+      input.author ?? null,
+      input.sourceUrl ?? null,
+    ],
   );
 
   return {
@@ -163,6 +191,10 @@ export async function beginUpload(
     status: 'pending',
     failure: null,
     sizeBytes: null,
+    license: input.license ?? null,
+    author: input.author ?? null,
+    sourceUrl: input.sourceUrl ?? null,
+    origin: 'customer',
     createdAt: created.rows[0]!.created_at.toISOString(),
   };
 }
@@ -196,12 +228,21 @@ export async function completeUpload(
   const hash = createHash('sha256').update(input.bytes).digest('hex').slice(0, 32);
   const glbPath = storage.put(`orgs/${input.organizationId}/assets/${hash}.glb`, input.bytes);
 
-  const updated = await db.query<{ id: string; created_at: Date; name: string; category: string }>(
+  const updated = await db.query<{
+    id: string;
+    created_at: Date;
+    name: string;
+    category: string;
+    license: string | null;
+    author: string | null;
+    source_url: string | null;
+    origin: 'first-party' | 'customer' | 'third-party';
+  }>(
     `update assets
         set glb_path = $3, content_hash = $4, size_bytes = $5, status = 'ready',
             failure = null, updated_at = now()
       where organization_id = $1 and asset_id = $2
-      returning id, created_at, name, category`,
+      returning id, created_at, name, category, license, author, source_url, origin`,
     [input.organizationId, input.assetId, glbPath, hash, input.bytes.byteLength],
   );
 
@@ -220,6 +261,12 @@ export async function completeUpload(
     status: 'ready',
     failure: null,
     sizeBytes: input.bytes.byteLength,
+    // Read back rather than echoed from the request: `beginUpload` is what recorded them, possibly
+    // in an earlier call, and the row is the only thing that knows what actually landed.
+    license: row.license,
+    author: row.author,
+    sourceUrl: row.source_url,
+    origin: row.origin,
     createdAt: row.created_at.toISOString(),
   };
 }
@@ -236,10 +283,14 @@ async function failUpload(
     name: string;
     category: string;
     created_at: Date;
+    license: string | null;
+    author: string | null;
+    source_url: string | null;
+    origin: 'first-party' | 'customer' | 'third-party';
   }>(
     `update assets set status = 'failed', failure = $3, updated_at = now()
       where organization_id = $1 and asset_id = $2
-      returning id, name, category, created_at`,
+      returning id, name, category, created_at, license, author, source_url, origin`,
     [input.organizationId, input.assetId, reason],
   );
 
@@ -258,6 +309,10 @@ async function failUpload(
     status: 'failed',
     failure: reason,
     sizeBytes: null,
+    license: row.license,
+    author: row.author,
+    sourceUrl: row.source_url,
+    origin: row.origin,
     createdAt: row.created_at.toISOString(),
   };
 }
@@ -287,9 +342,14 @@ export async function listAssets(
     failure: string | null;
     size_bytes: number | null;
     created_at: Date;
+    license: string | null;
+    author: string | null;
+    source_url: string | null;
+    origin: 'first-party' | 'customer' | 'third-party';
   }>(
     `select id, organization_id, asset_id, name, category, glb_path, thumbnail_path,
-            poly_count, status, failure, size_bytes, created_at
+            poly_count, status, failure, size_bytes, created_at,
+            license, author, source_url, origin
        from assets
       where (organization_id is null or organization_id = $1)
         and ($2::text is null or category = $2)
@@ -311,6 +371,10 @@ export async function listAssets(
     failure: row.failure,
     sizeBytes: row.size_bytes,
     createdAt: row.created_at.toISOString(),
+    license: row.license,
+    author: row.author,
+    sourceUrl: row.source_url,
+    origin: row.origin,
   }));
 }
 

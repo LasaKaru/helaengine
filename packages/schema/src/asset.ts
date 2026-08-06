@@ -67,6 +67,25 @@ export const AssetManifestEntrySchema = z.object({
   license: z.string().max(120).optional(),
   author: z.string().max(200).optional(),
   sourceUrl: z.string().max(500).optional(),
+
+  /**
+   * Who this asset came from, as a closed vocabulary.
+   *
+   * The marketplace groundwork the plan asks for, and the reason it is a separate field rather than
+   * something inferred: today "is it ours?" happens to equal "is `organization_id` null?" in the
+   * database, and the day a third party contributes to the shared library that stops being true —
+   * silently, with no schema change to notice. A row that says what it is cannot drift.
+   *
+   * - `first-party` — shipped with HelaEngine. Terms are the project's own.
+   * - `customer` — uploaded by an organisation into its private library. The organisation warrants
+   *   it has the rights; HelaEngine records what it was told.
+   * - `third-party` — contributed to the shared library by somebody else. Not reachable yet, and
+   *   defined now so the marketplace does not arrive needing a migration of every existing row.
+   *
+   * Defaulted rather than required, because every asset that exists today predates the field and a
+   * required column would mean a migration that guesses.
+   */
+  origin: z.enum(['first-party', 'customer', 'third-party']).default('first-party'),
 });
 export type AssetManifestEntry = z.infer<typeof AssetManifestEntrySchema>;
 

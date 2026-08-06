@@ -176,6 +176,13 @@ async function ingestOne(
       polyCount,
       bounds,
       placeholderColor: metadata.placeholderColor,
+      // Attribution travels with the entry, because the manifest is what an export reads to write
+      // its CREDITS file. Anything dropped here is attribution silently stripped from every game
+      // built with this asset.
+      ...(metadata.license === undefined ? {} : { license: metadata.license }),
+      ...(metadata.author === undefined ? {} : { author: metadata.author }),
+      ...(metadata.sourceUrl === undefined ? {} : { sourceUrl: metadata.sourceUrl }),
+      origin: metadata.origin,
     },
     rawBytes,
     compressedBytes: compressed.byteLength,
@@ -256,6 +263,10 @@ async function ingestAudio(
     colliderType: 'none',
     bounds: [1, 1, 1],
     placeholderColor: '#7a6fd0',
+    ...(metadata.license === undefined ? {} : { license: metadata.license }),
+    ...(metadata.author === undefined ? {} : { author: metadata.author }),
+    ...(metadata.sourceUrl === undefined ? {} : { sourceUrl: metadata.sourceUrl }),
+    origin: metadata.origin,
   };
 
   return {
