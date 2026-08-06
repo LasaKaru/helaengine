@@ -2632,3 +2632,228 @@ describe('plans, limits and money', () => {
     expect(refused.body.error).toMatch(/cancel/i);
   });
 });
+
+/**
+ * Sprint 35 — what happens when somebody drops to a plan they are already over.
+ *
+ * The sprint plan says to decide this rather than leave it undefined, and offers "read-only lockout
+ * of excess projects vs. grace period" as the choice. Neither, in the end:
+ *
+ * **Nothing is taken away. Only growth is refused.**
+ *
+ * A lockout means choosing *which* of somebody's projects to freeze, and every rule for choosing is
+ * arbitrary and feels punitive — the newest? the largest? A grace period only moves the same
+ * decision a fortnight into the future. What this does instead is keep every existing asset
+ * readable, listable and downloadable for ever, and refuse *new* uploads until the organisation is
+ * back inside its plan. Deleting is always available, so the way out is in the user's hands rather
+ * than in a support queue.
+ *
+ * The cost, stated plainly: a downgraded organisation can sit over the storage limit indefinitely,
+ * which is real money. The alternative is deleting a customer's work because their card changed,
+ * and that is not a trade this product should make.
+ */
+describe('downgrading below what is already used', () => {
+  let downgradeServer: Server;
+  let downgradeOrigin: string;
+
+  beforeAll(async () => {
+    downgradeServer = createApiServer({
+      db,
+      storage,
+      exportStorage,
+      uploadSecret: UPLOAD_SECRET,
+      sendInvite: (invite) => invites.push({ email: invite.email, token: invite.token }),
+      throttles: {
+        signupByAddress: new Throttle({ limit: 100_000, windowMs: 1000 }),
+        loginByAddress: new Throttle({ limit: 100_000, windowMs: 1000 }),
+        loginByAccount: new Throttle({ limit: 100_000, windowMs: 1000 }),
+        inviteByAddress: new Throttle({ limit: 100_000, windowMs: 1000 }),
+      },
+      telemetry: {
+        tracer: telemetry.tracer,
+        metrics,
+        log: createLogger({ service: 'api', level: 'error', write: () => {} }),
+      },
+    });
+    await new Promise<void>((done) => downgradeServer.listen(0, '127.0.0.1', done));
+    downgradeOrigin = `http://127.0.0.1:${(downgradeServer.address() as { port: number }).port}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((done) => downgradeServer.close(() => done()));
+  });
+
+  async function at<T = Record<string, unknown>>(
+    method: string,
+    path: string,
+    options: { token?: string; body?: unknown } = {},
+  ): Promise<{ status: number; body: T }> {
+    const response = await fetch(`${downgradeOrigin}${path}`, {
+      method,
+      headers: {
+        'content-type': 'application/json',
+        ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
+      },
+      ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
+    });
+    const text = await response.text();
+    return { status: response.status, body: (text ? JSON.parse(text) : {}) as T };
+  }
+
+  /** An asset of a given size, written straight to the row the meter reads. */
+  async function existingAsset(organizationId: string, assetId: string, bytes: number) {
+    await db.query(
+      `insert into assets (organization_id, asset_id, name, category, status, size_bytes, glb_path)
+       values ($1, $2, $3, 'props', 'ready', $4, $5)`,
+      [organizationId, assetId, assetId, bytes, `orgs/${organizationId}/assets/${assetId}.glb`],
+    );
+  }
+
+  /**
+   * A library that fills a plan, in one statement.
+   *
+   * Many rows rather than one enormous one, because `size_bytes` is an `integer` and an upload is
+   * capped at 25 MB — a single 11 GB asset cannot exist, and writing one to set up a test would be
+   * testing a state the product cannot reach. Filling 10 GB the way a real customer would takes
+   * four hundred assets.
+   */
+  async function fillLibrary(organizationId: string, count: number, eachBytes: number) {
+    await db.query(
+      // `$1::uuid` and `$4::text` for the same value: Postgres will not deduce one parameter used
+      // as both a uuid column and a string being concatenated into a path.
+      `insert into assets (organization_id, asset_id, name, category, status, size_bytes, glb_path)
+       select $1::uuid, 'bulk_' || n, 'Bulk ' || n, 'props', 'ready', $3,
+              'orgs/' || $4::text || '/assets/bulk_' || n || '.glb'
+         from generate_series(1, $2) as n`,
+      [organizationId, count, eachBytes, organizationId],
+    );
+  }
+
+  it('keeps every asset, and refuses only the next upload', async () => {
+    const owner = await signup('downgraded@example.com');
+    const org = owner.personalOrganizationId;
+    await upgrade(org, 'pro');
+
+    // 600 MB, comfortably inside Pro's 10 GB and past Free's half-gigabyte.
+    await existingAsset(org, 'big_one', 300 * 1024 * 1024);
+    await existingAsset(org, 'big_two', 300 * 1024 * 1024);
+
+    await db.query(
+      `update subscriptions set tier = 'free', status = 'none' where organization_id = $1`,
+      [org],
+    );
+
+    // Everything they made is still theirs, still listed, still there. This is the assertion that
+    // matters most in this file.
+    const library = await at<{ assets: Array<{ assetId: string }> }>('GET', `/orgs/${org}/assets`, {
+      token: owner.token,
+    });
+    expect(library.status).toBe(200);
+    expect(library.body.assets.filter((asset) => asset.assetId.startsWith('big_'))).toHaveLength(2);
+
+    // Growth is what stops. And the sentence says what happened rather than implying a threat.
+    const refused = await at<{ error: string; kind: string }>('POST', `/orgs/${org}/assets`, {
+      token: owner.token,
+      body: { assetId: 'one_more', name: 'One more', category: 'props' },
+    });
+    expect(refused.status).toBe(402);
+    // Refused at the feature gate first, because Free has no custom uploads at all.
+    expect(refused.body.kind).toBe('customAssets');
+  });
+
+  it('tells somebody already over the limit that nothing was deleted', async () => {
+    const owner = await signup('over-limit@example.com');
+    const org = owner.personalOrganizationId;
+    await upgrade(org, 'studio');
+
+    // Over Pro's 10 GB, so dropping to Pro leaves them above it — as a real library would be:
+    // four hundred and forty assets at the 25 MB upload cap.
+    await fillLibrary(org, 440, 25 * 1024 * 1024);
+    await db.query(`update subscriptions set tier = 'pro' where organization_id = $1`, [org]);
+
+    const ticket = await at<{ upload: { url: string } }>('POST', `/orgs/${org}/assets`, {
+      token: owner.token,
+      body: { assetId: 'another_one', name: 'Another', category: 'props' },
+    });
+    expect(ticket.status).toBe(201);
+
+    // The storage check happens when the bytes arrive, because a ticket is issued before anybody
+    // knows how big the file is.
+    const upload = await fetch(`${downgradeOrigin}${ticket.body.upload.url}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'model/gltf-binary' },
+      body: Buffer.from('glTF-ish bytes'),
+    });
+    const refusal = (await upload.json()) as { error: string; kind: string };
+
+    expect(upload.status).toBe(402);
+    expect(refusal.kind).toBe('storage');
+    // The difference between a downgrade message and a "your file is too big" message.
+    expect(refusal.error).toMatch(/nothing has been deleted/i);
+    expect(refusal.error).toMatch(/delete some assets/i);
+  });
+
+  it('lets somebody delete their way back under, without support', async () => {
+    const owner = await signup('deleting-back@example.com');
+    const org = owner.personalOrganizationId;
+    await upgrade(org, 'pro');
+
+    await fillLibrary(org, 400, 25 * 1024 * 1024);
+    await existingAsset(org, 'hefty', 25 * 1024 * 1024);
+
+    // Deleting is never gated: the way out has to be in the user's own hands, or the only route
+    // back to a working account is a support queue.
+    expect((await at('DELETE', `/orgs/${org}/assets/hefty`, { token: owner.token })).status).toBe(
+      204,
+    );
+
+    const ticket = await at<{ upload: { url: string } }>('POST', `/orgs/${org}/assets`, {
+      token: owner.token,
+      body: { assetId: 'small_one', name: 'Small', category: 'props' },
+    });
+    const upload = await fetch(`${downgradeOrigin}${ticket.body.upload.url}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'model/gltf-binary' },
+      body: Buffer.from([0x67, 0x6c, 0x54, 0x46, 2, 0, 0, 0, 12, 0, 0, 0]),
+    });
+    expect(upload.status).toBe(200);
+  });
+
+  it('keeps members who are already in when the seats shrink', async () => {
+    const owner = await signup('shrinking-team@example.com');
+    const member = await signup('kept-member@example.com');
+    const org = owner.personalOrganizationId;
+    await upgrade(org, 'pro');
+
+    await at('POST', `/orgs/${org}/invites`, {
+      token: owner.token,
+      body: { email: 'kept-member@example.com', role: 'editor' },
+    });
+    await at('POST', '/invites/accept', {
+      token: member.token,
+      body: { token: invites.at(-1)!.token },
+    });
+
+    // Down to a plan with fewer seats than the team already has.
+    await db.query(
+      `update subscriptions set tier = 'free', status = 'none' where organization_id = $1`,
+      [org],
+    );
+
+    // Nobody is thrown out. Removing somebody from a team because a card was cancelled would be a
+    // product deciding who gets to work today, which is not its place.
+    const members = await at<{ members: unknown[] }>('GET', `/orgs/${org}/members`, {
+      token: owner.token,
+    });
+    expect(members.body.members).toHaveLength(2);
+    expect((await at('GET', '/me', { token: member.token })).status).toBe(200);
+
+    // But the team cannot grow again until it is back inside the plan.
+    const third = await at<{ kind: string }>('POST', `/orgs/${org}/invites`, {
+      token: owner.token,
+      body: { email: 'third@example.com', role: 'editor' },
+    });
+    expect(third.status).toBe(402);
+    expect(third.body.kind).toBe('seats');
+  });
+});

@@ -6,9 +6,8 @@ import {
   PLAN_LIMITS,
   PLAN_ORDER,
   planThatAllows,
-  type PlanTier,
 } from './billing.js';
-import { EXPORTS_PER_PERIOD } from './exportJob.js';
+import { EXPORTS_PER_PERIOD, type PlanTier } from './exportJob.js';
 
 /**
  * The plan table is a contract between the API's enforcement and the editor's meters. These tests

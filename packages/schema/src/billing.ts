@@ -165,26 +165,42 @@ export const LimitExceededSchema = z.object({
 });
 export type LimitExceeded = z.infer<typeof LimitExceededSchema>;
 
-export function limitMessage(kind: LimitKind, tier: PlanTier, upgradeTo: PlanTier | null): string {
+/**
+ * What a refusal says.
+ *
+ * `alreadyOver` exists because a downgrade needs a different sentence from a limit reached by
+ * growing into it. Somebody who has just dropped to Free with 2 GB of assets is not being told
+ * "this upload is too big" — they are being told, accurately, that nothing has been deleted and
+ * what their two ways out are. Getting that wrong reads as a threat.
+ */
+export function limitMessage(
+  kind: LimitKind,
+  tier: PlanTier,
+  upgradeTo: PlanTier | null,
+  alreadyOver = false,
+): string {
   const plan = PLAN_NAMES[tier];
   const next = upgradeTo === null ? null : PLAN_NAMES[upgradeTo];
 
   // Each of these names the limit, what it is, and the way out — a refusal without a way out is
   // just a wall. Never "forbidden", which tells somebody nothing they can act on.
-  const sentences: Record<LimitKind, string> = {
+  const sentences: Record<LimitKind | 'storageOver', string> = {
     seats: `The ${plan} plan includes ${PLAN_LIMITS[tier].seats} seat${
       PLAN_LIMITS[tier].seats === 1 ? '' : 's'
     }.`,
     storage: `The ${plan} plan includes ${formatBytes(PLAN_LIMITS[tier].storageBytes)} of asset storage, and this upload would go past it.`,
+    storageOver: `This organisation is using more than the ${formatBytes(PLAN_LIMITS[tier].storageBytes)} the ${plan} plan includes. Nothing has been deleted — delete some assets to get back under, or move up a plan.`,
     exports: `The ${plan} plan includes ${PLAN_LIMITS[tier].exportsPerPeriod} exports every 30 days.`,
     customAssets: `Uploading your own models is part of the ${PLAN_NAMES.pro} plan.`,
     collaborators: `The ${plan} plan allows ${PLAN_LIMITS[tier].collaborators} people in a project at once.`,
     sso: `Single sign-on is part of the ${PLAN_NAMES.enterprise} plan.`,
   };
 
+  const sentence = alreadyOver && kind === 'storage' ? sentences.storageOver : sentences[kind];
+
   return next === null
-    ? `${sentences[kind]} Get in touch and we will sort something out.`
-    : `${sentences[kind]} ${next} lifts it.`;
+    ? `${sentence} Get in touch and we will sort something out.`
+    : `${sentence} ${next} lifts it.`;
 }
 
 export function formatBytes(bytes: number): string {

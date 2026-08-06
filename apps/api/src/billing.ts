@@ -160,10 +160,16 @@ export class LimitReached extends Error {
   }
 }
 
-function refuse(kind: LimitKind, tier: PlanTier, limit: number, used: number): never {
+function refuse(
+  kind: LimitKind,
+  tier: PlanTier,
+  limit: number,
+  used: number,
+  alreadyOver = false,
+): never {
   const upgradeTo = planThatAllows(kind, Math.max(used, limit + 1), tier);
   throw new LimitReached({
-    error: limitMessage(kind, tier, upgradeTo),
+    error: limitMessage(kind, tier, upgradeTo, alreadyOver),
     kind,
     tier,
     limit,
@@ -219,7 +225,22 @@ export async function requireStorage(
   const { storageBytes } = await usageOf(db, organizationId);
 
   if (storageBytes + additionalBytes > limits.storageBytes) {
-    refuse('storage', tier, limits.storageBytes, storageBytes + additionalBytes);
+    /**
+     * Two different situations, two different sentences.
+     *
+     * Growing into a limit is "this upload would go past it". Being *already* over it — which is
+     * what a downgrade produces — is a different message, because the honest thing to say is that
+     * nothing has been deleted and there are two ways back. See the downgrade policy in
+     * `docs/BILLING.md`: this product never destroys work over a plan change, it only refuses
+     * growth until somebody is back inside their plan.
+     */
+    refuse(
+      'storage',
+      tier,
+      limits.storageBytes,
+      storageBytes + additionalBytes,
+      storageBytes > limits.storageBytes,
+    );
   }
 }
 
