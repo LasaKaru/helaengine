@@ -3,7 +3,21 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { reportCrash } from './telemetry/report';
+import { configureFunnel, LocalAnalytics } from './telemetry/funnel';
 import './styles.css';
+
+/**
+ * The funnel sink.
+ *
+ * `LocalAnalytics` rather than nothing, and rather than a vendor: there is no analytics account
+ * here, so this keeps the last few hundred milestones in `localStorage` where the dev API can read
+ * them back and compute the drop-off table. That makes "we integrated analytics" checkable in a
+ * minute instead of a claim resting on a service nobody can log into.
+ *
+ * A real deployment swaps this one line for `new PostHogSink({ host, projectKey })`. Nothing else
+ * in the editor knows or cares which sink it is talking to.
+ */
+configureFunnel(new LocalAnalytics());
 
 /**
  * The two crashes React never sees (Sprint 33).

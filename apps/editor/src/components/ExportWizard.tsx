@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { track, trackFirst } from '../telemetry/funnel';
 import type { AssetManifest, Visibility } from '@helaengine/schema';
 import { useSceneStore } from '../store/sceneStore';
 import { ServerExport } from './ServerExport';
@@ -133,6 +134,11 @@ export function ExportWizard({
    * disclosed before the file is written.
    */
   const start = async (deliver: 'download' | 'share'): Promise<void> => {
+    // Raised on intent, and paired with a completion event below. The gap between the two is where
+    // a build that fails its own release gate lives, and that gap is the most useful thing this
+    // funnel can show — "people press Export and never get a file" is a different problem from
+    // "people never press Export".
+    trackFirst('export_started', { exportMode: options.mode, objectCount: scene.objects.length });
     setPhase('checking');
     setError('');
     setGate(null);
@@ -148,6 +154,7 @@ export function ExportWizard({
 
       if (!outcome.releasable) {
         setPhase('blocked');
+        track('export_completed', { exportMode: options.mode, outcome: 'failed' });
         return;
       }
 
@@ -183,6 +190,7 @@ export function ExportWizard({
         });
       }
       setPhase('done');
+      track('export_completed', { exportMode: options.mode, outcome: 'succeeded' });
     } catch (caught) {
       const message =
         caught instanceof ShareFailed
@@ -192,6 +200,7 @@ export function ExportWizard({
             : String(caught);
       setError(message);
       setPhase('error');
+      track('export_completed', { exportMode: options.mode, outcome: 'failed' });
     }
   };
 

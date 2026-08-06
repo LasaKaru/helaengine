@@ -36,6 +36,27 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:5174',
     trace: 'on-first-retry',
+
+    /**
+     * Every test starts as a returning user, with the first-run tour already dismissed.
+     *
+     * Set here rather than in each spec because the tour is *modal-ish* — it rings an element and
+     * puts a card beside it — and a card that lands over the Save button turns a passing test into
+     * a mystery about a click that hit nothing. Doing it globally means no future test can be
+     * ambushed by it, and the tour's own behaviour is covered by unit tests where the assertions
+     * can be about the tour rather than about whatever else the page was doing.
+     *
+     * A test that wants to see the tour clears this key itself, which is explicit and rare.
+     */
+    storageState: {
+      cookies: [],
+      origins: [
+        {
+          origin: 'http://127.0.0.1:5174',
+          localStorage: [{ name: 'helaengine.tour.seen', value: '1' }],
+        },
+      ],
+    },
   },
   /**
    * Chromium runs everything; Firefox and WebKit run the export QA suite.

@@ -2004,3 +2004,88 @@ body,
   margin: 0;
   line-height: 1.5;
 }
+
+/* ---- First-run tour ---- */
+
+/*
+  Not a modal overlay. A dimmed backdrop would be the conventional choice and the wrong one here:
+  the tour is *pointing at* the editor, and dimming the thing you are pointing at makes it harder to
+  see. The ring does the directing; everything else stays interactive and legible.
+*/
+.tour {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+
+.tour-ring {
+  position: fixed;
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  box-shadow: 0 0 0 3px rgb(74 143 69 / 25%);
+  transition: all 180ms ease;
+}
+
+.tour-card {
+  position: fixed;
+  width: 300px;
+  padding: 16px;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 45%);
+  pointer-events: auto;
+}
+
+.tour-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tour-card h2 {
+  margin: 4px 0 8px;
+  font-size: 15px;
+}
+
+.tour-card p {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.tour-step {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tour-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.tour-actions button {
+  padding: 6px 14px;
+  color: var(--bg);
+  font: inherit;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* Skip is a real choice, not a booby prize, so it is legible rather than hidden. */
+.tour-actions .tour-skip {
+  color: var(--text);
+  background: transparent;
+  border-color: var(--border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-ring {
+    transition: none;
+  }
+}

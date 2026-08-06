@@ -9,6 +9,7 @@ import { AssetLibraryPanel } from './AssetLibraryPanel';
 import { DragChip } from './DragChip';
 import { ErrorBoundary } from './ErrorBoundary';
 import { InspectorPanel } from './Panels';
+import { FirstRunTour } from './FirstRunTour';
 import { ShortcutsModal } from './ShortcutsModal';
 import { useUploadedAssets } from '../storage/useUploadedAssets';
 import { useImportedAssets } from '../storage/useImportedAssets';
@@ -160,6 +161,11 @@ export function EditorWorkspace(): React.JSX.Element {
       </div>
       <DragChip />
       <ShortcutsModal />
+      {/*
+        Mounted last, and inside the editor rather than the shell: every element it points at lives
+        in this subtree, so rendering it any earlier would measure elements that do not exist yet.
+      */}
+      <FirstRunTour />
     </div>
   );
 }

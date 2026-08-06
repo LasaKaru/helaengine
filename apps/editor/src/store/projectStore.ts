@@ -20,6 +20,7 @@ import {
   type ProjectSummary,
 } from '../storage/backend';
 import { templateById } from '@helaengine/templates';
+import { trackFirst } from '../telemetry/funnel';
 import { useSceneStore } from './sceneStore';
 
 export type Screen = 'projects' | 'editor';
@@ -228,6 +229,9 @@ export const useProjectStore = create<ProjectState>()(
           false,
           'project/create',
         );
+        // `templateId` travels because a starting point people abandon is a real finding, and it
+        // is a fixed identifier rather than anything the user wrote.
+        trackFirst('project_created', { templateId, objectCount: scene.objects.length });
         await get().refreshProjects();
       },
 
@@ -271,6 +275,12 @@ export const useProjectStore = create<ProjectState>()(
             false,
             'project/saved',
           );
+          // After the write succeeded, not before it. A funnel step that fires on intent counts
+          // people who tried and failed as people who arrived, which hides the failure it exists
+          // to surface.
+          trackFirst('project_saved', {
+            objectCount: useSceneStore.getState().scene.objects.length,
+          });
           await get().refreshProjects();
         } catch (error) {
           set(

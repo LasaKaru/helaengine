@@ -1,4 +1,6 @@
 import { Vector3, type Camera, type WebGLRenderer } from 'three';
+import { biggestDropOff, funnelFrom, type FunnelRecord, type FunnelStep } from '@helaengine/schema';
+import { currentSink, LocalAnalytics } from './telemetry/funnel';
 import type {
   AudioSystem,
   CoopClient,
@@ -16,6 +18,12 @@ import { nextObjectId, useSceneStore } from './store/sceneStore';
 
 export interface DevApi {
   store: typeof useSceneStore;
+  /** The funnel recorded in this browser, plus its drop-off table and worst step. */
+  funnel(): {
+    records: FunnelRecord[];
+    steps: FunnelStep[];
+    worst: FunnelStep | null;
+  };
   assetIds(): string[];
   /**
    * One manifest entry, whole.
@@ -353,6 +361,19 @@ export function exposeDevApi(library: AssetLibrary): void {
 
   window.helaengine = {
     store: useSceneStore,
+
+    /**
+     * The funnel this browser has recorded, and the drop-off table computed from it.
+     *
+     * Exposed because there is no analytics vendor here and a funnel nobody can look at is a claim
+     * rather than a feature. Reads the local sink; returns an empty table under any other sink.
+     */
+    funnel: () => {
+      const sink = currentSink();
+      const records = sink instanceof LocalAnalytics ? sink.all() : [];
+      const steps = funnelFrom(records);
+      return { records, steps, worst: biggestDropOff(steps) };
+    },
 
     assetIds: () => library.manifest.assets.map((asset) => asset.id),
 

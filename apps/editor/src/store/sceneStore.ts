@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { trackFirst } from '../telemetry/funnel';
 import { devtools } from 'zustand/middleware';
 import {
   CURRENT_SCENE_VERSION,
@@ -220,10 +221,15 @@ export const useSceneStore = create<SceneState>()(
             }
           }),
 
-        addObject: (object) =>
+        addObject: (object) => {
           commit('object/add', (draft) => {
             draft.objects.push(object);
-          }),
+          });
+          // The first moment the product has done something for them, and the step the plan most
+          // wants a number for. `trackFirst`, because a per-drop event would make placement look
+          // wider than project creation above it.
+          trackFirst('object_placed', { objectCount: get().scene.objects.length });
+        },
 
         removeObject: (objectId) => get().removeObjects([objectId]),
 
