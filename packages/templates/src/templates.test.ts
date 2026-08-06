@@ -1,4 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { BUILTIN_ASSET_ENTRIES } from '@helaengine/engine';
 import { SceneSchema } from '@helaengine/schema';
 import { CheckpointParamsSchema } from '@helaengine/engine';
 import { TEMPLATES, buildStressScene, templateById } from './index.js';
@@ -8,6 +12,51 @@ describe('templates', () => {
     for (const template of TEMPLATES) {
       expect(() => SceneSchema.parse(template.build()), template.id).not.toThrow();
     }
+  });
+
+  /**
+   * Every asset a template places actually exists.
+   *
+   * The schema check above passes on an id that resolves to nothing: `assetId` is a string, and a
+   * string that names no asset is a valid document describing a scene full of grey placeholder
+   * boxes. That is the failure mode a starter template can least afford — it is the first thing a
+   * new user sees, and it looks like the product is broken rather than like a typo.
+   *
+   * Read from the *generated* manifest rather than a list kept here, because the manifest is what
+   * the editor and every export actually load. A copy would agree with reality right up until
+   * somebody removed an asset.
+   */
+  it('places only assets the manifest actually has', () => {
+    const manifestPath = resolve(
+      fileURLToPath(new URL('.', import.meta.url)),
+      '../../../generated/assets/manifest.json',
+    );
+
+    let manifest: { assets: Array<{ id: string }> };
+    try {
+      manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as typeof manifest;
+    } catch {
+      // Generated output. A checkout that has not run `pnpm ingest-assets` cannot answer this, and
+      // failing there would be a test about the working copy rather than about the templates.
+      return;
+    }
+
+    const known = new Set([
+      ...manifest.assets.map((asset) => asset.id),
+      // Trigger volumes come from the engine, not the pipeline, and are placed like props.
+      ...BUILTIN_ASSET_ENTRIES.map((entry) => entry.id),
+    ]);
+
+    const missing = new Map<string, string[]>();
+    for (const template of TEMPLATES) {
+      const unknown = template
+        .build()
+        .objects.map((object) => object.assetId)
+        .filter((assetId) => !known.has(assetId));
+      if (unknown.length > 0) missing.set(template.id, [...new Set(unknown)]);
+    }
+
+    expect(Object.fromEntries(missing)).toEqual({});
   });
 
   it('builds the same scene every time, so a bug report is reproducible', () => {

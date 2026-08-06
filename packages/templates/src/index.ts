@@ -431,6 +431,296 @@ export const TEMPLATES: SceneTemplate[] = [
     },
   },
   {
+    id: 'castle-siege',
+    name: 'Castle siege',
+    description: 'A walled keep with towers, siege engines outside, and defenders on the approach.',
+    build: () => {
+      const random = seeded(20260901);
+      const placements: Placement[] = [];
+
+      /**
+       * A square curtain wall, built from segments rather than one long model.
+       *
+       * The corner pieces are separate assets from the straight ones, so the loop places straights
+       * along each side and corners at the joins — which is how these kits are meant to be used and
+       * why the category has 88 entries rather than four.
+       */
+      const half = 18;
+      for (let step = -3; step <= 3; step += 1) {
+        const offset = step * 6;
+        placements.push({ assetId: 'wall', position: [offset, 0, -half], rotationY: 0 });
+        placements.push({ assetId: 'wall', position: [offset, 0, half], rotationY: 180 });
+        placements.push({ assetId: 'wall', position: [-half, 0, offset], rotationY: 90 });
+        // The gate replaces one east segment, so there is a way in that is not a gap in the fiction.
+        placements.push({
+          assetId: step === 0 ? 'gate' : 'wall',
+          position: [half, 0, offset],
+          rotationY: 270,
+          ...(step === 0 ? { label: 'Main gate' } : {}),
+        });
+      }
+
+      for (const [x, z] of [
+        [-half, -half],
+        [half, -half],
+        [-half, half],
+        [half, half],
+      ] as const) {
+        placements.push({ assetId: 'tower_base', position: [x, 0, z] });
+        placements.push({ assetId: 'tower_top', position: [x, 4, z] });
+      }
+
+      // The keep, and something to look at inside the walls.
+      placements.push({ assetId: 'tower_hexagon_base', position: [0, 0, 0], label: 'Keep' });
+      placements.push({ assetId: 'tower_hexagon_mid', position: [0, 4, 0] });
+      placements.push({ assetId: 'tower_hexagon_roof', position: [0, 8, 0] });
+      placements.push({ assetId: 'flag', position: [-4, 0, 4] });
+      placements.push({ assetId: 'statue_head', position: [4, 0, 5], rotationY: 200 });
+
+      // The siege, drawn up outside the east gate.
+      placements.push({ assetId: 'siege_catapult', position: [34, 0, -6], rotationY: 270 });
+      placements.push({ assetId: 'siege_trebuchet', position: [38, 0, 8], rotationY: 250 });
+      placements.push({ assetId: 'siege_tower', position: [30, 0, 14], rotationY: 260 });
+      placements.push({ assetId: 'siege_ballista', position: [32, 0, -18], rotationY: 280 });
+
+      for (let index = 0; index < 12; index += 1) {
+        const angle = random() * Math.PI * 2;
+        const distance = 30 + random() * 26;
+        placements.push({
+          assetId: random() > 0.5 ? 'rock_large_a' : 'stone_large_a',
+          position: [
+            Number((Math.cos(angle) * distance).toFixed(2)),
+            0,
+            Number((Math.sin(angle) * distance).toFixed(2)),
+          ],
+          rotationY: Number((random() * 360).toFixed(1)),
+        });
+      }
+
+      placements.push({
+        assetId: 'enemy_goblin_01',
+        position: [26, 0, 0],
+        rotationY: 270,
+        label: 'Gate guard',
+        behaviors: [
+          {
+            type: 'chaseOnSight',
+            params: { sightRange: 26, chaseSpeed: 3.2, health: 70, attackDamage: 14 },
+          },
+        ],
+      });
+
+      placements.push({
+        assetId: 'logic_trigger_box',
+        position: [half, 0, 0],
+        scale: 5,
+        label: 'Gatehouse',
+        trigger: { shape: 'box', detects: 'player', once: true },
+      });
+
+      return buildScene('Castle Siege', placements, {
+        terrain: sculptedTerrain((field) => {
+          // The keep on a rise, the siege lines on the flat below it — the shape of the fight.
+          field.sculpt(0, 0, 'raise', { radius: 34, strength: 0.7 });
+          field.sculpt(40, 0, 'lower', { radius: 26, strength: 0.3 });
+          field.sculpt(0, 0, 'smooth', { radius: 70, strength: 0.5 });
+        }),
+      });
+    },
+  },
+  {
+    id: 'survivors-camp',
+    name: "Survivor's camp",
+    description: 'Tents around a fire in a clearing, with supplies to find and woods to search.',
+    build: () => {
+      const random = seeded(20261104);
+      const placements: Placement[] = [
+        { assetId: 'campfire_logs', position: [0, 0, 0], label: 'Campfire' },
+        { assetId: 'tent_detailed_open', position: [-6, 0, -4], rotationY: 40 },
+        { assetId: 'tent_detailed_closed', position: [6, 0, -5], rotationY: -30 },
+        { assetId: 'tent_small_closed', position: [1, 0, 8], rotationY: 190 },
+        { assetId: 'bedroll', position: [-5, 0, -2], rotationY: 40 },
+        { assetId: 'log_stack', position: [4, 0, 3], rotationY: 15 },
+        { assetId: 'barrel', position: [-9, 0, 2] },
+        { assetId: 'box_large', position: [8, 0, 1], rotationY: 20 },
+        {
+          assetId: 'chest',
+          position: [-2, 0, 11],
+          label: 'Supply chest',
+          behaviors: [
+            { type: 'pickup', params: { kind: 'health', amount: 50, radius: 2.5 } },
+          ],
+        },
+      ];
+
+      // Woods around the camp, thinning as they go out — a clearing reads as one because the trees
+      // stop, not because a circle was drawn.
+      for (let index = 0; index < 60; index += 1) {
+        const angle = random() * Math.PI * 2;
+        const distance = 18 + random() * 34;
+        const pick = random();
+        placements.push({
+          assetId:
+            pick > 0.66
+              ? 'tree_pine_default_a'
+              : pick > 0.33
+                ? 'tree_default_dark'
+                : 'tree_oak_dark',
+          position: [
+            Number((Math.cos(angle) * distance).toFixed(2)),
+            0,
+            Number((Math.sin(angle) * distance).toFixed(2)),
+          ],
+          rotationY: Number((random() * 360).toFixed(1)),
+          scale: Number((0.8 + random() * 0.5).toFixed(2)),
+        });
+      }
+
+      for (let index = 0; index < 18; index += 1) {
+        const angle = random() * Math.PI * 2;
+        const distance = 12 + random() * 30;
+        const pick = random();
+        placements.push({
+          assetId:
+            pick > 0.6 ? 'mushroom_red_group' : pick > 0.3 ? 'flower_purple_a' : 'stump_round',
+          position: [
+            Number((Math.cos(angle) * distance).toFixed(2)),
+            0,
+            Number((Math.sin(angle) * distance).toFixed(2)),
+          ],
+          rotationY: Number((random() * 360).toFixed(1)),
+        });
+      }
+
+      placements.push({
+        assetId: 'enemy_goblin_01',
+        position: [-14, 0, -18],
+        rotationY: 140,
+        label: 'Prowler',
+        behaviors: [
+          {
+            type: 'chaseOnSight',
+            params: { sightRange: 20, chaseSpeed: 3, health: 50, attackDamage: 10 },
+          },
+        ],
+      });
+
+      placements.push({
+        assetId: 'logic_trigger_sphere',
+        position: [0, 0, 0],
+        scale: 8,
+        label: 'By the fire',
+        trigger: { shape: 'sphere', detects: 'player', once: false },
+      });
+
+      return buildScene("Survivor's Camp", placements, {
+        terrain: sculptedTerrain((field) => {
+          field.sculpt(0, 0, 'lower', { radius: 22, strength: 0.25 });
+          field.sculpt(-30, -26, 'raise', { radius: 34, strength: 0.6 });
+          field.sculpt(28, 24, 'raise', { radius: 28, strength: 0.45 });
+          field.sculpt(0, 0, 'smooth', { radius: 64, strength: 0.55 });
+        }),
+      });
+    },
+  },
+  {
+    id: 'rocky-canyon',
+    name: 'Rocky canyon',
+    description: 'A cut through high ground, walled by cliffs, with cover to fight around.',
+    build: () => {
+      const random = seeded(20260222);
+      const placements: Placement[] = [];
+
+      /**
+       * Two cliff walls with a gap between them.
+       *
+       * Built as a corridor rather than a scatter because a canyon is a *shape*, and the point of
+       * the template is to show that the library can make one — which needs the cliff pieces the
+       * Kenney nature kit brought and the ten-asset library could not express at all.
+       */
+      for (let step = -6; step <= 6; step += 1) {
+        const z = step * 7;
+        const jitter = (random() - 0.5) * 3;
+        placements.push({
+          assetId: random() > 0.5 ? 'cliff_block_rock' : 'cliff_block_stone',
+          position: [Number((-14 + jitter).toFixed(2)), 0, z],
+          rotationY: 90,
+        });
+        placements.push({
+          assetId: random() > 0.5 ? 'cliff_block_rock' : 'cliff_block_stone',
+          position: [Number((14 - jitter).toFixed(2)), 0, z],
+          rotationY: 270,
+        });
+      }
+
+      for (let index = 0; index < 24; index += 1) {
+        const side = random() > 0.5 ? 1 : -1;
+        placements.push({
+          assetId: random() > 0.5 ? 'rock_tall_a' : 'stone_tall_a',
+          position: [
+            Number((side * (16 + random() * 10)).toFixed(2)),
+            0,
+            Number(((random() - 0.5) * 90).toFixed(2)),
+          ],
+          rotationY: Number((random() * 360).toFixed(1)),
+          scale: Number((0.9 + random() * 0.6).toFixed(2)),
+        });
+      }
+
+      // Cover in the corridor itself, so the fight has somewhere to happen.
+      for (let index = 0; index < 9; index += 1) {
+        placements.push({
+          assetId: random() > 0.5 ? 'rock_small_a' : 'stone_small_a',
+          position: [
+            Number(((random() - 0.5) * 20).toFixed(2)),
+            0,
+            Number(((random() - 0.5) * 80).toFixed(2)),
+          ],
+          rotationY: Number((random() * 360).toFixed(1)),
+        });
+      }
+
+      placements.push({ assetId: 'barrel', position: [3, 0, -12] });
+      placements.push({ assetId: 'box', position: [-4, 0, 6], rotationY: 25 });
+
+      for (const [x, z, name] of [
+        [-5, -26, 'Canyon watch'],
+        [6, 24, 'Rear guard'],
+      ] as const) {
+        placements.push({
+          assetId: 'enemy_goblin_01',
+          position: [x, 0, z],
+          rotationY: z < 0 ? 180 : 0,
+          label: name,
+          behaviors: [
+            {
+              type: 'chaseOnSight',
+              params: { sightRange: 22, chaseSpeed: 3.4, health: 55, attackDamage: 12 },
+            },
+          ],
+        });
+      }
+
+      placements.push({
+        assetId: 'logic_trigger_box',
+        position: [0, 0, -34],
+        scale: 6,
+        label: 'Canyon mouth',
+        trigger: { shape: 'box', detects: 'player', once: true },
+      });
+
+      return buildScene('Rocky Canyon', placements, {
+        terrain: sculptedTerrain((field) => {
+          // High ground either side, a trough down the middle.
+          field.sculpt(-30, 0, 'raise', { radius: 30, strength: 0.9 });
+          field.sculpt(30, 0, 'raise', { radius: 30, strength: 0.9 });
+          field.sculpt(0, 0, 'lower', { radius: 18, strength: 0.4 });
+          field.sculpt(0, 0, 'smooth', { radius: 40, strength: 0.5 });
+        }),
+      });
+    },
+  },
+  {
     id: 'stress-test',
     name: 'Stress test',
     description:
