@@ -3,6 +3,8 @@ import type { AssetCategory, AssetManifestEntry } from '@helaengine/schema';
 import type { AssetLibrary } from '../engine/assetLibrary';
 import { cloudAssets, subscribeToSession, type CloudAssets } from './backend';
 import { assetIdFromFilename, type CloudAsset } from './cloudAssets';
+import type { LimitReached } from './billing';
+import { asLimit } from '../components/UpgradePrompt';
 
 /**
  * An organisation's own assets, as far as the editor is concerned.
@@ -25,6 +27,15 @@ export interface UploadedAssets {
   available: boolean;
   busy: boolean;
   error: string | null;
+  /**
+   * A plan limit, kept apart from ordinary errors (Sprint 35).
+   *
+   * "That file is not a glTF" and "your plan does not include uploads" are different kinds of news
+   * and want different screens — one is a mistake to correct, the other is a door. Flattening both
+   * into `error` is how the second becomes a red string nobody can act on.
+   */
+  limit: LimitReached | null;
+  dismissLimit: () => void;
   upload: (files: FileList | File[], category: AssetCategory) => Promise<void>;
   remove: (assetId: string) => Promise<void>;
   dismissError: () => void;
@@ -34,6 +45,7 @@ export function useUploadedAssets(library: AssetLibrary | null): UploadedAssets 
   const [fetched, setAll] = useState<CloudAsset[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [limit, setLimit] = useState<LimitReached | null>(null);
   // Bumped to ask for a refetch. An upload's own response is what the server said at that instant;
   // re-reading afterwards is how anything a later processing stage adds arrives without a reload.
   const [generation, setGeneration] = useState(0);
@@ -114,6 +126,13 @@ export function useUploadedAssets(library: AssetLibrary | null): UploadedAssets 
             });
             setAll((current) => [...current.filter((a) => a.assetId !== assetId), uploaded]);
           } catch (problem: unknown) {
+            const reached = asLimit(problem);
+            // The first limit wins and stops the batch: uploading nine more files to be refused
+            // nine more times helps nobody.
+            if (reached) {
+              setLimit(reached);
+              break;
+            }
             problems.push(problem instanceof Error ? problem.message : String(problem));
           }
         }
@@ -144,6 +163,18 @@ export function useUploadedAssets(library: AssetLibrary | null): UploadedAssets 
   );
 
   const dismissError = useCallback(() => setError(null), []);
+  const dismissLimit = useCallback(() => setLimit(null), []);
 
-  return { all, entries, available, busy, error, upload, remove, dismissError };
+  return {
+    all,
+    entries,
+    available,
+    busy,
+    error,
+    limit,
+    upload,
+    remove,
+    dismissError,
+    dismissLimit,
+  };
 }

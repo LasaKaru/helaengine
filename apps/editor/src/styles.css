@@ -1879,3 +1879,70 @@ body,
   display: flex;
   gap: 0.5rem;
 }
+
+/* The plan and its meters (Sprint 35). */
+.billing-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: var(--surface-2, #1b1d22);
+}
+
+.billing-panel h3 {
+  margin: 0;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+}
+
+.billing-plan {
+  margin: 0;
+}
+
+.billing-meter {
+  display: grid;
+  /* Label, bar, value — a three-column grid so the bars line up however long the labels are. */
+  grid-template-columns: 10rem 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.billing-meter meter {
+  width: 100%;
+}
+
+.billing-meter.over .billing-meter-value {
+  color: var(--warning, #e0a44a);
+}
+
+.billing-warning {
+  color: var(--warning, #e0a44a);
+}
+
+.billing-actions,
+.upgrade-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* The one prompt every plan limit produces, wherever it was hit. */
+.upgrade-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--warning, #e0a44a);
+  background: var(--surface-2, #1b1d22);
+}
+
+.upgrade-message {
+  margin: 0;
+  line-height: 1.5;
+}

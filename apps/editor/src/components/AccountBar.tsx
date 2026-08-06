@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useProjectStore } from '../store/projectStore';
 import { apiConfigured, restore, signIn, signOut, signUp, type SignedIn } from '../storage/session';
+import { BillingPanel } from './BillingPanel';
 
 /**
  * Sign in, or do not.
@@ -61,15 +62,23 @@ export function AccountBar(): React.JSX.Element | null {
 
   if (who) {
     return (
-      <div className="account-bar" role="status">
-        <span>
-          Signed in as <strong>{who.displayName}</strong>. Projects are saved to your account, with
-          a version for every save.
-        </span>
-        <button type="button" onClick={() => void leave()}>
-          Sign out
-        </button>
-      </div>
+      <>
+        <div className="account-bar" role="status">
+          <span>
+            Signed in as <strong>{who.displayName}</strong>. Projects are saved to your account,
+            with a version for every save.
+          </span>
+          <button type="button" onClick={() => void leave()}>
+            Sign out
+          </button>
+        </div>
+        {/*
+          The plan lives on the projects screen rather than in the editor's chrome (Sprint 35).
+          It is something somebody reads between sessions — "how many exports have I got left" —
+          not while placing a tree, and a meter in the toolbar would be a permanent nag.
+        */}
+        <BillingPanel />
+      </>
     );
   }
 

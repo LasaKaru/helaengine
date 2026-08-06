@@ -4011,3 +4011,111 @@ test.describe('following one export end to end', () => {
     expect(view).not.toContain('span(s) failed');
   });
 });
+
+/**
+ * Sprint 35 — the definition of done, in a browser.
+ *
+ * "A free-tier account attempting a Pro-only action is cleanly blocked with an upgrade prompt;
+ * upgrading immediately unlocks the feature without requiring a manual support action; usage meters
+ * accurately reflect actual metered usage."
+ *
+ * Walked end to end against the local billing provider, which is the real port with the network
+ * removed rather than a mock: the checkout page is served by the API, its button posts a *signed
+ * webhook*, and the webhook is what changes the entitlement. Everything except Stripe itself is the
+ * code a paying deployment runs.
+ */
+test.describe('plans and upgrading', () => {
+  test('a blocked upload becomes an unlocked one, with no manual step', async ({ page }) => {
+    test.setTimeout(180_000);
+
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Create an account' }).click();
+    await page.getByLabel('Display name').fill('Plan Person');
+    await page.getByLabel('Email').fill(`plans-${Date.now().toString(36)}@example.com`);
+    await page.getByLabel('Password').fill('a-long-enough-password');
+    await page.getByRole('button', { name: 'Create account' }).click();
+    await expect(page.getByText('Signed in as')).toBeVisible({ timeout: 30_000 });
+
+    // The meters are on the projects screen, where somebody reads them between sessions.
+    const plan = page.getByRole('region', { name: 'Plan' });
+    await expect(plan).toBeVisible({ timeout: 30_000 });
+    await expect(plan.getByTestId('billing-plan')).toHaveText(/Free/);
+    await expect(plan.getByTestId('meter-exports')).toHaveText(/0 of 5/);
+
+    // A Pro-only action on a free account.
+    await page.getByRole('button', { name: /Empty field/ }).click();
+    await editorOpen(page);
+
+    const library = page.getByRole('region', { name: 'Assets' });
+    await library
+      .getByLabel('Upload a model')
+      .setInputFiles({ name: 'mine.glb', mimeType: 'model/gltf-binary', buffer: glbBytes() });
+
+    // Blocked cleanly, with the way out attached — not a red string, and not a silent failure.
+    const prompt = page.getByTestId('upgrade-prompt');
+    await expect(prompt).toBeVisible({ timeout: 30_000 });
+    await expect(prompt).toContainText('Pro');
+
+    // Upgrading goes through the provider's page, exactly as a card payment would.
+    await prompt.getByRole('button', { name: /Upgrade to Pro/ }).click();
+    await page.waitForURL(/\/billing\/checkout/, { timeout: 30_000 });
+    await page.getByRole('button', { name: 'Complete the upgrade' }).click();
+
+    // …and comes back to the editor with the plan changed. Nobody touched a database.
+    await page.waitForURL((url) => !url.pathname.startsWith('/billing'), { timeout: 30_000 });
+    await page.waitForFunction(() => window.helaengine !== undefined, undefined, {
+      timeout: 30_000,
+    });
+
+    await expect(page.getByTestId('billing-plan')).toHaveText(/Pro/, { timeout: 30_000 });
+
+    // The feature is available immediately: the same upload that was refused a moment ago.
+    await page.getByRole('button', { name: /Empty field/ }).click();
+    await editorOpen(page);
+    await page
+      .getByRole('region', { name: 'Assets' })
+      .getByLabel('Upload a model')
+      .setInputFiles({ name: 'mine.glb', mimeType: 'model/gltf-binary', buffer: glbBytes() });
+
+    await expect(page.getByText('mine', { exact: false })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('upgrade-prompt')).toBeHidden();
+  });
+
+  test('the meters follow what was actually spent', async ({ page }) => {
+    test.setTimeout(180_000);
+
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Create an account' }).click();
+    await page.getByLabel('Display name').fill('Meter Person');
+    await page.getByLabel('Email').fill(`meters-${Date.now().toString(36)}@example.com`);
+    await page.getByLabel('Password').fill('a-long-enough-password');
+    await page.getByRole('button', { name: 'Create account' }).click();
+    await expect(page.getByText('Signed in as')).toBeVisible({ timeout: 30_000 });
+
+    await expect(page.getByTestId('meter-exports')).toHaveText(/0 of 5/, { timeout: 30_000 });
+
+    // Spend one, for real: a server-side export is what the meter counts.
+    await page.getByRole('button', { name: /Empty field/ }).click();
+    await editorOpen(page);
+    await saveAndSettle(page);
+
+    await page.getByRole('button', { name: 'Export' }).click();
+    const serverExport = page.getByRole('region', { name: 'Build on the server' });
+    await serverExport.getByRole('button', { name: 'Build on the server' }).click();
+    await expect(serverExport.getByTestId('export-ready')).toBeVisible({ timeout: 180_000 });
+
+    // Back to the projects screen, where the meter is read from the server's own count of
+    // `export_jobs` — not from anything this browser remembered.
+    await page.getByRole('button', { name: 'Projects' }).click();
+    await expect(page.getByTestId('meter-exports')).toHaveText(/1 of 5/, { timeout: 30_000 });
+  });
+});
+
+/** Twelve bytes that begin the way a binary glTF begins, which is all the validator checks. */
+function glbBytes(): Buffer {
+  const bytes = Buffer.alloc(12);
+  bytes.write('glTF', 0, 'ascii');
+  bytes.writeUInt32LE(2, 4);
+  bytes.writeUInt32LE(12, 8);
+  return bytes;
+}

@@ -120,9 +120,11 @@ describe('AssetLibraryPanel — my assets', () => {
       available: true,
       busy: false,
       error: null,
+      limit: null,
       upload: async () => {},
       remove: async () => {},
       dismissError: () => {},
+      dismissLimit: () => {},
       ...overrides,
     };
   }

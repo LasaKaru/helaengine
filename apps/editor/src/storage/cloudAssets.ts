@@ -4,6 +4,7 @@ import {
   type AssetManifestEntry,
 } from '@helaengine/schema';
 import { NotSignedIn, type CloudSession } from './cloudProjects';
+import { limitFrom } from './billing';
 
 /**
  * Assets a customer uploaded, over the API.
@@ -90,6 +91,11 @@ export class CloudAssets {
     const text = await sent.text();
     const parsed = (text ? JSON.parse(text) : {}) as { asset?: CloudAsset; error?: string };
     if (parsed.asset) return parsed.asset;
+    // The storage limit is checked when the bytes arrive, because a ticket is issued before
+    // anybody knows how big the file is — so this path needs the same typed refusal.
+    const limit = limitFrom(sent.status, parsed as unknown as Record<string, unknown>);
+    if (limit) throw limit;
+
     throw new Error(parsed.error ?? `The upload failed (${sent.status}).`);
   }
 
@@ -161,6 +167,13 @@ export class CloudAssets {
 
     const text = await response.text();
     const parsed = (text ? JSON.parse(text) : {}) as Record<string, unknown>;
+
+    // A plan limit is a door, not a wall (Sprint 35). Raised as the same typed error the billing
+    // screen raises, so one prompt handles both — a product where some walls have doors and others
+    // do not is one people stop trying.
+    const limit = limitFrom(response.status, parsed);
+    if (limit) throw limit;
+
     if (!response.ok) {
       throw new Error(
         String(parsed['error'] ?? `The API refused this request (${response.status}).`),

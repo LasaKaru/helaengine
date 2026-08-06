@@ -150,6 +150,14 @@ export default defineConfig({
          * this is generous enough for a machine, which is a different thing and should be said
          * out loud rather than achieved by making the product lenient.
          */
+        /**
+         * The local billing provider (Sprint 35): a real implementation of the billing port with
+         * the network removed. It makes the whole upgrade path — press upgrade, land on a checkout
+         * page, complete it, receive a signed webhook, watch the feature unlock — walkable by a
+         * browser in a test, which no amount of mocking would.
+         */
+        BILLING_LOCAL_SECRET: 'e2e-billing-secret',
+        BILLING_LOCAL_ORIGIN: 'http://127.0.0.1:3100',
         AUTH_SIGNUPS_PER_HOUR: '10000',
         AUTH_LOGINS_PER_MINUTE: '10000',
         AUTH_LOGINS_PER_ACCOUNT: '10000',

@@ -10,6 +10,7 @@ import { ASSET_BASE_URL } from '../engine/assetLibrary';
 import type { UploadedAssets } from '../storage/useUploadedAssets';
 import { useEditorStore } from '../store/editorStore';
 import { SceneTree } from './SceneTree';
+import { UpgradePrompt } from './UpgradePrompt';
 
 const CARD_HEIGHT = 116;
 const MIN_CARD_WIDTH = 96;
@@ -198,6 +199,11 @@ function MyAssets({ uploads }: { uploads: UploadedAssets }): React.JSX.Element |
           }}
         />
       </div>
+
+      {uploads.limit !== null && (
+        // The same prompt every limit produces, wherever it was hit.
+        <UpgradePrompt limit={uploads.limit} onDismiss={uploads.dismissLimit} />
+      )}
 
       {uploads.error !== null && (
         <p className="upload-error" role="alert">
