@@ -37,6 +37,17 @@ export interface ProjectState {
   screen: Screen;
   projectId: string | null;
   projects: ProjectSummary[];
+  /**
+   * Whether the list has actually been fetched yet.
+   *
+   * Without this, `projects: []` means two different things — "you have none" and "we have not
+   * looked" — and the screen cannot tell them apart. A signed-in user with a dozen projects was
+   * shown "Nothing saved yet. Pick a template above" for the duration of the fetch, which is the
+   * worst possible first impression: the product telling somebody their work is gone.
+   */
+  projectsStatus: 'loading' | 'ready' | 'error';
+  /** Why the list could not be loaded, for a message the user can act on. */
+  projectsError: string | null;
   saveState: SaveState;
   /** True when the document has changed since the last successful save. */
   dirty: boolean;
@@ -151,6 +162,8 @@ export const useProjectStore = create<ProjectState>()(
       screen: 'projects',
       projectId: null,
       projects: [],
+      projectsStatus: 'loading',
+      projectsError: null,
       saveState: { status: 'idle' },
       dirty: false,
       adoptedScene: null,
@@ -163,7 +176,32 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       refreshProjects: async () => {
-        set({ projects: await listProjects() }, false, 'projects/refresh');
+        // Not flipped back to 'loading' on a refresh that already has data: a re-fetch after a
+        // save would blank the list somebody is looking at, which is a worse flicker than a stale
+        // row for half a second.
+        if (get().projectsStatus !== 'ready') {
+          set({ projectsStatus: 'loading', projectsError: null }, false, 'projects/loading');
+        }
+
+        try {
+          set(
+            { projects: await listProjects(), projectsStatus: 'ready', projectsError: null },
+            false,
+            'projects/refresh',
+          );
+        } catch (error) {
+          // Recorded rather than rethrown. Every caller of this is a fire-and-forget refresh after
+          // some other action succeeded, so throwing would produce an unhandled rejection and an
+          // empty list — the same silent wrong answer this whole field exists to prevent.
+          set(
+            {
+              projectsStatus: 'error',
+              projectsError: error instanceof Error ? error.message : String(error),
+            },
+            false,
+            'projects/failed',
+          );
+        }
       },
 
       createFromTemplate: async (templateId) => {

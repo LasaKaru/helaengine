@@ -16,6 +16,8 @@ function formatWhen(timestamp: number): string {
 /** The home screen: existing projects, and the template picker for new ones. */
 export function ProjectsScreen(): React.JSX.Element {
   const projects = useProjectStore((state) => state.projects);
+  const projectsStatus = useProjectStore((state) => state.projectsStatus);
+  const projectsError = useProjectStore((state) => state.projectsError);
   const loadError = useProjectStore((state) => state.loadError);
   const refreshProjects = useProjectStore((state) => state.refreshProjects);
   const createFromTemplate = useProjectStore((state) => state.createFromTemplate);
@@ -114,7 +116,28 @@ export function ProjectsScreen(): React.JSX.Element {
 
       <section aria-label="Your projects">
         <h2>Your projects</h2>
-        {projects.length === 0 ? (
+        {/*
+          Three states, not two. `projects: []` used to mean both "you have none" and "we have not
+          looked yet", so a signed-in user with a dozen projects was told "Nothing saved yet" for
+          the length of the fetch — the product telling somebody their work is gone.
+
+          The failure case gets a retry rather than only a sentence: a project list that fails to
+          load is usually a network blip, and the alternative is asking the user to reload the page
+          and lose whatever else they were doing.
+        */}
+        {projectsStatus === 'loading' ? (
+          <p className="panel-hint" role="status">
+            <span className="spinner spinner-inline" aria-hidden="true" />
+            Loading your projects…
+          </p>
+        ) : projectsStatus === 'error' ? (
+          <div className="projects-error" role="alert">
+            <p>Could not load your projects. {projectsError}</p>
+            <button type="button" onClick={() => void refreshProjects()}>
+              Try again
+            </button>
+          </div>
+        ) : projects.length === 0 ? (
           <p className="panel-hint">
             Nothing saved yet. Pick a template above and it will appear here.
           </p>

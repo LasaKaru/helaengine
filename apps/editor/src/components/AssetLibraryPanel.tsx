@@ -346,7 +346,32 @@ export function AssetLibraryPanel({
 
         <div className="asset-grid" ref={gridRef} data-testid="asset-grid">
           {visible.length === 0 ? (
-            <p className="panel-hint">No assets match “{search}”.</p>
+            /*
+              An empty result that says why it is empty and offers the way out.
+              
+              "No assets match X" is true and unhelpful when a *category* filter is also on: the
+              user reads it as "this product has no crates", clears the search, and still sees
+              nothing. Naming both filters and giving a button that drops them is the difference
+              between a dead end and a hint.
+            */
+            <div className="panel-hint empty-state">
+              <p>
+                {search === ''
+                  ? `No ${category ?? 'assets'} to show.`
+                  : `No ${category ? `${category} ` : ''}assets match “${search}”.`}
+              </p>
+              {(search !== '' || category !== null) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch('');
+                    setCategory(null);
+                  }}
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
           ) : (
             width > 0 &&
             height > 0 && (

@@ -269,6 +269,35 @@ body,
   animation: spin 0.9s linear infinite;
 }
 
+/*
+  The same spinner at text size, for a state that sits inside a sentence rather than filling a
+  screen. `currentColor` on the leading edge so it reads as part of the line it is in.
+
+  Reduced motion is handled by the existing rule below, which slows the spin to 3s rather than
+  stopping it — a decision this file already made, so this one joins it rather than overriding it.
+*/
+.spinner-inline {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-width: 2px;
+  border-top-color: currentcolor;
+  vertical-align: -1px;
+  margin-right: 8px;
+}
+
+/* An empty result and the action that resolves it, stacked rather than run together. */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.empty-state p {
+  margin: 0;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -276,7 +305,8 @@ body,
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .spinner {
+  .spinner,
+  .spinner-inline {
     animation-duration: 3s;
   }
 }
@@ -1107,6 +1137,21 @@ body,
 
 .projects-screen section + section {
   margin-top: 36px;
+}
+
+.projects-error p {
+  margin: 0 0 8px;
+}
+
+.projects-error button {
+  padding: 5px 12px;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  background: transparent;
+  border: 1px solid currentcolor;
+  border-radius: 6px;
+  cursor: pointer;
 }
 
 .projects-error {
