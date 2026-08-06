@@ -1,0 +1,19 @@
+{
+  "name": "@helaengine/bundle",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Bundle budgets and cache-header checks. What the browser actually downloads, compared to a number somebody committed to.",
+  "scripts": {
+    "budget": "tsx src/cli.ts",
+    "headers": "tsx src/headersCli.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

@@ -11,5 +11,9 @@ export default defineConfig({
   build: {
     target: 'es2022',
     sourcemap: true,
+    // The manifest is what makes the bundle budget checkable rather than a guess: it records which
+    // chunks the entry pulls in *statically* — the bytes a user waits for before anything renders —
+    // as distinct from the ones behind a dynamic import, which cost nothing until they are needed.
+    manifest: true,
   },
 });

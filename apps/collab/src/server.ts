@@ -52,7 +52,16 @@ export function createCollabServer(options: CollabServerOptions): {
   const server = createServer((request, response) => {
     if (request.url === '/health') {
       response.writeHead(200, { 'content-type': 'application/json' });
-      response.end(JSON.stringify({ ok: true, service: 'helaengine-collab', rooms: rooms.size }));
+      // `rss` is here for the load tool, which has no other way to ask what a connection costs:
+      // this process's memory is the scaling limit, and the number is only meaningful from inside.
+      response.end(
+        JSON.stringify({
+          ok: true,
+          service: 'helaengine-collab',
+          rooms: rooms.size,
+          rss: process.memoryUsage().rss,
+        }),
+      );
       return;
     }
     response.writeHead(404).end();

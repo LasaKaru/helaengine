@@ -673,7 +673,11 @@ export function createApiServer(options: ApiOptions): Server {
     }
 
     const fileMatch = /^\/assets\/(.+)$/.exec(path);
-    if (fileMatch && method === 'GET') {
+    // HEAD as well as GET, because this is the CDN-facing path and HEAD is how a cache asks
+    // whether it still has the right bytes. Matching GET alone sent HEAD down to the authenticated
+    // routes below, where it became a 401 — a CDN or a `curl -I` being told this public,
+    // content-addressed URL required a login.
+    if (fileMatch && (method === 'GET' || method === 'HEAD')) {
       // Also unauthenticated, and also on purpose: this is the path a CDN sits in front of, and a
       // CDN holds no session. The protection is that the path contains a content hash nobody can
       // guess — the same bargain the share service makes for an unlisted build.

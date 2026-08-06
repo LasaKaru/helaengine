@@ -868,6 +868,31 @@ describe('assets', () => {
     expect(anonymous.status).toBe(200);
   });
 
+  it('answers HEAD on an asset the same way it answers GET', async () => {
+    const { token, organizationId } = await workspace();
+    const granted = await requestUpload(token, organizationId, { assetId: 'head_rock' });
+    await put(granted.body.upload.url, glb('rock'));
+
+    const listed = await call<{ assets: Array<{ assetId: string; glbPath: string }> }>(
+      'GET',
+      `/orgs/${organizationId}/assets`,
+      { token },
+    );
+    const path = listed.body.assets.find((a) => a.assetId === 'head_rock')!.glbPath;
+
+    /**
+     * Found by pointing the Sprint 36 header checker at a running server, not by reading the code.
+     * The route matched `method === 'GET'`, so HEAD fell through to the authenticated routes below
+     * it and came back 401 — a deliberately public, CDN-facing URL telling a cache it needed to log
+     * in. HEAD is how a cache revalidates and how most uptime probes ask, so the failure would have
+     * shown up as a cold CDN and a monitor that never went green, neither pointing at the cause.
+     */
+    const head = await fetch(`${origin}/assets/${path}`, { method: 'HEAD' });
+    expect(head.status).toBe(200);
+    expect(head.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
+    expect(head.headers.get('content-type')).toBe('model/gltf-binary');
+  });
+
   it('answers the preflight a browser sends before an upload', async () => {
     // Found by driving a browser, not by reading the code. `model/gltf-binary` is not a
     // CORS-safelisted content type, so the upload is preflighted — and an `allow-methods` without

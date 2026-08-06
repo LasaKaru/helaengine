@@ -92,6 +92,14 @@ jobs:
         env:
           SKIP_THUMBNAILS: '1'
 
+      # The bundle budget (Sprint 36). A budget that only prints is a budget that gets exceeded on
+      # a Tuesday and noticed the following quarter, so this fails the build — and it needs a real
+      # production build, which nothing else in this job produces.
+      - name: Bundle budget
+        run: |
+          pnpm --filter @helaengine/editor build
+          pnpm budget
+
   e2e:
     name: Editor end-to-end
     runs-on: ubuntu-latest
