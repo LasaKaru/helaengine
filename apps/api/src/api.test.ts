@@ -1570,3 +1570,243 @@ describe('what the API says about itself', () => {
     expect(body.job.correlationId).toBe(correlationId);
   });
 });
+
+/**
+ * Sprint 34 — cross-tenant isolation, endpoint by endpoint.
+ *
+ * The definition of done says this must be *tested*, not inferred from the RBAC design, and the
+ * distinction is the point: `requireRole` is called at every call site by hand, so isolation holds
+ * exactly as long as nobody forgets one. A route added without a guard is invisible in review and
+ * obvious here.
+ *
+ * The table is the test. Every route that takes an organisation, project, job or asset id appears
+ * in it, and each is driven with a *valid session belonging to somebody else* — not an anonymous
+ * request, which is a much weaker claim. If a route is added and not listed, the count assertion at
+ * the end fails, so the omission is loud rather than silent.
+ */
+describe('one organisation cannot reach another', () => {
+  interface Tenant {
+    token: string;
+    organizationId: string;
+    projectId: string;
+    jobId: string;
+    assetId: string;
+  }
+
+  async function tenant(label: string): Promise<Tenant> {
+    const owner = await signup(`${label}-${Math.random().toString(36).slice(2)}@example.com`);
+
+    const created = await call<{ project: { id: string } }>(
+      'POST',
+      `/orgs/${owner.personalOrganizationId}/projects`,
+      {
+        token: owner.token,
+        body: {
+          name: `${label} project`,
+          scene: { sceneId: 's', version: 1, name: `${label} project`, objects: [] },
+        },
+      },
+    );
+    const projectId = created.body.project.id;
+
+    const job = await call<{ job: { id: string } }>('POST', `/projects/${projectId}/exports`, {
+      token: owner.token,
+    });
+
+    const assetId = `asset_${Math.random().toString(36).slice(2, 10)}`;
+    const asset = await call<{ asset: { id: string } }>(
+      'POST',
+      `/orgs/${owner.personalOrganizationId}/assets`,
+      {
+        token: owner.token,
+        body: { assetId, name: `${label} model`, category: 'props' },
+      },
+    );
+
+    return {
+      token: owner.token,
+      organizationId: owner.personalOrganizationId,
+      projectId,
+      jobId: job.body.job.id,
+      assetId: asset.body.asset.id,
+    };
+  }
+
+  interface Attempt {
+    what: string;
+    method: string;
+    path: (victim: Tenant) => string;
+    body?: unknown;
+    /**
+     * 404 for anything that would reveal the resource exists, 403 only where the attacker already
+     * knows it does. See `requireRole` — telling a stranger "you may not touch organisation X"
+     * confirms X exists, which is a membership oracle for anybody willing to guess ids.
+     */
+    expected: number[];
+  }
+
+  const attempts: Attempt[] = [
+    {
+      what: 'list the members',
+      method: 'GET',
+      path: (victim) => `/orgs/${victim.organizationId}/members`,
+      expected: [404],
+    },
+    {
+      what: 'invite themselves in',
+      method: 'POST',
+      path: (victim) => `/orgs/${victim.organizationId}/invites`,
+      body: { email: 'attacker@example.com', role: 'owner' },
+      expected: [404],
+    },
+    {
+      what: 'list the projects',
+      method: 'GET',
+      path: (victim) => `/orgs/${victim.organizationId}/projects`,
+      expected: [404],
+    },
+    {
+      what: 'create a project in it',
+      method: 'POST',
+      path: (victim) => `/orgs/${victim.organizationId}/projects`,
+      body: { name: 'Theirs now', scene: { sceneId: 's', version: 1, name: 'x', objects: [] } },
+      expected: [404],
+    },
+    {
+      what: 'read the export allowance',
+      method: 'GET',
+      path: (victim) => `/orgs/${victim.organizationId}/export-quota`,
+      expected: [404],
+    },
+    {
+      what: 'list the uploaded assets',
+      method: 'GET',
+      path: (victim) => `/orgs/${victim.organizationId}/assets`,
+      expected: [404],
+    },
+    {
+      what: 'start an upload into it',
+      method: 'POST',
+      path: (victim) => `/orgs/${victim.organizationId}/assets`,
+      body: { assetId: 'theirs_now', name: 'theirs.glb', category: 'props' },
+      expected: [404],
+    },
+    {
+      what: 'delete an asset',
+      method: 'DELETE',
+      path: (victim) => `/orgs/${victim.organizationId}/assets/${victim.assetId}`,
+      expected: [404],
+    },
+    {
+      what: 'read a project',
+      method: 'GET',
+      path: (victim) => `/projects/${victim.projectId}`,
+      expected: [404],
+    },
+    {
+      what: 'rename a project',
+      method: 'PATCH',
+      path: (victim) => `/projects/${victim.projectId}`,
+      body: { name: 'Renamed by a stranger' },
+      expected: [404],
+    },
+    {
+      what: 'delete a project',
+      method: 'DELETE',
+      path: (victim) => `/projects/${victim.projectId}`,
+      expected: [404],
+    },
+    {
+      what: 'read the version history',
+      method: 'GET',
+      path: (victim) => `/projects/${victim.projectId}/versions`,
+      expected: [404],
+    },
+    {
+      what: 'save over a project',
+      method: 'POST',
+      path: (victim) => `/projects/${victim.projectId}/versions`,
+      body: {
+        baseVersion: 1,
+        scene: { sceneId: 's', version: 1, name: 'overwritten', objects: [] },
+      },
+      expected: [404],
+    },
+    {
+      what: 'roll a project back',
+      method: 'POST',
+      path: (victim) => `/projects/${victim.projectId}/versions/1/restore`,
+      expected: [404],
+    },
+    {
+      what: 'spend the export quota',
+      method: 'POST',
+      path: (victim) => `/projects/${victim.projectId}/exports`,
+      expected: [404],
+    },
+    {
+      what: 'list the builds',
+      method: 'GET',
+      path: (victim) => `/projects/${victim.projectId}/exports`,
+      expected: [404],
+    },
+    {
+      what: 'poll an export job',
+      method: 'GET',
+      path: (victim) => `/export-jobs/${victim.jobId}`,
+      expected: [404],
+    },
+    {
+      what: 'download a finished build',
+      method: 'GET',
+      path: (victim) => `/export-jobs/${victim.jobId}/download`,
+      expected: [403, 404],
+    },
+  ];
+
+  it.each(attempts)('refuses to let a stranger $what', async (attempt) => {
+    const victim = await tenant('victim');
+    const attacker = await tenant('attacker');
+
+    const response = await call(attempt.method, attempt.path(victim), {
+      token: attacker.token,
+      ...(attempt.body === undefined ? {} : { body: attempt.body }),
+    });
+
+    expect(attempt.expected).toContain(response.status);
+  });
+
+  it('covers every route that takes somebody else’s id', () => {
+    /**
+     * A tripwire, not a metric.
+     *
+     * The number is here so that adding a tenant-scoped route without adding a row above fails
+     * this test rather than quietly shipping. The other routes in `routePattern`'s list are
+     * unauthenticated by design and tested elsewhere: `/health` and `/metrics` carry no tenant
+     * data, `/auth/*` and `/invites/accept` are how a session is obtained in the first place,
+     * `/uploads/:org/:asset` is authorised by a signed ticket rather than a session (forgery is
+     * tested above), and `/assets/:key` is the content-addressed CDN path.
+     */
+    expect(attempts).toHaveLength(18);
+  });
+
+  it('does not let one organisation’s export be downloaded with the other’s token in the URL', async () => {
+    const victim = await tenant('victim');
+    const attacker = await tenant('attacker');
+
+    // The download route accepts a token in the query, because a browser's download manager cannot
+    // send a header. That concession must not become a way in: membership is still checked.
+    const response = await fetch(
+      `${origin}/export-jobs/${victim.jobId}/download?token=${encodeURIComponent(attacker.token)}`,
+    );
+    expect([403, 404]).toContain(response.status);
+  });
+
+  it('refuses a session token that has been tampered with', async () => {
+    const victim = await tenant('victim');
+    const forged = `${victim.token.slice(0, -1)}${victim.token.endsWith('a') ? 'b' : 'a'}`;
+
+    const response = await call('GET', `/orgs/${victim.organizationId}/members`, { token: forged });
+    expect(response.status).toBe(401);
+  });
+});

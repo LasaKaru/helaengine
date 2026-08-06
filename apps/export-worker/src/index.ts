@@ -3,6 +3,7 @@ import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPool } from '@helaengine/api/db';
+import { within } from '@helaengine/api/paths';
 import { createExportQueue, createRedis } from '@helaengine/api/queue';
 import {
   createLogger,
@@ -40,7 +41,7 @@ class LocalArtifactStorage implements ArtifactStorage {
 
   put(key: string, bytes: Uint8Array): string {
     const target = join(this.#root, key);
-    if (!target.startsWith(this.#root)) throw new Error('that key would escape the artifact store');
+    if (!within(this.#root, target)) throw new Error('that key would escape the artifact store');
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, bytes);
     return key;
@@ -48,7 +49,7 @@ class LocalArtifactStorage implements ArtifactStorage {
 
   read(key: string): Uint8Array | null {
     const target = join(this.#root, key);
-    if (!target.startsWith(this.#root) || !existsSync(target)) return null;
+    if (!within(this.#root, target) || !existsSync(target)) return null;
     return readFileSync(target);
   }
 }

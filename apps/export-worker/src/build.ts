@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import JSZip from 'jszip';
 import { buildExport, DEFAULT_EXPORT_OPTIONS, slugify, type ExportPlan } from '@helaengine/export';
 import { parseAssetManifest, type AssetManifest, type Scene } from '@helaengine/schema';
+import { within } from '@helaengine/api/paths';
 
 /**
  * Building an export, server-side.
@@ -72,7 +73,7 @@ export class LocalAssetSource implements AssetSource {
     const target = join(this.#assetRoot, path);
     // A manifest is generated output rather than user input, but it is still a path from a file
     // being turned into a filesystem read, and the check costs nothing.
-    if (!target.startsWith(this.#assetRoot)) {
+    if (!within(this.#assetRoot, target)) {
       throw new Error(`asset path "${path}" escapes the asset root`);
     }
     return new Uint8Array(await readFile(target));

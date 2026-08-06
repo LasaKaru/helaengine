@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { within } from './paths.js';
 import type { Db } from './db.js';
 import { Forbidden, NotFound } from './roles.js';
 
@@ -36,7 +37,7 @@ export class LocalAssetStorage implements AssetStorage {
 
   put(key: string, bytes: Uint8Array): string {
     const target = join(this.#root, key);
-    if (!target.startsWith(this.#root)) throw new Error('that key would escape the asset store');
+    if (!within(this.#root, target)) throw new Error('that key would escape the asset store');
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, bytes);
     return key;
@@ -44,7 +45,7 @@ export class LocalAssetStorage implements AssetStorage {
 
   read(key: string): Uint8Array | null {
     const target = join(this.#root, key);
-    if (!target.startsWith(this.#root) || !existsSync(target)) return null;
+    if (!within(this.#root, target) || !existsSync(target)) return null;
     return readFileSync(target);
   }
 }
