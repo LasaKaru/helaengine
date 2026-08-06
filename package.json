@@ -18,6 +18,7 @@
     "format:check": "prettier --check .",
     "generate-assets": "pnpm --filter @helaengine/asset-pipeline generate-raw",
     "ingest-assets": "pnpm --filter @helaengine/asset-pipeline ingest",
+    "import-pack": "pnpm --filter @helaengine/asset-pipeline import-pack",
     "editor": "pnpm --filter @helaengine/editor dev",
     "e2e": "pnpm --filter @helaengine/editor e2e",
     "bench": "node tools/benchmark/run.mjs",

@@ -217,15 +217,33 @@ describe('asset attribution', () => {
     expect(gaps).toEqual([]);
   });
 
-  it('marks everything shipped in this repository as first-party', async () => {
+  it('gives every asset an origin from the closed vocabulary', async () => {
     const lookup = await readAssetMetadata(metadataFile);
     const declared = await readDeclaredIds();
 
-    // Not cosmetic. `origin` is what a marketplace will filter on, and the alternative — inferring
-    // ownership from whether a row has an organisation — stops being true the day somebody else
-    // contributes, silently and with no schema change to notice.
-    const foreign = declared.filter((id) => lookup.get(id).origin !== 'first-party');
-    expect(foreign).toEqual([]);
+    // This replaces an assertion that everything here is first-party, which was true when it was
+    // written and stopped being true the moment the Kenney packs landed. The useful invariant was
+    // never "we made all of this" — it is that every asset *says* which it is, from a fixed set,
+    // so a marketplace can filter on it and a licence audit can group by it.
+    const allowed = new Set(['first-party', 'customer', 'third-party']);
+    const bad = declared.filter((id) => !allowed.has(lookup.get(id).origin));
+
+    expect(bad).toEqual([]);
+  });
+
+  it('gives every third-party asset a source URL, not just a licence name', async () => {
+    const lookup = await readAssetMetadata(metadataFile);
+    const declared = await readDeclaredIds();
+
+    // A licence string with no link is a claim nobody can check. For our own work the repository is
+    // the source and the field is a formality; for somebody else's it is the only way a person
+    // reading CREDITS.md can go and verify the terms they were given.
+    const unsourced = declared.filter((id) => {
+      const metadata = lookup.get(id);
+      return metadata.origin === 'third-party' && !metadata.sourceUrl;
+    });
+
+    expect(unsourced).toEqual([]);
   });
 });
 

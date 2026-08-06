@@ -8,7 +8,8 @@
     "generate-raw": "tsx src/generate-raw-assets.ts && tsx src/generate-raw-audio.ts",
     "ingest": "tsx src/ingest-assets.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "import-pack": "tsx src/import-pack-cli.ts"
   },
   "dependencies": {
     "@gltf-transform/core": "^4.4.1",

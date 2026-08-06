@@ -1,155 +1,4 @@
 {
-  "tree_pine_01": {
-    "name": "Pine Tree",
-    "category": "trees",
-    "tags": [
-      "conifer",
-      "forest",
-      "foliage"
-    ],
-    "colliderType": "capsule",
-    "placeholderColor": "#2f6f3f",
-    "license": "MIT",
-    "author": "HelaEngine contributors",
-    "sourceUrl": "https://github.com/LasaKaru/helaengine",
-    "origin": "first-party"
-  },
-  "tree_pine_02": {
-    "name": "Tall Pine",
-    "category": "trees",
-    "tags": [
-      "conifer",
-      "forest",
-      "foliage",
-      "tall"
-    ],
-    "colliderType": "capsule",
-    "placeholderColor": "#27603a",
-    "license": "MIT",
-    "author": "HelaEngine contributors",
-    "sourceUrl": "https://github.com/LasaKaru/helaengine",
-    "origin": "first-party"
-  },
-  "tree_oak_01": {
-    "name": "Oak Tree",
-    "category": "trees",
-    "tags": [
-      "broadleaf",
-      "forest",
-      "foliage"
-    ],
-    "colliderType": "capsule",
-    "placeholderColor": "#4a8f45",
-    "license": "MIT",
-    "author": "HelaEngine contributors",
-    "sourceUrl": "https://github.com/LasaKaru/helaengine",
-    "origin": "first-party"
-  },
-  "rock_boulder_01": {
-    "name": "Boulder",
-    "category": "rocks",
-    "tags": [
-      "stone",
-      "scatter",
-      "large"
-    ],
-    "colliderType": "sphere",
-    "placeholderColor": "#8a8880",
-    "license": "MIT",
-    "author": "HelaEngine contributors",
-    "sourceUrl": "https://github.com/LasaKaru/helaengine",
-    "origin": "first-party"
-  },
-  "rock_shard_01": {
-    "name": "Rock Shard",
-    "category": "rocks",
-    "tags": [
-      "stone",
-      "scatter",
-      "small"
-    ],
-    "colliderType": "sphere",
-    "placeholderColor": "#767470",
-    "license": "MIT",
-    "author": "HelaEngine contributors",
-    "sourceUrl": "https://github.com/LasaKaru/helaengine",
-    "origin": "first-party"
-  },
-  "building_hut_01": {
-    "name": "Thatched Hut",
-    "category": "buildings",
-    "tags": [
-      "village",
-      "shelter",
-      "wood"
-    ],
-    "colliderType": "box",
-    "placeholderColor": "#b08a5a",
-    "license": "MIT",
-    "author": "HelaEngine contributors",
-    "sourceUrl": "https://github.com/LasaKaru/helaengine",
-    "origin": "first-party"
-  },
-  "enemy_goblin_01": {
-    "name": "Goblin",
-    "category": "enemies",
-    "tags": [
-      "humanoid",
-      "melee",
-      "hostile"
-    ],
-    "colliderType": "capsule",
-    "placeholderColor": "#a83f3f",
-    "license": "MIT",
-    "author": "HelaEngine contributors",
-    "sourceUrl": "https://github.com/LasaKaru/helaengine",
-    "origin": "first-party"
-  },
-  "prop_barrel_01": {
-    "name": "Barrel",
-    "category": "props",
-    "tags": [
-      "container",
-      "village",
-      "wood"
-    ],
-    "colliderType": "sphere",
-    "placeholderColor": "#8a6238",
-    "license": "MIT",
-    "author": "HelaEngine contributors",
-    "sourceUrl": "https://github.com/LasaKaru/helaengine",
-    "origin": "first-party"
-  },
-  "prop_crate_01": {
-    "name": "Crate",
-    "category": "props",
-    "tags": [
-      "container",
-      "village",
-      "wood"
-    ],
-    "colliderType": "box",
-    "placeholderColor": "#9a7845",
-    "license": "MIT",
-    "author": "HelaEngine contributors",
-    "sourceUrl": "https://github.com/LasaKaru/helaengine",
-    "origin": "first-party"
-  },
-  "prop_fence_01": {
-    "name": "Fence Section",
-    "category": "props",
-    "tags": [
-      "village",
-      "wood",
-      "barrier"
-    ],
-    "colliderType": "box",
-    "placeholderColor": "#8b6f4a",
-    "license": "MIT",
-    "author": "HelaEngine contributors",
-    "sourceUrl": "https://github.com/LasaKaru/helaengine",
-    "origin": "first-party"
-  },
   "audio_music_combat": {
     "name": "Combat Music",
     "category": "audio",
@@ -296,5 +145,6862 @@
     "author": "HelaEngine contributors",
     "sourceUrl": "https://github.com/LasaKaru/helaengine",
     "origin": "first-party"
+  },
+  "barrel": {
+    "name": "Barrel",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "barrel_open": {
+    "name": "Barrel Open",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "bed": {
+    "name": "Bed",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "bed_floor": {
+    "name": "Bed Floor",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "bedroll": {
+    "name": "Bedroll",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "bedroll_frame": {
+    "name": "Bedroll Frame",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "bedroll_packed": {
+    "name": "Bedroll Packed",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "bottle": {
+    "name": "Bottle",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "bottle_large": {
+    "name": "Bottle Large",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "box": {
+    "name": "Box",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "box_large": {
+    "name": "Box Large",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "box_large_open": {
+    "name": "Box Large Open",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "box_open": {
+    "name": "Box Open",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "bridge_center_stone": {
+    "name": "Bridge Center Stone",
+    "category": "buildings",
+    "tags": [
+      "nature-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "bridge_center_stone_round": {
+    "name": "Bridge Center Stone Round",
+    "category": "buildings",
+    "tags": [
+      "nature-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "bridge_center_wood": {
+    "name": "Bridge Center Wood",
+    "category": "buildings",
+    "tags": [
+      "nature-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "bridge_center_wood_round": {
+    "name": "Bridge Center Wood Round",
+    "category": "buildings",
+    "tags": [
+      "nature-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "bridge_draw": {
+    "name": "Bridge Draw",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "bridge_side_stone": {
+    "name": "Bridge Side Stone",
+    "category": "buildings",
+    "tags": [
+      "nature-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "bridge_side_stone_round": {
+    "name": "Bridge Side Stone Round",
+    "category": "buildings",
+    "tags": [
+      "nature-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "bridge_side_wood": {
+    "name": "Bridge Side Wood",
+    "category": "buildings",
+    "tags": [
+      "nature-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "bridge_side_wood_round": {
+    "name": "Bridge Side Wood Round",
+    "category": "buildings",
+    "tags": [
+      "nature-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "bridge_stone": {
+    "name": "Bridge Stone",
+    "category": "buildings",
+    "tags": [
+      "nature-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "bridge_stone_narrow": {
+    "name": "Bridge Stone Narrow",
+    "category": "buildings",
+    "tags": [
+      "nature-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "bridge_stone_round": {
+    "name": "Bridge Stone Round",
+    "category": "buildings",
+    "tags": [
+      "nature-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "bridge_stone_round_narrow": {
+    "name": "Bridge Stone Round Narrow",
+    "category": "buildings",
+    "tags": [
+      "nature-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "bridge_straight": {
+    "name": "Bridge Straight",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "bridge_straight_pillar": {
+    "name": "Bridge Straight Pillar",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "bridge_wood": {
+    "name": "Bridge Wood",
+    "category": "buildings",
+    "tags": [
+      "nature-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "bridge_wood_narrow": {
+    "name": "Bridge Wood Narrow",
+    "category": "buildings",
+    "tags": [
+      "nature-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "bridge_wood_round": {
+    "name": "Bridge Wood Round",
+    "category": "buildings",
+    "tags": [
+      "nature-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "bridge_wood_round_narrow": {
+    "name": "Bridge Wood Round Narrow",
+    "category": "buildings",
+    "tags": [
+      "nature-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "bucket": {
+    "name": "Bucket",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "building_hut_01": {
+    "name": "Thatched Hut",
+    "category": "buildings",
+    "tags": [
+      "village",
+      "shelter",
+      "wood"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#b08a5a",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "cactus_short": {
+    "name": "Cactus Short",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cactus_tall": {
+    "name": "Cactus Tall",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "campfire_bricks": {
+    "name": "Campfire Bricks",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "campfire_fishing_stand": {
+    "name": "Campfire Fishing Stand",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "campfire_logs": {
+    "name": "Campfire Logs",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "campfire_pit": {
+    "name": "Campfire Pit",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "campfire_planks": {
+    "name": "Campfire Planks",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "campfire_stand": {
+    "name": "Campfire Stand",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "campfire_stones": {
+    "name": "Campfire Stones",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "canoe": {
+    "name": "Canoe",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "canoe_paddle": {
+    "name": "Canoe Paddle",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "chest": {
+    "name": "Chest",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "cliff_block_cave_rock": {
+    "name": "Cliff Block Cave Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_block_cave_stone": {
+    "name": "Cliff Block Cave Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_block_diagonal_rock": {
+    "name": "Cliff Block Diagonal Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_block_diagonal_stone": {
+    "name": "Cliff Block Diagonal Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_block_half_rock": {
+    "name": "Cliff Block Half Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_block_half_stone": {
+    "name": "Cliff Block Half Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_block_quarter_rock": {
+    "name": "Cliff Block Quarter Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_block_quarter_stone": {
+    "name": "Cliff Block Quarter Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_block_rock": {
+    "name": "Cliff Block Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_block_slope_half_walls_rock": {
+    "name": "Cliff Block Slope Half Walls Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_block_slope_half_walls_stone": {
+    "name": "Cliff Block Slope Half Walls Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_block_slope_rock": {
+    "name": "Cliff Block Slope Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_block_slope_stone": {
+    "name": "Cliff Block Slope Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_block_slope_walls_rock": {
+    "name": "Cliff Block Slope Walls Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_block_slope_walls_stone": {
+    "name": "Cliff Block Slope Walls Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_block_stone": {
+    "name": "Cliff Block Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_cave_rock": {
+    "name": "Cliff Cave Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_cave_stone": {
+    "name": "Cliff Cave Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_corner_inner_large_rock": {
+    "name": "Cliff Corner Inner Large Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_corner_inner_large_stone": {
+    "name": "Cliff Corner Inner Large Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_corner_inner_rock": {
+    "name": "Cliff Corner Inner Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_corner_inner_stone": {
+    "name": "Cliff Corner Inner Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_corner_inner_top_rock": {
+    "name": "Cliff Corner Inner Top Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_corner_inner_top_stone": {
+    "name": "Cliff Corner Inner Top Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_corner_large_rock": {
+    "name": "Cliff Corner Large Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_corner_large_stone": {
+    "name": "Cliff Corner Large Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_corner_rock": {
+    "name": "Cliff Corner Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_corner_stone": {
+    "name": "Cliff Corner Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_corner_top_rock": {
+    "name": "Cliff Corner Top Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_corner_top_stone": {
+    "name": "Cliff Corner Top Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_diagonal_rock": {
+    "name": "Cliff Diagonal Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_diagonal_stone": {
+    "name": "Cliff Diagonal Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_half_corner_inner_rock": {
+    "name": "Cliff Half Corner Inner Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_half_corner_inner_stone": {
+    "name": "Cliff Half Corner Inner Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_half_corner_rock": {
+    "name": "Cliff Half Corner Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_half_corner_stone": {
+    "name": "Cliff Half Corner Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_half_rock": {
+    "name": "Cliff Half Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_half_stone": {
+    "name": "Cliff Half Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_large_rock": {
+    "name": "Cliff Large Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_large_stone": {
+    "name": "Cliff Large Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_rock": {
+    "name": "Cliff Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_steps_corner_inner_rock": {
+    "name": "Cliff Steps Corner Inner Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_steps_corner_inner_stone": {
+    "name": "Cliff Steps Corner Inner Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_steps_corner_rock": {
+    "name": "Cliff Steps Corner Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_steps_corner_stone": {
+    "name": "Cliff Steps Corner Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_steps_rock": {
+    "name": "Cliff Steps Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_steps_stone": {
+    "name": "Cliff Steps Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_stone": {
+    "name": "Cliff Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_top_diagonal_rock": {
+    "name": "Cliff Top Diagonal Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_top_diagonal_stone": {
+    "name": "Cliff Top Diagonal Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_top_rock": {
+    "name": "Cliff Top Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_top_stone": {
+    "name": "Cliff Top Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_waterfall_rock": {
+    "name": "Cliff Waterfall Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_waterfall_stone": {
+    "name": "Cliff Waterfall Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_waterfall_top_rock": {
+    "name": "Cliff Waterfall Top Rock",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "cliff_waterfall_top_stone": {
+    "name": "Cliff Waterfall Top Stone",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "crop_carrot": {
+    "name": "Crop Carrot",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "crop_melon": {
+    "name": "Crop Melon",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "crop_pumpkin": {
+    "name": "Crop Pumpkin",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "crop_turnip": {
+    "name": "Crop Turnip",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "crops_bamboo_stage_a": {
+    "name": "Crops Bamboo Stage A",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "crops_bamboo_stage_b": {
+    "name": "Crops Bamboo Stage B",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "crops_corn_stage_a": {
+    "name": "Crops Corn Stage A",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "crops_corn_stage_b": {
+    "name": "Crops Corn Stage B",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "crops_corn_stage_c": {
+    "name": "Crops Corn Stage C",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "crops_corn_stage_d": {
+    "name": "Crops Corn Stage D",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "crops_dirt_double_row": {
+    "name": "Crops Dirt Double Row",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "crops_dirt_double_row_corner": {
+    "name": "Crops Dirt Double Row Corner",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "crops_dirt_double_row_end": {
+    "name": "Crops Dirt Double Row End",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "crops_dirt_row": {
+    "name": "Crops Dirt Row",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "crops_dirt_row_corner": {
+    "name": "Crops Dirt Row Corner",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "crops_dirt_row_end": {
+    "name": "Crops Dirt Row End",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "crops_dirt_single": {
+    "name": "Crops Dirt Single",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "crops_leafs_stage_a": {
+    "name": "Crops Leafs Stage A",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "crops_leafs_stage_b": {
+    "name": "Crops Leafs Stage B",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "crops_wheat_stage_a": {
+    "name": "Crops Wheat Stage A",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "crops_wheat_stage_b": {
+    "name": "Crops Wheat Stage B",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "door": {
+    "name": "Door",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "enemy_goblin_01": {
+    "name": "Goblin",
+    "category": "enemies",
+    "tags": [
+      "humanoid",
+      "melee",
+      "hostile"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#a83f3f",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "fence": {
+    "name": "Fence",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "fence_bend": {
+    "name": "Fence Bend",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "fence_bend_center": {
+    "name": "Fence Bend Center",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "fence_corner": {
+    "name": "Fence Corner",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "fence_doorway": {
+    "name": "Fence Doorway",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "fence_fortified": {
+    "name": "Fence Fortified",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "fence_gate": {
+    "name": "Fence Gate",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "fence_planks": {
+    "name": "Fence Planks",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "fence_planks_double": {
+    "name": "Fence Planks Double",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "fence_simple": {
+    "name": "Fence Simple",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "fence_simple_center": {
+    "name": "Fence Simple Center",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "fence_simple_diagonal": {
+    "name": "Fence Simple Diagonal",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "fence_simple_diagonal_center": {
+    "name": "Fence Simple Diagonal Center",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "fence_simple_high": {
+    "name": "Fence Simple High",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "fence_simple_low": {
+    "name": "Fence Simple Low",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "fish": {
+    "name": "Fish",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "fish_large": {
+    "name": "Fish Large",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "flag": {
+    "name": "Flag",
+    "category": "props",
+    "tags": [
+      "castle-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "flag_banner_long": {
+    "name": "Flag Banner Long",
+    "category": "props",
+    "tags": [
+      "castle-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "flag_banner_short": {
+    "name": "Flag Banner Short",
+    "category": "props",
+    "tags": [
+      "castle-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "flag_pennant": {
+    "name": "Flag Pennant",
+    "category": "props",
+    "tags": [
+      "castle-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "flag_wide": {
+    "name": "Flag Wide",
+    "category": "props",
+    "tags": [
+      "castle-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "floor": {
+    "name": "Floor",
+    "category": "buildings",
+    "tags": [
+      "survival-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "floor_hole": {
+    "name": "Floor Hole",
+    "category": "buildings",
+    "tags": [
+      "survival-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "floor_old": {
+    "name": "Floor Old",
+    "category": "buildings",
+    "tags": [
+      "survival-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "flower_purple_a": {
+    "name": "Flower Purple A",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "flower_purple_b": {
+    "name": "Flower Purple B",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "flower_purple_c": {
+    "name": "Flower Purple C",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "flower_red_a": {
+    "name": "Flower Red A",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "flower_red_b": {
+    "name": "Flower Red B",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "flower_red_c": {
+    "name": "Flower Red C",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "flower_yellow_a": {
+    "name": "Flower Yellow A",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "flower_yellow_b": {
+    "name": "Flower Yellow B",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "flower_yellow_c": {
+    "name": "Flower Yellow C",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "gate": {
+    "name": "Gate",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "grass": {
+    "name": "Grass",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "grass_large": {
+    "name": "Grass Large",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "grass_leafs": {
+    "name": "Grass Leafs",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "grass_leafs_large": {
+    "name": "Grass Leafs Large",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground": {
+    "name": "Ground",
+    "category": "terrain",
+    "tags": [
+      "castle-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "ground_grass": {
+    "name": "Ground Grass",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_hills": {
+    "name": "Ground Hills",
+    "category": "terrain",
+    "tags": [
+      "castle-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "ground_path_bend": {
+    "name": "Ground Path Bend",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_path_bend_bank": {
+    "name": "Ground Path Bend Bank",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_path_corner": {
+    "name": "Ground Path Corner",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_path_corner_small": {
+    "name": "Ground Path Corner Small",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_path_cross": {
+    "name": "Ground Path Cross",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_path_end": {
+    "name": "Ground Path End",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_path_end_closed": {
+    "name": "Ground Path End Closed",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_path_open": {
+    "name": "Ground Path Open",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_path_rocks": {
+    "name": "Ground Path Rocks",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_path_side": {
+    "name": "Ground Path Side",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_path_side_open": {
+    "name": "Ground Path Side Open",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_path_split": {
+    "name": "Ground Path Split",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_path_straight": {
+    "name": "Ground Path Straight",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_path_tile": {
+    "name": "Ground Path Tile",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_river_bend": {
+    "name": "Ground River Bend",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_river_bend_bank": {
+    "name": "Ground River Bend Bank",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_river_corner": {
+    "name": "Ground River Corner",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_river_corner_small": {
+    "name": "Ground River Corner Small",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_river_cross": {
+    "name": "Ground River Cross",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_river_end": {
+    "name": "Ground River End",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_river_end_closed": {
+    "name": "Ground River End Closed",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_river_open": {
+    "name": "Ground River Open",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_river_rocks": {
+    "name": "Ground River Rocks",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_river_side": {
+    "name": "Ground River Side",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_river_side_open": {
+    "name": "Ground River Side Open",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_river_split": {
+    "name": "Ground River Split",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_river_straight": {
+    "name": "Ground River Straight",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "ground_river_tile": {
+    "name": "Ground River Tile",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "hanging_moss": {
+    "name": "Hanging Moss",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "lily_large": {
+    "name": "Lily Large",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "lily_small": {
+    "name": "Lily Small",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "log": {
+    "name": "Log",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "log_large": {
+    "name": "Log Large",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "log_stack": {
+    "name": "Log Stack",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "log_stack_large": {
+    "name": "Log Stack Large",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "metal_gate": {
+    "name": "Metal Gate",
+    "category": "props",
+    "tags": [
+      "castle-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "metal_panel": {
+    "name": "Metal Panel",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "metal_panel_narrow": {
+    "name": "Metal Panel Narrow",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "metal_panel_screws": {
+    "name": "Metal Panel Screws",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "metal_panel_screws_half": {
+    "name": "Metal Panel Screws Half",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "metal_panel_screws_narrow": {
+    "name": "Metal Panel Screws Narrow",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "mushroom_red": {
+    "name": "Mushroom Red",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "mushroom_red_group": {
+    "name": "Mushroom Red Group",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "mushroom_red_tall": {
+    "name": "Mushroom Red Tall",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "mushroom_tan": {
+    "name": "Mushroom Tan",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "mushroom_tan_group": {
+    "name": "Mushroom Tan Group",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "mushroom_tan_tall": {
+    "name": "Mushroom Tan Tall",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "patch_grass": {
+    "name": "Patch Grass",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "patch_grass_large": {
+    "name": "Patch Grass Large",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "path_stone": {
+    "name": "Path Stone",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "path_stone_circle": {
+    "name": "Path Stone Circle",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "path_stone_corner": {
+    "name": "Path Stone Corner",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "path_stone_end": {
+    "name": "Path Stone End",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "path_wood": {
+    "name": "Path Wood",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "path_wood_corner": {
+    "name": "Path Wood Corner",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "path_wood_end": {
+    "name": "Path Wood End",
+    "category": "terrain",
+    "tags": [
+      "nature-kit",
+      "terrain"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#6b7a4a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "plant_bush": {
+    "name": "Plant Bush",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "plant_bush_detailed": {
+    "name": "Plant Bush Detailed",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "plant_bush_large": {
+    "name": "Plant Bush Large",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "plant_bush_large_triangle": {
+    "name": "Plant Bush Large Triangle",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "plant_bush_small": {
+    "name": "Plant Bush Small",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "plant_bush_triangle": {
+    "name": "Plant Bush Triangle",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "plant_flat_short": {
+    "name": "Plant Flat Short",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "plant_flat_tall": {
+    "name": "Plant Flat Tall",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "platform_beach": {
+    "name": "Platform Beach",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "platform_grass": {
+    "name": "Platform Grass",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "platform_stone": {
+    "name": "Platform Stone",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "pot_large": {
+    "name": "Pot Large",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "pot_small": {
+    "name": "Pot Small",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "prop_barrel_01": {
+    "name": "Barrel",
+    "category": "props",
+    "tags": [
+      "container",
+      "village",
+      "wood"
+    ],
+    "colliderType": "sphere",
+    "placeholderColor": "#8a6238",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "prop_crate_01": {
+    "name": "Crate",
+    "category": "props",
+    "tags": [
+      "container",
+      "village",
+      "wood"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a7845",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "prop_fence_01": {
+    "name": "Fence Section",
+    "category": "props",
+    "tags": [
+      "village",
+      "wood",
+      "barrier"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8b6f4a",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "resource_planks": {
+    "name": "Resource Planks",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "resource_stone": {
+    "name": "Resource Stone",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "resource_stone_large": {
+    "name": "Resource Stone Large",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "resource_wood": {
+    "name": "Resource Wood",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "rock_a": {
+    "name": "Rock A",
+    "category": "rocks",
+    "tags": [
+      "survival-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "rock_b": {
+    "name": "Rock B",
+    "category": "rocks",
+    "tags": [
+      "survival-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "rock_boulder_01": {
+    "name": "Boulder",
+    "category": "rocks",
+    "tags": [
+      "stone",
+      "scatter",
+      "large"
+    ],
+    "colliderType": "sphere",
+    "placeholderColor": "#8a8880",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "rock_c": {
+    "name": "Rock C",
+    "category": "rocks",
+    "tags": [
+      "survival-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "rock_flat": {
+    "name": "Rock Flat",
+    "category": "rocks",
+    "tags": [
+      "survival-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "rock_flat_grass": {
+    "name": "Rock Flat Grass",
+    "category": "rocks",
+    "tags": [
+      "survival-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "rock_large_a": {
+    "name": "Rock Large A",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_large_b": {
+    "name": "Rock Large B",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_large_c": {
+    "name": "Rock Large C",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_large_d": {
+    "name": "Rock Large D",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_large_e": {
+    "name": "Rock Large E",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_large_f": {
+    "name": "Rock Large F",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_sand_a": {
+    "name": "Rock Sand A",
+    "category": "rocks",
+    "tags": [
+      "survival-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "rock_sand_b": {
+    "name": "Rock Sand B",
+    "category": "rocks",
+    "tags": [
+      "survival-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "rock_sand_c": {
+    "name": "Rock Sand C",
+    "category": "rocks",
+    "tags": [
+      "survival-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "rock_shard_01": {
+    "name": "Rock Shard",
+    "category": "rocks",
+    "tags": [
+      "stone",
+      "scatter",
+      "small"
+    ],
+    "colliderType": "sphere",
+    "placeholderColor": "#767470",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "rock_small_a": {
+    "name": "Rock Small A",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_small_b": {
+    "name": "Rock Small B",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_small_c": {
+    "name": "Rock Small C",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_small_d": {
+    "name": "Rock Small D",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_small_e": {
+    "name": "Rock Small E",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_small_f": {
+    "name": "Rock Small F",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_small_flat_a": {
+    "name": "Rock Small Flat A",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_small_flat_b": {
+    "name": "Rock Small Flat B",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_small_flat_c": {
+    "name": "Rock Small Flat C",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_small_g": {
+    "name": "Rock Small G",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_small_h": {
+    "name": "Rock Small H",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_small_i": {
+    "name": "Rock Small I",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_small_top_a": {
+    "name": "Rock Small Top A",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_small_top_b": {
+    "name": "Rock Small Top B",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_tall_a": {
+    "name": "Rock Tall A",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_tall_b": {
+    "name": "Rock Tall B",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_tall_c": {
+    "name": "Rock Tall C",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_tall_d": {
+    "name": "Rock Tall D",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_tall_e": {
+    "name": "Rock Tall E",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_tall_f": {
+    "name": "Rock Tall F",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_tall_g": {
+    "name": "Rock Tall G",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_tall_h": {
+    "name": "Rock Tall H",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_tall_i": {
+    "name": "Rock Tall I",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rock_tall_j": {
+    "name": "Rock Tall J",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "rocks_large": {
+    "name": "Rocks Large",
+    "category": "rocks",
+    "tags": [
+      "castle-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "rocks_small": {
+    "name": "Rocks Small",
+    "category": "rocks",
+    "tags": [
+      "castle-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "siege_ballista": {
+    "name": "Siege Ballista",
+    "category": "props",
+    "tags": [
+      "castle-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "siege_ballista_demolished": {
+    "name": "Siege Ballista Demolished",
+    "category": "props",
+    "tags": [
+      "castle-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "siege_catapult": {
+    "name": "Siege Catapult",
+    "category": "props",
+    "tags": [
+      "castle-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "siege_catapult_demolished": {
+    "name": "Siege Catapult Demolished",
+    "category": "props",
+    "tags": [
+      "castle-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "siege_ram": {
+    "name": "Siege Ram",
+    "category": "props",
+    "tags": [
+      "castle-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "siege_ram_demolished": {
+    "name": "Siege Ram Demolished",
+    "category": "props",
+    "tags": [
+      "castle-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "siege_tower": {
+    "name": "Siege Tower",
+    "category": "props",
+    "tags": [
+      "castle-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "siege_tower_demolished": {
+    "name": "Siege Tower Demolished",
+    "category": "props",
+    "tags": [
+      "castle-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "siege_trebuchet": {
+    "name": "Siege Trebuchet",
+    "category": "props",
+    "tags": [
+      "castle-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "siege_trebuchet_demolished": {
+    "name": "Siege Trebuchet Demolished",
+    "category": "props",
+    "tags": [
+      "castle-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "sign": {
+    "name": "Sign",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "signpost": {
+    "name": "Signpost",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "signpost_single": {
+    "name": "Signpost Single",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "stairs_stone": {
+    "name": "Stairs Stone",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "stairs_stone_square": {
+    "name": "Stairs Stone Square",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "statue_block": {
+    "name": "Statue Block",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "statue_column": {
+    "name": "Statue Column",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "statue_column_damaged": {
+    "name": "Statue Column Damaged",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "statue_head": {
+    "name": "Statue Head",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "statue_obelisk": {
+    "name": "Statue Obelisk",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "statue_ring": {
+    "name": "Statue Ring",
+    "category": "props",
+    "tags": [
+      "nature-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_large_a": {
+    "name": "Stone Large A",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_large_b": {
+    "name": "Stone Large B",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_large_c": {
+    "name": "Stone Large C",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_large_d": {
+    "name": "Stone Large D",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_large_e": {
+    "name": "Stone Large E",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_large_f": {
+    "name": "Stone Large F",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_small_a": {
+    "name": "Stone Small A",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_small_b": {
+    "name": "Stone Small B",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_small_c": {
+    "name": "Stone Small C",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_small_d": {
+    "name": "Stone Small D",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_small_e": {
+    "name": "Stone Small E",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_small_f": {
+    "name": "Stone Small F",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_small_flat_a": {
+    "name": "Stone Small Flat A",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_small_flat_b": {
+    "name": "Stone Small Flat B",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_small_flat_c": {
+    "name": "Stone Small Flat C",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_small_g": {
+    "name": "Stone Small G",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_small_h": {
+    "name": "Stone Small H",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_small_i": {
+    "name": "Stone Small I",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_small_top_a": {
+    "name": "Stone Small Top A",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_small_top_b": {
+    "name": "Stone Small Top B",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_tall_a": {
+    "name": "Stone Tall A",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_tall_b": {
+    "name": "Stone Tall B",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_tall_c": {
+    "name": "Stone Tall C",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_tall_d": {
+    "name": "Stone Tall D",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_tall_e": {
+    "name": "Stone Tall E",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_tall_f": {
+    "name": "Stone Tall F",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_tall_g": {
+    "name": "Stone Tall G",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_tall_h": {
+    "name": "Stone Tall H",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_tall_i": {
+    "name": "Stone Tall I",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stone_tall_j": {
+    "name": "Stone Tall J",
+    "category": "rocks",
+    "tags": [
+      "nature-kit",
+      "rocks"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#7d8590",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "structure": {
+    "name": "Structure",
+    "category": "buildings",
+    "tags": [
+      "survival-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "structure_canvas": {
+    "name": "Structure Canvas",
+    "category": "buildings",
+    "tags": [
+      "survival-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "structure_floor": {
+    "name": "Structure Floor",
+    "category": "buildings",
+    "tags": [
+      "survival-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "structure_metal": {
+    "name": "Structure Metal",
+    "category": "buildings",
+    "tags": [
+      "survival-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "structure_metal_doorway": {
+    "name": "Structure Metal Doorway",
+    "category": "buildings",
+    "tags": [
+      "survival-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "structure_metal_floor": {
+    "name": "Structure Metal Floor",
+    "category": "buildings",
+    "tags": [
+      "survival-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "structure_metal_roof": {
+    "name": "Structure Metal Roof",
+    "category": "buildings",
+    "tags": [
+      "survival-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "structure_metal_wall": {
+    "name": "Structure Metal Wall",
+    "category": "buildings",
+    "tags": [
+      "survival-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "structure_roof": {
+    "name": "Structure Roof",
+    "category": "buildings",
+    "tags": [
+      "survival-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "stump_old": {
+    "name": "Stump Old",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stump_old_tall": {
+    "name": "Stump Old Tall",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stump_round": {
+    "name": "Stump Round",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stump_round_detailed": {
+    "name": "Stump Round Detailed",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stump_square": {
+    "name": "Stump Square",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stump_square_detailed": {
+    "name": "Stump Square Detailed",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "stump_square_detailed_wide": {
+    "name": "Stump Square Detailed Wide",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tent": {
+    "name": "Tent",
+    "category": "buildings",
+    "tags": [
+      "survival-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "tent_canvas": {
+    "name": "Tent Canvas",
+    "category": "buildings",
+    "tags": [
+      "survival-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "tent_canvas_half": {
+    "name": "Tent Canvas Half",
+    "category": "buildings",
+    "tags": [
+      "survival-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "tent_detailed_closed": {
+    "name": "Tent Detailed Closed",
+    "category": "buildings",
+    "tags": [
+      "nature-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tent_detailed_open": {
+    "name": "Tent Detailed Open",
+    "category": "buildings",
+    "tags": [
+      "nature-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tent_small_closed": {
+    "name": "Tent Small Closed",
+    "category": "buildings",
+    "tags": [
+      "nature-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tent_small_open": {
+    "name": "Tent Small Open",
+    "category": "buildings",
+    "tags": [
+      "nature-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tool_axe": {
+    "name": "Tool Axe",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "tool_axe_upgraded": {
+    "name": "Tool Axe Upgraded",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "tool_hammer": {
+    "name": "Tool Hammer",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "tool_hammer_upgraded": {
+    "name": "Tool Hammer Upgraded",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "tool_hoe": {
+    "name": "Tool Hoe",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "tool_hoe_upgraded": {
+    "name": "Tool Hoe Upgraded",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "tool_pickaxe": {
+    "name": "Tool Pickaxe",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "tool_pickaxe_upgraded": {
+    "name": "Tool Pickaxe Upgraded",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "tool_shovel": {
+    "name": "Tool Shovel",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "tool_shovel_upgraded": {
+    "name": "Tool Shovel Upgraded",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "tower_base": {
+    "name": "Tower Base",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_hexagon_base": {
+    "name": "Tower Hexagon Base",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_hexagon_mid": {
+    "name": "Tower Hexagon Mid",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_hexagon_roof": {
+    "name": "Tower Hexagon Roof",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_hexagon_roof_secondary": {
+    "name": "Tower Hexagon Roof Secondary",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_hexagon_top": {
+    "name": "Tower Hexagon Top",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_hexagon_top_wood": {
+    "name": "Tower Hexagon Top Wood",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_slant_roof": {
+    "name": "Tower Slant Roof",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_square": {
+    "name": "Tower Square",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_square_arch": {
+    "name": "Tower Square Arch",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_square_base": {
+    "name": "Tower Square Base",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_square_base_border": {
+    "name": "Tower Square Base Border",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_square_base_color": {
+    "name": "Tower Square Base Color",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_square_mid": {
+    "name": "Tower Square Mid",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_square_mid_color": {
+    "name": "Tower Square Mid Color",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_square_mid_door": {
+    "name": "Tower Square Mid Door",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_square_mid_open": {
+    "name": "Tower Square Mid Open",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_square_mid_open_simple": {
+    "name": "Tower Square Mid Open Simple",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_square_mid_windows": {
+    "name": "Tower Square Mid Windows",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_square_roof": {
+    "name": "Tower Square Roof",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_square_top": {
+    "name": "Tower Square Top",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_square_top_color": {
+    "name": "Tower Square Top Color",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_square_top_roof": {
+    "name": "Tower Square Top Roof",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_square_top_roof_high": {
+    "name": "Tower Square Top Roof High",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_square_top_roof_high_windows": {
+    "name": "Tower Square Top Roof High Windows",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_square_top_roof_rounded": {
+    "name": "Tower Square Top Roof Rounded",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tower_top": {
+    "name": "Tower Top",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tree": {
+    "name": "Tree",
+    "category": "trees",
+    "tags": [
+      "survival-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "tree_autumn": {
+    "name": "Tree Autumn",
+    "category": "trees",
+    "tags": [
+      "survival-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "tree_autumn_tall": {
+    "name": "Tree Autumn Tall",
+    "category": "trees",
+    "tags": [
+      "survival-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "tree_autumn_trunk": {
+    "name": "Tree Autumn Trunk",
+    "category": "trees",
+    "tags": [
+      "survival-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "tree_blocks": {
+    "name": "Tree Blocks",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_blocks_dark": {
+    "name": "Tree Blocks Dark",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_blocks_fall": {
+    "name": "Tree Blocks Fall",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_cone": {
+    "name": "Tree Cone",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_cone_dark": {
+    "name": "Tree Cone Dark",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_cone_fall": {
+    "name": "Tree Cone Fall",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_default": {
+    "name": "Tree Default",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_default_dark": {
+    "name": "Tree Default Dark",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_default_fall": {
+    "name": "Tree Default Fall",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_detailed": {
+    "name": "Tree Detailed",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_detailed_dark": {
+    "name": "Tree Detailed Dark",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_detailed_fall": {
+    "name": "Tree Detailed Fall",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_fat": {
+    "name": "Tree Fat",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_fat_darkh": {
+    "name": "Tree Fat Darkh",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_fat_fall": {
+    "name": "Tree Fat Fall",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_large": {
+    "name": "Tree Large",
+    "category": "trees",
+    "tags": [
+      "castle-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "tree_log": {
+    "name": "Tree Log",
+    "category": "trees",
+    "tags": [
+      "survival-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "tree_log_small": {
+    "name": "Tree Log Small",
+    "category": "trees",
+    "tags": [
+      "survival-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "tree_oak": {
+    "name": "Tree Oak",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_oak_01": {
+    "name": "Oak Tree",
+    "category": "trees",
+    "tags": [
+      "broadleaf",
+      "forest",
+      "foliage"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#4a8f45",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "tree_oak_dark": {
+    "name": "Tree Oak Dark",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_oak_fall": {
+    "name": "Tree Oak Fall",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_palm": {
+    "name": "Tree Palm",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_palm_bend": {
+    "name": "Tree Palm Bend",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_palm_detailed_short": {
+    "name": "Tree Palm Detailed Short",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_palm_detailed_tall": {
+    "name": "Tree Palm Detailed Tall",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_palm_short": {
+    "name": "Tree Palm Short",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_palm_tall": {
+    "name": "Tree Palm Tall",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_pine_01": {
+    "name": "Pine Tree",
+    "category": "trees",
+    "tags": [
+      "conifer",
+      "forest",
+      "foliage"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "tree_pine_02": {
+    "name": "Tall Pine",
+    "category": "trees",
+    "tags": [
+      "conifer",
+      "forest",
+      "foliage",
+      "tall"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#27603a",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "tree_pine_default_a": {
+    "name": "Tree Pine Default A",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_pine_default_b": {
+    "name": "Tree Pine Default B",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_pine_ground_a": {
+    "name": "Tree Pine Ground A",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_pine_ground_b": {
+    "name": "Tree Pine Ground B",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_pine_round_a": {
+    "name": "Tree Pine Round A",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_pine_round_b": {
+    "name": "Tree Pine Round B",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_pine_round_c": {
+    "name": "Tree Pine Round C",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_pine_round_d": {
+    "name": "Tree Pine Round D",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_pine_round_e": {
+    "name": "Tree Pine Round E",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_pine_round_f": {
+    "name": "Tree Pine Round F",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_pine_small_a": {
+    "name": "Tree Pine Small A",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_pine_small_b": {
+    "name": "Tree Pine Small B",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_pine_small_c": {
+    "name": "Tree Pine Small C",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_pine_small_d": {
+    "name": "Tree Pine Small D",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_pine_tall_a": {
+    "name": "Tree Pine Tall A",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_pine_tall_a_detailed": {
+    "name": "Tree Pine Tall A Detailed",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_pine_tall_b": {
+    "name": "Tree Pine Tall B",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_pine_tall_b_detailed": {
+    "name": "Tree Pine Tall B Detailed",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_pine_tall_c": {
+    "name": "Tree Pine Tall C",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_pine_tall_c_detailed": {
+    "name": "Tree Pine Tall C Detailed",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_pine_tall_d": {
+    "name": "Tree Pine Tall D",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_pine_tall_d_detailed": {
+    "name": "Tree Pine Tall D Detailed",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_plateau": {
+    "name": "Tree Plateau",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_plateau_dark": {
+    "name": "Tree Plateau Dark",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_plateau_fall": {
+    "name": "Tree Plateau Fall",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_simple": {
+    "name": "Tree Simple",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_simple_dark": {
+    "name": "Tree Simple Dark",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_simple_fall": {
+    "name": "Tree Simple Fall",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_small": {
+    "name": "Tree Small",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_small_dark": {
+    "name": "Tree Small Dark",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_small_fall": {
+    "name": "Tree Small Fall",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_tall": {
+    "name": "Tree Tall",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_tall_dark": {
+    "name": "Tree Tall Dark",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_tall_fall": {
+    "name": "Tree Tall Fall",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_thin": {
+    "name": "Tree Thin",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_thin_dark": {
+    "name": "Tree Thin Dark",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_thin_fall": {
+    "name": "Tree Thin Fall",
+    "category": "trees",
+    "tags": [
+      "nature-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/nature-kit",
+    "origin": "third-party"
+  },
+  "tree_trunk": {
+    "name": "Tree Trunk",
+    "category": "trees",
+    "tags": [
+      "survival-kit",
+      "trees"
+    ],
+    "colliderType": "capsule",
+    "placeholderColor": "#2f6f3f",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "wall": {
+    "name": "Wall",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "wall_corner": {
+    "name": "Wall Corner",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "wall_corner_half": {
+    "name": "Wall Corner Half",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "wall_corner_half_tower": {
+    "name": "Wall Corner Half Tower",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "wall_corner_slant": {
+    "name": "Wall Corner Slant",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "wall_doorway": {
+    "name": "Wall Doorway",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "wall_half": {
+    "name": "Wall Half",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "wall_half_modular": {
+    "name": "Wall Half Modular",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "wall_narrow": {
+    "name": "Wall Narrow",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "wall_narrow_corner": {
+    "name": "Wall Narrow Corner",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "wall_narrow_gate": {
+    "name": "Wall Narrow Gate",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "wall_narrow_stairs": {
+    "name": "Wall Narrow Stairs",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "wall_narrow_stairs_rail": {
+    "name": "Wall Narrow Stairs Rail",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "wall_narrow_wood": {
+    "name": "Wall Narrow Wood",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "wall_narrow_wood_fence": {
+    "name": "Wall Narrow Wood Fence",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "wall_pillar": {
+    "name": "Wall Pillar",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "wall_stud": {
+    "name": "Wall Stud",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "wall_to_narrow": {
+    "name": "Wall To Narrow",
+    "category": "buildings",
+    "tags": [
+      "castle-kit",
+      "buildings"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#8a7a63",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/castle-kit",
+    "origin": "third-party"
+  },
+  "workbench": {
+    "name": "Workbench",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "workbench_anvil": {
+    "name": "Workbench Anvil",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
+  },
+  "workbench_grind": {
+    "name": "Workbench Grind",
+    "category": "props",
+    "tags": [
+      "survival-kit",
+      "props"
+    ],
+    "colliderType": "box",
+    "placeholderColor": "#9a8f7a",
+    "license": "CC0-1.0",
+    "author": "Kenney",
+    "sourceUrl": "https://kenney.nl/assets/survival-kit",
+    "origin": "third-party"
   }
 }
