@@ -117,13 +117,16 @@ Worth knowing, deliberately not paged on:
 
 Everything is off by default, in every service, and each variable turns on exactly one thing:
 
-| Variable                      | Effect                                                             |
-| ----------------------------- | ------------------------------------------------------------------ |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | Traces go to a collector (Grafana Tempo, Jaeger, anything OTLP)    |
-| `HELA_TRACE_FILE`             | Traces are also written as NDJSON, for `pnpm trace`                |
-| `LOG_LEVEL`                   | `debug`, `info` (default), `warn`, `error`                         |
-| `METRICS_TOKEN`               | `/metrics` requires `Authorization: Bearer …`                      |
-| `VITE_SENTRY_DSN`             | The editor reports crashes; without it, nothing leaves the browser |
+| Variable                          | Effect                                                             |
+| --------------------------------- | ------------------------------------------------------------------ |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`     | Traces go to a collector (Grafana Tempo, Jaeger, anything OTLP)    |
+| `HELA_TRACE_FILE`                 | Traces are also written as NDJSON, for `pnpm trace`                |
+| `LOG_LEVEL`                       | `debug`, `info` (default), `warn`, `error`                         |
+| `METRICS_TOKEN`                   | `/metrics` requires `Authorization: Bearer …`                      |
+| `VITE_SENTRY_DSN`                 | The editor reports crashes; without it, nothing leaves the browser |
+| `ALLOWED_ORIGINS`                 | Comma-separated CORS allowlist; unset means a wildcard             |
+| `TRUST_PROXY`                     | Take the client address from `X-Forwarded-For`                     |
+| `AUTH_*` (see `docs/SECURITY.md`) | Rate limits, when the defaults do not suit the deployment          |
 
 `/metrics` is served by the API on its own port and by the worker on its health port (3300).
 

@@ -48,6 +48,12 @@ Security Policy without `unsafe-eval`.
 Timing is handled where it matters: login verifies a hash even when there is no such user, so the
 response time does not say which of the two it was.
 
+Limits are configurable — `AUTH_LOGINS_PER_MINUTE`, `AUTH_LOGINS_PER_ACCOUNT`,
+`AUTH_SIGNUPS_PER_HOUR`, `AUTH_INVITE_ATTEMPTS_PER_HOUR` — and the per-address defaults are
+deliberately loose. An office, a school and a co-working space are each _one_ address, so an
+address limit tight enough to feel rigorous locks out a building; the per-account limit is the one
+that actually stops credential stuffing.
+
 **Known limit:** rate limiting is per process and in memory. Two API instances behind a load
 balancer give an attacker twice the budget, and a restart clears the counters. The upgrade is Redis,
 which this product already runs. `apps/api/src/throttle.ts` says the same thing at the call site.

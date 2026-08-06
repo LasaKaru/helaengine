@@ -143,6 +143,17 @@ export default defineConfig({
         REDIS_URL: process.env['TEST_REDIS_URL'] ?? 'redis://127.0.0.1:6379',
         EXPORT_ROOT: process.env['EXPORT_ROOT'] ?? '.hela-exports-e2e',
         HELA_TRACE_FILE: TRACE_FILE,
+        /**
+         * The suite signs up a browser per test from one address, which is what the per-address
+         * rate limit (Sprint 34) exists to refuse — and did refuse, five tests in, the first time
+         * these limits shipped. The production defaults are generous enough for an office now;
+         * this is generous enough for a machine, which is a different thing and should be said
+         * out loud rather than achieved by making the product lenient.
+         */
+        AUTH_SIGNUPS_PER_HOUR: '10000',
+        AUTH_LOGINS_PER_MINUTE: '10000',
+        AUTH_LOGINS_PER_ACCOUNT: '10000',
+        AUTH_INVITE_ATTEMPTS_PER_HOUR: '10000',
         // Uploaded assets (Sprint 30) land on disk. A directory per run keeps one run's models out
         // of the next one's storage, the same bargain `SHARE_ROOT` makes below.
         ASSET_ROOT: process.env['ASSET_ROOT'] ?? '.hela-assets-e2e',

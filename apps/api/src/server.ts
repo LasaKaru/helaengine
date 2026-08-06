@@ -160,22 +160,38 @@ export function createApiServer(options: ApiOptions): Server {
   /**
    * Guessing costs something now (Sprint 34).
    *
-   * Two limiters, because they answer different questions. The per-address one stops a single
-   * source hammering the endpoint; the per-account one stops a distributed attempt at *one*
-   * person's password, which the address limit would never see. Credential stuffing needs both.
+   * Two limiters on login, because they answer different questions. The per-account one is the
+   * real defence: it stops an attempt on *one* person's password no matter how many addresses it
+   * comes from, which is what credential stuffing looks like. The per-address one is a blunter
+   * instrument aimed at a single source hammering the endpoint.
    *
-   * The numbers are deliberately generous for a human and hopeless for a script: ten logins a
-   * minute is more than anybody types, and five accounts an hour from one address is more than
-   * anybody signs up for.
+   * **The per-address numbers are generous on purpose, and the first version was not.** Five
+   * sign-ups an hour per address sounds strict-but-fair until you remember that an office, a
+   * school and a co-working space are each *one* address — and the end-to-end suite, which signs
+   * up a browser per test, is a fair imitation of exactly that. It locked the suite out, which is
+   * the cheapest possible version of the same lesson. An address limit should catch a script, not
+   * a building.
+   *
+   * Every number is overridable, because "generous" depends on who is in front of the server: a
+   * public instance and one behind a corporate proxy want different answers.
    */
+  const limit = (name: string, fallback: number): number => {
+    const configured = Number(process.env[name]);
+    return Number.isFinite(configured) && configured > 0 ? configured : fallback;
+  };
+
   const loginByAddress =
-    options.throttles?.loginByAddress ?? new Throttle({ limit: 10, windowMs: 60_000 });
+    options.throttles?.loginByAddress ??
+    new Throttle({ limit: limit('AUTH_LOGINS_PER_MINUTE', 60), windowMs: 60_000 });
   const loginByAccount =
-    options.throttles?.loginByAccount ?? new Throttle({ limit: 10, windowMs: 15 * 60_000 });
+    options.throttles?.loginByAccount ??
+    new Throttle({ limit: limit('AUTH_LOGINS_PER_ACCOUNT', 10), windowMs: 15 * 60_000 });
   const signupByAddress =
-    options.throttles?.signupByAddress ?? new Throttle({ limit: 5, windowMs: 60 * 60_000 });
+    options.throttles?.signupByAddress ??
+    new Throttle({ limit: limit('AUTH_SIGNUPS_PER_HOUR', 60), windowMs: 60 * 60_000 });
   const inviteByAddress =
-    options.throttles?.inviteByAddress ?? new Throttle({ limit: 20, windowMs: 60 * 60_000 });
+    options.throttles?.inviteByAddress ??
+    new Throttle({ limit: limit('AUTH_INVITE_ATTEMPTS_PER_HOUR', 30), windowMs: 60 * 60_000 });
 
   function refuseIfThrottled(
     response: ServerResponse,
