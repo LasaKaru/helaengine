@@ -130,6 +130,47 @@ Everything is off by default, in every service, and each variable turns on exact
 
 `/metrics` is served by the API on its own port and by the worker on its health port (3300).
 
+## Backups, and restoring one
+
+Scripts live in `ops/backup/`.
+
+```bash
+# Nightly. Custom format, verified readable before old ones are deleted.
+DATABASE_URL=postgres://… BACKUP_DIR=/mnt/backups ops/backup/backup.sh
+
+# When you need one back. Refuses a non-empty target unless FORCE=1.
+TARGET_URL=postgres://… ops/backup/restore.sh /mnt/backups/helaengine-20260806T101500Z.dump
+
+# Prove the whole loop still works, without touching production.
+SOURCE_URL=postgres://… ops/backup/verify.sh
+```
+
+**`verify.sh` is the one that matters**, and running it on a schedule is worth more than running
+`backup.sh` on a schedule. It backs up a real database, restores into a scratch one, and compares
+row counts, a content digest and the constraint count — because a dump that has been running
+nightly for a year and has never been read back is not a backup, it is a hope. Most data-loss
+incidents are not "there was no backup"; they are "the backup did not restore".
+
+Three deliberate refusals, each because the moment somebody runs these they are stressed:
+
+- **`backup.sh` reads the archive back** before deleting anything older. A truncated dump never
+  becomes the newest one, and old backups are removed only after a new one is proved readable.
+- **`restore.sh` reads the archive before touching the target.** A corrupt file found halfway
+  through a restore has already dropped the schema it was replacing.
+- **`restore.sh` refuses a database that has tables** unless `FORCE=1`. Restoring onto a live
+  database is how a partial outage becomes a total one.
+
+Verified on a database of 448 projects and 858 scene versions: counts, content digest and all 125
+constraints came back identical. A deliberately truncated archive was refused before the restore
+started.
+
+### What is still missing
+
+The scripts are here and proved; **nothing runs them on a schedule**, because there is no
+production host to schedule them on. Off-site copies, encryption at rest and a tested
+point-in-time-recovery window are also absent — `pg_dump` gives you last night, not last minute.
+Before real customer data exists, those three are the work.
+
 ## What is not here yet
 
 Being explicit, because a runbook that overstates its coverage is worse than a short one:

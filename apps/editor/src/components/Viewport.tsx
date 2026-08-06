@@ -142,6 +142,11 @@ export function Viewport({ loader, resolver }: ViewportProps): React.JSX.Element
         )}
         {!walking && (
           <Grid
+            // Named so it can be found and hidden. The export QA suite compares an editor
+            // screenshot against an export of the same scene, and the grid is editor furniture that
+            // an export correctly does not have — so a comparison that leaves it visible is
+            // comparing two things that are meant to differ.
+            name="editor-grid"
             args={[200, 200]}
             cellSize={1}
             cellColor="#3a4354"

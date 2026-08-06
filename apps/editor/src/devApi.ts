@@ -36,6 +36,8 @@ export interface DevApi {
   addObject(assetId: string, position?: Vec3, rotationY?: number): string;
   clear(): void;
   /** Object ids currently instantiated in the Three.js scene, not merely present in the store. */
+  /** Hides the editor's in-scene furniture (the reference grid). True when it found something. */
+  hideEditorFurniture(): boolean;
   viewportObjectIds(): string[];
   /** Per-object view of what the engine actually built, including whether a GLB or a placeholder. */
   viewportObjects(): Array<{ id: string; assetId: string; isModel: boolean }>;
@@ -417,6 +419,23 @@ export function exposeDevApi(library: AssetLibrary): void {
     clear() {
       const state = useSceneStore.getState();
       for (const object of [...state.scene.objects]) state.removeObject(object.id);
+    },
+
+    /**
+     * Hides the editor's own furniture inside the 3D scene.
+     *
+     * DOM overlays can be hidden with a stylesheet; the reference grid cannot, because it is a mesh
+     * in the scene graph. The export QA suite screenshots the editor and an export of the same
+     * scene and expects them to match — and an editor that draws a 200×200 grid the export
+     * correctly omits fails that comparison at around 8% of pixels on an empty level, which is a
+     * test comparing two things that are supposed to differ rather than a rendering bug.
+     */
+    hideEditorFurniture: () => {
+      const scene = currentLoadedScene?.threeScene;
+      if (!scene) return false;
+      const grid = scene.getObjectByName('editor-grid');
+      if (grid) grid.visible = false;
+      return grid !== undefined;
     },
 
     viewportObjectIds: () => [...(currentLoadedScene?.objects.keys() ?? [])],

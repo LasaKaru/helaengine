@@ -258,6 +258,17 @@ export async function hideEditorOverlays(page: Page): Promise<void> {
     content: `.placement-toolbar, .walk-hint, .health-bar, .viewport-stats, .hela-ui,
               .drag-chip { visibility: hidden !important; }`,
   });
+
+  /**
+   * The reference grid, which a stylesheet cannot touch.
+   *
+   * It is a mesh in the scene graph, not a DOM overlay, and an export correctly does not have one.
+   * Leaving it visible made this suite compare an editor *with* a 200×200 grid against an export
+   * *without* — around 8% of pixels on an empty level, permanently over the 6% budget, and red in
+   * CI for as long as the grid has existed. The failure looked like a rendering bug and was a test
+   * comparing two things that are supposed to differ.
+   */
+  await page.evaluate(() => window.helaengine?.hideEditorFurniture());
 }
 
 /** Asserts a screenshot pair matches, with a readable message when it does not. */
