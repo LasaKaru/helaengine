@@ -4106,7 +4106,11 @@ test.describe('plans and upgrading', () => {
 
     // The wizard has to be closed first: its backdrop covers the toolbar, and Playwright reports
     // that faithfully — "element intercepts pointer events" is the same thing a user would find.
-    await page.keyboard.press('Escape');
+    // Closed by its own button rather than by Escape, which asserts the more useful thing: that
+    // the dialog is dismissible at all once a server build has finished.
+    const closer = page.locator('.modal-actions button', { hasText: /Close|Cancel/ }).first();
+    await expect(closer).toBeEnabled();
+    await closer.click();
     await expect(page.locator('.modal-backdrop')).toBeHidden();
 
     // Back to the projects screen, where the meter is read from the server's own count of
