@@ -1155,17 +1155,31 @@ The bug worth recording cost a debugging session and is the sort that would have
 
 **Tasks:**
 
-- [ ] Set up Dependabot (or Snyk) for automated dependency vulnerability scanning across all packages; set up a SAST tool (e.g., Semgrep) in CI
-- [ ] Audit all signed URL expiry times (uploads, downloads) — ensure they're as short as practically usable, not left at generous defaults
-- [ ] Audit S3/R2 bucket policies and CORS configuration explicitly — verify no bucket is publicly listable/writable beyond intended signed-URL flows
-- [ ] Re-verify the behavior sandboxing guarantee from Sprint 9: grep the entire codebase for `eval(`, `new Function(`, or any dynamic code execution path reachable from user-controlled scene data — this should return zero hits; if it doesn't, fix immediately, this is a critical finding
-- [ ] Implement/verify audit logging (the `AuditLog` table from DEVELOPMENT-PLAN.md) is actually being written on sensitive actions: project access, membership changes, billing changes, asset deletion
-- [ ] Write a basic SOC2-readiness checklist doc: data retention policy, access control review process, incident response process, vendor list (Clerk/Stripe/R2/etc. and their own compliance posture) — you likely won't pursue formal SOC2 certification yet, but having this doc ready dramatically shortens future enterprise security questionnaires
-- [ ] Run an OWASP Top 10-focused review against staging (manually, or with a tool like OWASP ZAP) — auth bypass attempts, injection, broken access control between orgs (critical: verify Org A can never read/write Org B's projects/assets under any endpoint)
+- [x] Dependabot (weekly, grouped) and a `Security` workflow: `pnpm audit --prod` blocking on runtime advisories, dev advisories reported; Semgrep with four published rulesets plus **four rules specific to this codebase**
+- [x] Every lifetime in the system read and recorded — and two of them found to be claims rather than facts: expired sessions and invites were never deleted, and an expired build's _bytes_ stayed on disk after its link stopped working. Both are swept hourly now
+- [x] CORS reviewed: a wildcard by default is safe _here_ because auth is a bearer token rather than a cookie and `Allow-Credentials` is never sent — with `ALLOWED_ORIGINS` to narrow it. **No bucket policies to audit**: storage is local disk behind an interface, which is Sprint 30's recorded decision
+- [x] The sandboxing guarantee re-verified and then **made permanent**: lint rules, a Semgrep rule, and a sweep of every tracked file that returns nothing
+- [x] Audit log: ten actions, closed vocabulary in the database as well as the code, `subject` as text so a record outlives what it describes, correlation id on every entry, admin-only to read
+- [x] `docs/SECURITY.md`: retention table, vendor list, SOC 2 readiness with the gaps named — backups being the largest
+- [x] OWASP-focused review of the API, which found **no rate limit anywhere** and **a sign-out that revoked nothing**. Both fixed. Cross-org isolation proven by a table-driven suite over all eighteen tenant-scoped routes
+
+**Tech notes:**
+
+- **The sweep found the one hit in the repository, and it was in a test.** `packages/export`'s generated-code check compiled `main.js` with `new Function` — a _script_ compiler, so the test stripped the import block and every `export` keyword to make it parse, meaning the module syntax that the bug it was written for actually broke was the part not being checked. esbuild parses it properly now, and there is no exception in the rule for somebody to point at later.
+- **`startsWith(root)` is not containment.** Every local store used it, and it is true for `/data/assets-old/secret.glb` when the root is `/data/assets`. `join` already normalised `..` away, so the classic traversal was refused; this is the narrower case underneath, and the difference is one separator.
+- **Two limiters on login, not one.** Per address misses credential stuffing spread across a botnet; per account misses a broad sweep of many accounts. Each is blind to the other's attack. Sliding windows, because a fixed one hands an attacker double rate across the boundary — and `X-Forwarded-For` is trusted only under `TRUST_PROXY`, since a header the client sets is a bypass rather than an identity.
+- **`audit()` never throws,** and the reasoning is in the code: a database hiccup turning a member removal into a 500 _after_ the removal committed is worse than a missing row.
+- **Express left the co-op server.** It was there for one health route and two CORS headers, and it brought a `path-to-regexp` ReDoS advisory into a deployed process. Matchmaking runs over the WebSocket transport, so the router was never used; fifteen lines of `node:http` replace it.
 
 **Deliverables:** Dependency/SAST scanning in CI, security audit findings resolved, compliance-readiness doc.
 
 **Definition of Done:** The OWASP-focused review and codebase `eval`/dynamic-execution grep both come back clean (or all findings are resolved, not just documented); cross-org data isolation is explicitly tested and verified via integration tests, not just assumed from the RBAC design.
+
+**Met, with the nature of the review qualified.** The dynamic-execution sweep is clean across every tracked file and is now enforced by two independent mechanisms rather than repeated by hand. Cross-org isolation is tested per endpoint — eighteen routes, each driven with a valid session belonging to a different tenant, which is a stronger claim than an anonymous request — and the suite was itself verified by removing a guard on purpose and watching exactly one test fail.
+
+Every finding was fixed rather than filed: no rate limiting, a sign-out that revoked nothing, a containment check that a sibling directory could satisfy, expired credentials kept for ever, expired build artifacts kept for ever, and two runtime dependency advisories (one removed with its dependency, one pinned forward).
+
+What is **not** met is the phrase "against staging". There is no staging deployment and no ZAP run; the review was a read of the code and a set of tests written against it, by the person who wrote the code. That is worth something and it is not an independent assessment, which is why `docs/SECURITY.md` says so in its own words alongside the other gaps — no penetration test, no secrets management, no MFA or SSO, and no database backups, which is the largest hole on the page.
 
 ---
 

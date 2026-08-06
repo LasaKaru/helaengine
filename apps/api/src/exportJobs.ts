@@ -280,3 +280,40 @@ export function requireDownloadable(job: ExportJob): void {
     throw new Forbidden('that download link has expired — export the project again');
   }
 }
+
+/**
+ * Artifacts whose time is up.
+ *
+ * The Sprint 34 expiry audit found that "builds expire after 24 hours" was only true of the *link*:
+ * `artifactIsDownloadable` refuses to serve an expired build, and the zip stayed on disk for ever.
+ * That is a storage leak and, more importantly, a false retention claim — a customer told their
+ * build is gone would be right to expect it gone.
+ *
+ * Returns the rows to delete rather than deleting anything itself, because the bytes live wherever
+ * the *worker* put them and only the worker knows how to remove them. The row is then cleared of
+ * its path, so the history entry survives — somebody can still see that they exported on Tuesday,
+ * which is the part worth keeping.
+ */
+export async function expiredArtifacts(
+  db: Db,
+  limit = 200,
+): Promise<Array<{ id: string; artifactPath: string }>> {
+  const found = await db.query<{ id: string; artifact_path: string }>(
+    `select id, artifact_path
+       from export_jobs
+      where artifact_path is not null and expires_at is not null and expires_at < now()
+      order by expires_at
+      limit $1`,
+    [limit],
+  );
+  return found.rows.map((row) => ({ id: row.id, artifactPath: row.artifact_path }));
+}
+
+/** Clears the pointer once the bytes are gone. The job's history entry stays. */
+export async function forgetArtifact(db: Db, jobId: string): Promise<void> {
+  await db.query(
+    `update export_jobs set artifact_path = null, artifact_bytes = null, updated_at = now()
+      where id = $1`,
+    [jobId],
+  );
+}

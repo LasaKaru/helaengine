@@ -1,10 +1,11 @@
 import { createServer } from 'node:http';
-import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPool } from '@helaengine/api/db';
 import { within } from '@helaengine/api/paths';
 import { createExportQueue, createRedis } from '@helaengine/api/queue';
+import { expiredArtifacts, forgetArtifact } from '@helaengine/api/exportJobs';
 import {
   createLogger,
   PROMETHEUS_CONTENT_TYPE,
@@ -37,6 +38,13 @@ class LocalArtifactStorage implements ArtifactStorage {
   constructor(root: string) {
     this.#root = resolve(root);
     mkdirSync(this.#root, { recursive: true });
+  }
+
+  /** Removes a build whose time is up. Missing is success: the point is that it is not there. */
+  remove(key: string): void {
+    const target = join(this.#root, key);
+    if (!within(this.#root, target)) throw new Error('that key would escape the artifact store');
+    rmSync(target, { force: true });
   }
 
   put(key: string, bytes: Uint8Array): string {
@@ -111,6 +119,34 @@ async function readQueueDepth(): Promise<void> {
     log.warn('could not read queue depth', { error });
   }
 }
+
+/**
+ * Expired builds are deleted, not merely refused.
+ *
+ * The worker owns the artifact store, so it is the process that can remove bytes from it — the API
+ * only reads. Hourly and bounded: a batch of two hundred keeps a long-neglected deployment from
+ * spending its first hour deleting rather than building.
+ */
+const SWEEP_INTERVAL_MS = 60 * 60 * 1000;
+async function sweepExpiredArtifacts(): Promise<void> {
+  const expired = await expiredArtifacts(db);
+  for (const artifact of expired) {
+    storage.remove(artifact.artifactPath);
+    // The row keeps its history entry and loses its pointer, so "you exported this on Tuesday"
+    // survives while "and here it is" does not.
+    await forgetArtifact(db, artifact.id);
+  }
+  if (expired.length > 0) log.info('swept expired builds', { count: expired.length });
+}
+
+const sweeping = setInterval(() => {
+  void sweepExpiredArtifacts().catch((error: unknown) => {
+    log.warn('could not sweep expired builds', { error });
+  });
+}, SWEEP_INTERVAL_MS);
+sweeping.unref();
+// Once at startup as well: a worker that has been down for a day should not wait another hour.
+void sweepExpiredArtifacts().catch(() => {});
 
 /**
  * A health endpoint, on a worker with no HTTP surface of its own.

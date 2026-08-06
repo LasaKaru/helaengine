@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { trace } from '@opentelemetry/api';
 import { ZodError } from 'zod';
 import {
+  CORRELATION_HEADER,
   createLogger,
   currentCorrelationId,
   inSpan,
@@ -223,8 +224,42 @@ export function createApiServer(options: ApiOptions): Server {
     const path = url.pathname;
     const method = request.method ?? 'GET';
 
-    response.setHeader('access-control-allow-origin', '*');
-    response.setHeader('access-control-allow-headers', 'content-type, authorization');
+    /**
+     * CORS: a wildcard by default, an allowlist when one is configured (Sprint 34).
+     *
+     * The wildcard is not as alarming as it looks, and it is worth writing down why rather than
+     * leaving the next reader to work it out. This API authenticates with a bearer token held in
+     * `localStorage`, not a cookie — so a hostile page cannot make an authenticated request on a
+     * user's behalf the way it could with ambient credentials. `Access-Control-Allow-Credentials`
+     * is never sent, and with it absent a browser will not attach cookies to a cross-origin call
+     * even if some future change adds them.
+     *
+     * What the wildcard does cost is that any origin may *attempt* a call, which is a nuisance in
+     * logs and a slightly wider surface than necessary. `ALLOWED_ORIGINS` narrows it for a
+     * deployment that knows where its editor is served from — which a hosted deployment does and a
+     * self-hosted one usually does not, hence the default.
+     */
+    const allowed = (process.env['ALLOWED_ORIGINS'] ?? '')
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter((entry) => entry !== '');
+    const origin = request.headers.origin;
+
+    if (allowed.length === 0) {
+      response.setHeader('access-control-allow-origin', '*');
+    } else if (origin !== undefined && allowed.includes(origin)) {
+      // Echoed rather than listed: the header takes one origin, so a server with an allowlist has
+      // to answer per request — and `Vary` keeps a cache from serving one origin's answer to
+      // another, which is the mistake that makes an allowlist worse than a wildcard.
+      response.setHeader('access-control-allow-origin', origin);
+      response.setHeader('vary', 'origin');
+    }
+
+    response.setHeader(
+      'access-control-allow-headers',
+      'content-type, authorization, x-correlation-id',
+    );
+    response.setHeader('access-control-expose-headers', CORRELATION_HEADER);
     // PUT is here for the upload route, and it is not optional: `model/gltf-binary` is not a
     // CORS-safelisted content type, so a browser preflights the upload — and a preflight that does
     // not name PUT fails as "Failed to fetch", with the row left saying "Processing…" forever.

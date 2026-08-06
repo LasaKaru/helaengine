@@ -14,7 +14,8 @@ import {
 } from '@helaengine/telemetry';
 import { createPool, migrate, reset, type Db } from './db.js';
 import { LocalAssetStorage } from './assets.js';
-import { hashToken } from './auth.js';
+import { hashToken, pruneExpiredCredentials } from './auth.js';
+import { expiredArtifacts, forgetArtifact } from './exportJobs.js';
 import { createApiServer } from './server.js';
 import { Throttle } from './throttle.js';
 import { routePattern } from './observability.js';
@@ -2036,7 +2037,9 @@ describe('rate limiting the endpoints where guessing is the attack', () => {
     await new Promise<void>((done) => strict.close(() => done()));
   });
 
-  async function post(path: string, body: unknown): Promise<Response> {
+  // `globalThis.Response`, because this file declares its own `Response<T>` for the `call` helper
+  // and the shadow is invisible until it is a type error.
+  async function post(path: string, body: unknown): Promise<globalThis.Response> {
     return fetch(`${strictOrigin}${path}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -2156,5 +2159,133 @@ describe('signing out', () => {
       headers: { authorization: 'Bearer not-a-real-token' },
     });
     expect(response.status).toBe(204);
+  });
+});
+
+/**
+ * Sprint 34 — the expiry audit, as tests.
+ *
+ * Two findings came out of reading every lifetime in the system, and neither was a way in. Both
+ * were retention claims that were not true: expired credentials were left in the table for ever,
+ * and an expired build's bytes stayed on disk after the link stopped working. "We keep sessions for
+ * fourteen days" and "builds expire after a day" are only true if something deletes them.
+ */
+describe('expiry is enforced, not merely checked', () => {
+  it('deletes sessions and unaccepted invites once they are past their time', async () => {
+    const person = await signup('expiry-sweep@example.com');
+    const org = person.personalOrganizationId;
+
+    await call('POST', `/orgs/${org}/invites`, {
+      token: person.token,
+      body: { email: 'never-accepts@example.com', role: 'viewer' },
+    });
+
+    // Aged rather than waited for: a test that sits out fourteen days is a test nobody runs.
+    await db.query("update sessions set expires_at = now() - interval '1 day'");
+    await db.query("update invites set expires_at = now() - interval '1 day'");
+
+    const pruned = await pruneExpiredCredentials(db);
+    expect(pruned.sessions).toBeGreaterThan(0);
+    expect(pruned.invites).toBeGreaterThan(0);
+
+    expect((await db.query('select count(*)::int as count from sessions')).rows[0]).toMatchObject({
+      count: 0,
+    });
+  });
+
+  it('keeps a session that has not expired, which is the part that must not break', async () => {
+    const person = await signup('expiry-keeps@example.com');
+    await pruneExpiredCredentials(db);
+    expect((await call('GET', '/me', { token: person.token })).status).toBe(200);
+  });
+
+  it('keeps an accepted invite, because it is a record rather than a credential', async () => {
+    const owner = await signup('expiry-inviter@example.com');
+    const joiner = await signup('expiry-joiner@example.com');
+    const org = owner.personalOrganizationId;
+
+    await call('POST', `/orgs/${org}/invites`, {
+      token: owner.token,
+      body: { email: 'expiry-joiner@example.com', role: 'editor' },
+    });
+    await call('POST', '/invites/accept', {
+      token: joiner.token,
+      body: { token: invites.at(-1)!.token },
+    });
+
+    await db.query("update invites set expires_at = now() - interval '1 day'");
+    await pruneExpiredCredentials(db);
+
+    // The audit trail refers to it, and its token hash is already spent.
+    expect((await db.query('select count(*)::int as count from invites')).rows[0]).toMatchObject({
+      count: 1,
+    });
+  });
+
+  it('lists the builds whose bytes should be gone, without touching the history', async () => {
+    const owner = await signup('expiry-builds@example.com');
+    const org = owner.personalOrganizationId;
+    const created = await call<{ project: { id: string } }>('POST', `/orgs/${org}/projects`, {
+      token: owner.token,
+      body: { name: 'Expiring', scene: { sceneId: 's', version: 1, name: 'x', objects: [] } },
+    });
+    const requested = await call<{ job: { id: string } }>(
+      'POST',
+      `/projects/${created.body.project.id}/exports`,
+      { token: owner.token },
+    );
+    const jobId = requested.body.job.id;
+
+    // As the worker leaves it when a build finishes, then aged past its day.
+    await db.query(
+      `update export_jobs
+          set status = 'done', artifact_path = $2, artifact_bytes = 1024,
+              expires_at = now() - interval '1 hour'
+        where id = $1`,
+      [jobId, `exports/${jobId}.zip`],
+    );
+
+    const expired = await expiredArtifacts(db);
+    expect(expired.map((each) => each.id)).toContain(jobId);
+
+    await forgetArtifact(db, jobId);
+
+    // The row survives with its history: "you exported this on Tuesday" is worth keeping, "and
+    // here it is" is not.
+    const after = await call<{ job: { artifactPath: string | null; status: string } }>(
+      'GET',
+      `/export-jobs/${jobId}`,
+      { token: owner.token },
+    );
+    expect(after.body.job.status).toBe('done');
+    expect(after.body.job.artifactPath).toBeNull();
+    expect((await expiredArtifacts(db)).map((each) => each.id)).not.toContain(jobId);
+  });
+});
+
+describe('CORS', () => {
+  it('answers a preflight with the methods and headers the editor needs', async () => {
+    const response = await fetch(`${origin}/projects/00000000-0000-0000-0000-000000000000`, {
+      method: 'OPTIONS',
+      headers: { origin: 'https://editor.example.com' },
+    });
+
+    expect(response.status).toBe(204);
+    // PUT is not optional: `model/gltf-binary` is not a safelisted content type, so an upload is
+    // preflighted, and a preflight that omits PUT fails as "Failed to fetch".
+    expect(response.headers.get('access-control-allow-methods')).toContain('PUT');
+    // The editor sends its own correlation id and reads the one it gets back.
+    expect(response.headers.get('access-control-allow-headers')).toContain('x-correlation-id');
+    expect(response.headers.get('access-control-expose-headers')).toContain('x-correlation-id');
+  });
+
+  it('never claims to allow credentials, which is what makes a wildcard safe here', async () => {
+    const response = await fetch(`${origin}/health`, {
+      headers: { origin: 'https://anywhere.example.com' },
+    });
+    // A wildcard origin plus credentials is the combination browsers refuse and servers should
+    // never offer. Auth here is a bearer token, so nothing ambient is ever attached.
+    expect(response.headers.get('access-control-allow-credentials')).toBeNull();
+    expect(response.headers.get('access-control-allow-origin')).toBe('*');
   });
 });

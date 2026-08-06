@@ -178,3 +178,26 @@ export async function provisionUser(
 export const INVITE_LIFETIME_MS = INVITE_DAYS * 24 * 60 * 60 * 1000;
 
 export type { Role };
+
+/**
+ * Deletes credentials that have already expired.
+ *
+ * Found by the Sprint 34 expiry audit, and it is a retention finding rather than an access one: an
+ * expired session already fails to authenticate — `identify` checks `expires_at > now()` — so
+ * nothing here is a way in. What the rows *are* is a growing table of credential hashes that the
+ * product has no reason to keep, sitting in every backup, waiting to be part of somebody's breach.
+ * "We keep session records for fourteen days" is only true if something deletes them.
+ *
+ * Returns what it removed, so the caller can log a number rather than a shrug.
+ */
+export async function pruneExpiredCredentials(
+  db: Db,
+): Promise<{ sessions: number; invites: number }> {
+  const sessions = await db.query('delete from sessions where expires_at < now()');
+  // Accepted invites are kept: the audit trail refers to them, and an accepted invite is a record
+  // of how somebody got access rather than a credential — its token hash is already spent.
+  const invites = await db.query(
+    'delete from invites where expires_at < now() and accepted_at is null',
+  );
+  return { sessions: sessions.rowCount ?? 0, invites: invites.rowCount ?? 0 };
+}

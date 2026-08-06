@@ -341,11 +341,11 @@ schema-validated auto-repair loop, and whatever was changed is disclosed. Detail
 
 **Sprint 34: Security & compliance pass**
 
-- [ ] Dependency scanning (Dependabot/Snyk), SAST in CI
-- [ ] Signed URL expiry audit, S3 bucket policy audit, CORS lockdown
-- [ ] Behavior sandboxing review — reconfirm no user input ever reaches `eval`/`Function()` (your closed behavior vocabulary from Sprint 9 should make this a non-issue; verify it)
-- [ ] Basic SOC2-readiness checklist (audit logging on project access/changes, data retention policy doc)
-- **DoD:** Pen-test checklist (OWASP Top 10 relevant items) run against staging with no critical findings.
+- [x] Dependabot plus a Security workflow: `pnpm audit --prod` blocking, dev advisories reported, Semgrep with four published rulesets and four rules specific to this codebase. Both runtime advisories closed at the source — Express left the co-op server entirely
+- [x] Every lifetime audited, and two were claims rather than facts: expired credentials and expired build artifacts were both kept for ever. Swept hourly now. **No bucket policies to audit** — storage is local disk behind an interface, per Sprint 30. CORS reviewed and narrowable with `ALLOWED_ORIGINS`; a wildcard is safe here because auth is a bearer token and `Allow-Credentials` is never sent
+- [x] Sandboxing reconfirmed **and made permanent**: lint rules, a Semgrep rule, and a clean sweep. The one hit was in a test, and fixing it made the test better
+- [x] Audit log on membership, project access, deletion and exports, with a closed vocabulary and correlation ids; `docs/SECURITY.md` covers retention, vendors and SOC 2 readiness with the gaps named
+- **DoD: met, review qualified.** Every finding fixed rather than filed — no rate limiting, a sign-out that revoked nothing, a containment check a sibling directory satisfied, two retention leaks. Cross-org isolation is tested across all eighteen tenant-scoped routes, and the suite was verified by removing a guard on purpose. **Not met: "against staging"** — there is no staging deployment and no ZAP run, and the review was done by the author of the code. See `docs/SECURITY.md`.
 
 **Sprint 35: Billing & plan tiers**
 

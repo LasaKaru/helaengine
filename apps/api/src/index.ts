@@ -1,6 +1,7 @@
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createLogger, serviceMetrics, startTelemetry } from '@helaengine/telemetry';
+import { pruneExpiredCredentials } from './auth.js';
 import { LocalAssetStorage } from './assets.js';
 import { createPool, migrate } from './db.js';
 import { createExportQueue, createRedis } from './queue.js';
@@ -55,6 +56,24 @@ const server = createApiServer({
   queue: createExportQueue(redis),
   telemetry: { tracer: telemetry.tracer, metrics: serviceMetrics(), log },
 });
+
+/**
+ * Expired credentials are swept hourly.
+ *
+ * A timer rather than a cron entry, because a service that cleans up after itself needs no second
+ * deployment artefact to be correct — and `unref` so this never keeps a shutting-down process
+ * alive. An hour is arbitrary and generous: nothing depends on the promptness, only on it
+ * happening at all.
+ */
+const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
+const pruning = setInterval(() => {
+  void pruneExpiredCredentials(db)
+    .then(({ sessions, invites }) => {
+      if (sessions + invites > 0) log.info('pruned expired credentials', { sessions, invites });
+    })
+    .catch((error: unknown) => log.warn('could not prune expired credentials', { error }));
+}, PRUNE_INTERVAL_MS);
+pruning.unref();
 
 server.listen(port, () => {
   log.info('listening', { port, metrics: `http://localhost:${port}/metrics` });

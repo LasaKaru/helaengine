@@ -7,9 +7,10 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 33 — the platform has accounts, cloud save, per-organisation asset uploads,
-real-time collaborative editing, server-side export, and now traces, metrics and structured logs
-tying one user action together across every service that touches it.
+**Status:** Sprint 34 — the platform has accounts, cloud save, per-organisation asset uploads,
+real-time collaborative editing, server-side export, traces and metrics tying one user action
+together across every service that touches it, and a security pass that made the sandboxing
+guarantee enforceable rather than merely claimed.
 Exports are playable games, checked in three browsers, played before anyone can have them, automatically repaired where a fix
 exists, refused with a reason where one does not, and shareable as a link rather than a zip; a
 project now belongs to a user in an organisation with role-gated access, and is saved to a server
@@ -150,7 +151,7 @@ apps/api               Accounts, orgs, memberships, role gating. Postgres + hand
 apps/collab            The room server two editors meet in. Authenticates the socket, persists the room.
 apps/export-worker     Builds exports off the tab, on a BullMQ queue. Its own process, on purpose.
 ops/                   Grafana dashboard and Prometheus alert rules. Reviewed, not yet rendered.
-docs/                  GUIDE, DEVELOPMENT-PLAN, SPRINT, RUNBOOK, ASSET-CONVENTIONS — the plan of record.
+docs/                  GUIDE, DEVELOPMENT-PLAN, SPRINT, RUNBOOK, SECURITY — the plan of record.
 ```
 
 ## The two rules that shape the codebase
