@@ -388,6 +388,23 @@ schema-validated auto-repair loop, and whatever was changed is disclosed. Detail
 - [ ] **Not done:** a support channel and triage process. Needs an organisation
 - **DoD: not met, and half of it is not meetable here.** It rests on a beta cohort's support-ticket rate; there are no users and no tickets. The half that had to exist first is built — the funnel is instrumented, the table computes, and `biggestDropOff` answers the plan's question the moment there is data to answer it from.
 
+**Sprint 39: Beta findings remediation**
+
+- [ ] **Not done:** triage a beta backlog. There is no beta. The machinery is there — `biggestDropOff` ranks the drop-off the moment there is data — but ranking nothing produces nothing
+- [~] Fix top friction points. No beta data, so the substitute was friction _this project's own testing_ found: the export visual regression red in CI. **Four of five templates fixed**, and not by changing how anything renders — the suite was comparing an editor that draws a reference grid and trigger wireframes against exports that correctly have neither. The fifth, Stress test, is still 9.69% over a 6% budget and is recorded rather than claimed fixed
+- [x] Re-run export QA and the load tests. One caveat worth keeping: an autosave measurement taken while the export QA suite was running showed halved throughput. That is a contended container, not a regression, and is not reported as one
+- [x] Sanity-check the tier limits. A 500-object scene stores as **8.4 KB**, so project storage is not what the storage limit is about and never will be; uploaded models vary by two orders of magnitude, so Free's 0.5 GB is between 20 and 70,000 uploads depending entirely on where a user's assets come from. Storage is the tier most likely to need changing, and the funnel will say so before a support ticket does
+- **DoD: not met, not meetable.** It requires friction found _in beta_ and re-validated _with the cohort_. Both halves need users.
+
+**Sprint 40: Public launch readiness**
+
+- [ ] **Not done:** the marketing site. Positioning copy is not an engineering deliverable, and writing a pricing page for a product with no customers would be inventing claims
+- [~] Support processes — SLA per tier, a severity scale and an escalation path are written. No ticketing system, because there is no organisation to staff one
+- [~] Production readiness review — written, and organised around **verified versus configured**, because that gap is where launch incidents live. Ten things have been run and watched; seven exist and never have. **Backups moved from the second list to the first this sprint**; observability and Stripe did not
+- [x] Launch-day plan — what must be true before sign-ups open, who watches what, and rollback triggers agreed in advance. One is unconditional: any failure that loses or corrupts a saved project
+- [ ] **Not done:** execute launch, and the post-launch funnel review. Both need a public
+- **DoD: not met, and every clause needs something absent here** — a deployment target, a Stripe account, a running Grafana. The list of what has never run is the useful output, not a tick.
+
 ---
 
 ## 6. Ongoing (every sprint, not a phase)

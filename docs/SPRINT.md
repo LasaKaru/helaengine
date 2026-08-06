@@ -1292,14 +1292,14 @@ than left as a test that quietly avoids it.
 
 **Tasks:**
 
-- [ ] Triage the full beta feedback backlog + funnel analytics from Sprint 38; rank issues by (a) how many users hit it and (b) how severely it blocks the core flow
-- [ ] Fix the top-ranked friction points — this sprint's scope is intentionally defined by beta data rather than a pre-written task list, since you don't know yet what beta will surface
-- [ ] Re-run the Sprint 23 export QA suite and Sprint 36 load tests if any remediation touched engine/export/backend performance-sensitive code, to confirm no regressions
-- [ ] Finalize pricing page copy and plan-tier limits based on actual beta usage patterns observed (you now have real data on typical project sizes, export frequency, etc. — sanity check your Sprint 35 tier limits against reality)
+- [ ] **NOT DONE.** Triage the beta backlog and rank by how many users hit each issue. There is no beta and no backlog. The _machinery_ exists — `funnelFrom` and `biggestDropOff` produce the ranked drop-off table the moment there is data — but ranking nothing produces nothing
+- [~] Fix the top-ranked friction points. No beta data, so the substitute was **friction this project's own testing found**: the export visual regression that had been red in CI. Four of five templates fixed by removing editor furniture — the reference grid and trigger volumes — from a comparison that was never meant to include them. The fifth is recorded, not claimed
+- [x] Re-run the export QA suite and load tests — done, and one number needs a caveat: an autosave run taken _while the export QA suite was running_ showed halved throughput. That is a contended container, not a regression, and it is not reported as one
+- [x] Sanity-check the Sprint 35 tier limits against reality — done in `docs/LAUNCH-READINESS.md` §3 with the only real measurements available. Two findings: a 500-object scene stores as **8.4 KB**, so project storage is not what the storage limit is about; and uploaded models vary by two orders of magnitude, making Free's 0.5 GB anywhere between 20 and 70,000 uploads. **Storage is the tier most likely to be wrong**, and the funnel will say so — a spike of 402s on upload against a flat export rate
 
-**Deliverables:** Beta-informed product fixes, finalized pricing.
+**Deliverables:** Beta-informed fixes — **not deliverable**, there was no beta. Test-informed fixes and a pricing sanity-check were delivered instead.
 
-**Definition of Done:** The top 3-5 friction points identified in beta are resolved and re-validated with a subset of the original beta cohort confirming improvement.
+**Definition of Done: not met, and not meetable here.** It requires friction points identified _in beta_ and re-validated _with the beta cohort_. Both halves need users. What was done in their place is the honest substitute: fix the friction that real testing surfaced, and say which of it is still outstanding.
 
 ---
 
@@ -1309,16 +1309,16 @@ than left as a test that quietly avoids it.
 
 **Tasks:**
 
-- [ ] Finalize and QA the public marketing site (separate from the app itself) — pricing page, feature overview, template gallery showcasing Sprint 37's work
-- [ ] Set up production support processes: ticketing system (if not already from Sprint 38), documented SLA expectations per plan tier, escalation path for critical bugs
-- [ ] Run a final production readiness review: verify all Phase 5 observability/alerting is active on the actual production environment (not just staging), confirm backup/restore procedures for Postgres are tested (not just configured), confirm Stripe is in live mode with correct webhook endpoints
-- [ ] Prepare a launch-day monitoring plan: who's watching dashboards, what the rollback plan is if a critical issue emerges, communication plan for status updates if there's an incident
-- [ ] Execute launch (public sign-ups open, pricing live, marketing push per your go-to-market plan — outside the scope of this technical doc but coordinate timing with it)
-- [ ] Post-launch: run the same funnel analytics review cadence from beta, now at public scale, feeding into your first post-GA roadmap prioritization (see DEVELOPMENT-PLAN.md section 7 for the future roadmap this feeds into)
+- [ ] **NOT DONE.** Public marketing site. Marketing copy is a positioning decision, not an engineering one, and writing a pricing page for a product with no customers would be inventing claims rather than building anything
+- [~] Production support processes — SLA expectations per tier, a severity scale and an escalation path are written in `docs/LAUNCH-READINESS.md` §4. **No ticketing system**, because there is no organisation to staff one
+- [~] Final production readiness review — done, in `docs/LAUNCH-READINESS.md`, organised around **verified versus configured** because that distinction is where launch incidents live. Ten things executed and observed; seven that exist and have never run. Of the three the plan names specifically: **backup/restore is now genuinely tested** (§1), observability is configured and _has never rendered a panel or fired an alert_, and **Stripe has never been contacted**
+- [x] Launch-day monitoring plan — `docs/LAUNCH-READINESS.md` §5: what must be true before sign-ups open, who watches what during the window, and rollback triggers decided in advance so nobody argues at the time. One of them is unconditional: any failure that loses or corrupts a saved project
+- [ ] **NOT DONE.** Execute launch. Needs a deployment target, a Stripe account and a decision that is not mine to make
+- [ ] **NOT DONE.** Post-launch funnel review at public scale. Needs a public
 
-**Deliverables:** Public GA launch, production support processes active, monitoring plan executed.
+**Deliverables:** A GA launch — **not deliverable here**. The readiness review and the launch plan are.
 
-**Definition of Done:** Public sign-ups are open, a real payment successfully flows through Stripe live mode end-to-end, and the team has active visibility (dashboards + alerting) into production health during and after the launch window with no unmonitored blind spots.
+**Definition of Done: not met, and every clause of it needs something this environment does not have.** Public sign-ups need a deployment target; a real payment needs a Stripe account; active dashboards need a running Grafana. `docs/LAUNCH-READINESS.md` §2 lists exactly what has never run, so nobody mistakes a written dashboard for a watched one. That list, rather than a tick, is the useful output of this sprint.
 
 ---
 

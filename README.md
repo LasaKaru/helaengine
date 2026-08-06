@@ -7,7 +7,7 @@ It is **not** an LLM that writes games. It is a schema-driven engine — the edi
 `scene.json`, the runtime reads it, the exporter packages it, and the same runtime code runs in
 both places, unmodified. Every architectural decision in this repo follows from that.
 
-**Status:** Sprint 38 — the platform has accounts, cloud save, per-organisation asset uploads,
+**Status:** Sprint 40 — the plan is worked to its end. The platform has accounts, cloud save, per-organisation asset uploads,
 real-time collaborative editing, server-side export, traces and metrics tying one user action
 together across every service that touches it, a security pass that made the sandboxing
 guarantee enforceable rather than merely claimed, and plan tiers enforced in software — seats,
@@ -19,7 +19,13 @@ and an accessibility scan and a licence audit that run in CI, which between them
 no cells in it, text at 3.73:1, and twenty shipped assets with no attribution at all. The library
 is now **489 low-poly models** across eight starter templates, imported from CC0 packs by a tool
 that refuses to run without a licence, an author and a source URL; and new users get a short
-skippable tour, while a funnel instrumented from signup to export can say where people stop.
+skippable tour, while a funnel instrumented from signup to export can say where people stop; and
+backups that are **tested rather than configured** — a real database restored into a scratch one and
+compared row for row.
+
+What is _not_ done is recorded as carefully as what is: there is no staging, no Stripe account, no
+running Grafana, and no users. `docs/LAUNCH-READINESS.md` separates what has been executed and
+watched from what merely exists, because that gap is where launch incidents live.
 Exports are playable games, checked in three browsers, played before anyone can have them, automatically repaired where a fix
 exists, refused with a reason where one does not, and shareable as a link rather than a zip; a
 project now belongs to a user in an organisation with role-gated access, and is saved to a server
