@@ -435,7 +435,28 @@ export function exposeDevApi(library: AssetLibrary): void {
       if (!scene) return false;
       const grid = scene.getObjectByName('editor-grid');
       if (grid) grid.visible = false;
-      return grid !== undefined;
+
+      /**
+       * Trigger volumes, which are the same class of thing as the grid.
+       *
+       * A trigger is a yellow wireframe box the editor draws so you can see where the volume is.
+       * An export never renders one — `PhysicsPreview` hides them the moment play starts, for
+       * exactly this reason. Leaving them visible in the editor screenshot is comparing a level
+       * with wireframes against the same level without.
+       *
+       * Hiding the grid alone took Empty field and Forest clearing under budget and left Skirmish
+       * and Stress test over it, which is what pointed here: the ones still failing were the ones
+       * with triggers in them.
+       */
+      let hidden = grid === undefined ? 0 : 1;
+      for (const node of currentLoadedScene?.objects.values() ?? []) {
+        if (node.userData['isTrigger']) {
+          node.visible = false;
+          hidden += 1;
+        }
+      }
+
+      return hidden > 0;
     },
 
     viewportObjectIds: () => [...(currentLoadedScene?.objects.keys() ?? [])],

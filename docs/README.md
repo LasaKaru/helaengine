@@ -18,7 +18,9 @@
 - [**Load and capacity**](LOAD-TESTING.md) — the platform under concurrent use, and where it stops
   meeting its targets.
 - [**Security**](SECURITY.md) — the sandboxing guarantee and how it is enforced.
-- [**Runbook**](RUNBOOK.md) — what to do when something is on fire.
+- [**Runbook**](RUNBOOK.md) — what to do when something is on fire, including backup and restore.
+- [**Launch readiness**](LAUNCH-READINESS.md) — what is verified versus what is merely configured,
+  SLA expectations, and the launch-day plan.
 
 ## On the absence of a docs site
 
