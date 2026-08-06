@@ -349,9 +349,11 @@ schema-validated auto-repair loop, and whatever was changed is disclosed. Detail
 
 **Sprint 35: Billing & plan tiers**
 
-- [ ] Stripe integration: Free / Pro / Enterprise tiers (asset upload limits, export size limits, seat counts, collab session limits)
-- [ ] Usage metering (exports/month, storage used, active seats) feeding into Postgres for billing reconciliation
-- **DoD:** Upgrading/downgrading a plan correctly gates features (test: free-tier user blocked from custom asset upload, sees upgrade prompt).
+- [x] Four tiers with seats, storage, exports, custom uploads, collaborators and SSO in **one table in the schema**, shared by the API that enforces them and the editor that draws the meters. Writing it exposed a contradiction in its own first draft: Free allowed two people in a room and one member
+- [x] Billing behind a port, like authentication. **`StripeBilling` has never spoken to Stripe** — there is no account here — while `LocalBilling` implements the same port with the network removed, so checkout → signed webhook → entitlement runs and is tested end to end
+- [x] Usage **derived, never counted**: exports from `export_jobs`, storage from `assets`, seats from `memberships`. A counter drifts, and being refused an export the meter said you had looks like theft
+- [x] Downgrade decided rather than left undefined: **nothing is taken away, only growth is refused.** No lockout, no grace period — assets and members stay, the next upload and next invitation do not
+- **DoD: met.** An end-to-end test in a real browser: free account refused a Pro-only upload with a structured prompt, upgrade through the provider's checkout page, signed webhook, back in the editor on Pro, same upload succeeds — no manual step. A second test spends a real server-side export and watches the meter move. **No Stripe account was involved**; see `docs/SPRINT.md`.
 
 **Sprint 36: Performance & load testing**
 

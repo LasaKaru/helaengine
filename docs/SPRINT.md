@@ -1196,6 +1196,16 @@ What is **not** met is the phrase "against staging". There is no staging deploym
 - [ ] Build in-app billing UI: current plan display, usage meters, upgrade/downgrade flow, invoice history (Stripe-hosted portal is often sufficient here rather than building custom UI)
 - [ ] Test plan transitions explicitly: downgrade from Pro to Free while over the Free tier's storage limit — decide and implement the actual behavior (e.g., read-only lockout of excess projects vs. grace period) rather than leaving it undefined
 
+**Open question, found while testing and not part of this sprint:** `page.keyboard.press('Escape')`
+does not dismiss the Export wizard, on a freshly opened dialog with `phase === 'idle'` — the case
+its handler is written to allow. A probe established that the `window` keydown listener _is_
+attached and _does_ fire when an Escape event is dispatched synthetically, so the handler and its
+phase guard are not the problem; something about a real key press is not reaching it. Every modal in
+the editor shares this pattern, so it may be wider than one dialog. The end-to-end tests close the
+wizard with its own Close button, which is the primary affordance and asserts the more useful
+property anyway — but a modal that ignores Escape is a real papercut and this is written down rather
+than left as a test that quietly avoids it.
+
 **Deliverables:** Working metered billing across all plan tiers, enforced in the API.
 
 **Definition of Done:** A free-tier account attempting a Pro-only action (e.g., custom asset upload) is cleanly blocked with an upgrade prompt; upgrading via Stripe Checkout immediately unlocks the feature without requiring a manual support action; usage meters in the UI accurately reflect actual metered usage.
