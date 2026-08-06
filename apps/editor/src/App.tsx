@@ -62,8 +62,19 @@ export function App(): React.JSX.Element {
    * entry chunk this split exists to empty. This way the shell renders first and the engine is
    * fetched afterwards — so it is honest to say the projects screen no longer *waits* on the
    * engine, and dishonest to say it never downloads it.
+   *
+   * **Only on the projects screen**, and that restriction is load-bearing rather than tidy. Around
+   * a dozen tests reload the page and then wait for `window.helaengine` as their signal that the
+   * editor is ready. That worked because the dev API used to be published from the editor and
+   * nowhere else — an accidental barrier, but a correct one. Publishing unconditionally from here
+   * would race the workspace's own chunk and let those waits resolve against a viewport that does
+   * not exist yet, turning a reliable signal into a coin flip. On the editor screen the workspace
+   * remains the only publisher, so the global still means what every caller assumes it means.
    */
+  const onProjects = screen === 'projects';
   useEffect(() => {
+    if (!onProjects) return;
+
     let live = true;
     void (async () => {
       const [{ exposeDevApi }, { assetLibraryOnce }] = await Promise.all([
@@ -71,14 +82,14 @@ export function App(): React.JSX.Element {
         import('./engine/libraryOnce'),
       ]);
       const library = await assetLibraryOnce().catch(() => null);
-      // The workspace republishes with the merged manifest once it mounts, so this is the floor
-      // rather than the final answer — and it must not overwrite the richer one on a late resolve.
-      if (live && library && window.helaengine === undefined) exposeDevApi(library);
+      // Guarded against a late resolve landing after the user has already opened a project, where
+      // it would replace the workspace's richer manifest with the curated list.
+      if (live && library) exposeDevApi(library);
     })();
     return () => {
       live = false;
     };
-  }, []);
+  }, [onProjects]);
 
   if (screen === 'projects') return <ProjectsScreen />;
 

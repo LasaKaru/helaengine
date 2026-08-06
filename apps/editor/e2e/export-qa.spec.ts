@@ -68,7 +68,22 @@ async function openTemplate(page: Page, template: string): Promise<void> {
   );
   await page.reload();
   await page.getByRole('button', { name: new RegExp(template) }).click();
-  await expect(page.getByRole('banner')).toBeVisible();
+  /**
+   * Waits for the *editor*, which `getByRole('banner')` does not do.
+   *
+   * The projects screen renders its own `<header>`, so the banner assertion this replaces passed
+   * the instant the click landed and told nobody anything. `editor.spec.ts` was corrected for the
+   * same reason in Sprint 33; this file was missed, and stayed green only because
+   * `waitForFunction(window.helaengine)` happened to be an accidental barrier — the dev API was
+   * published from the editor, so waiting for it meant waiting for the editor.
+   *
+   * Sprint 36 removed that accident. `window.helaengine` is now published from the shell as well,
+   * because opening a .hela file is a projects-screen gesture and the suite needs it there, so the
+   * wait started resolving on the projects screen and this test began screenshotting a viewport
+   * that had not finished mounting. The right barrier is, and always was, the editor's own chrome.
+   */
+  await expect(page.locator('header.topbar')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByLabel('Project name')).toBeVisible({ timeout: 30_000 });
   await page.waitForFunction(() => window.helaengine !== undefined);
 }
 
