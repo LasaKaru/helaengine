@@ -1,3 +1,4 @@
+import { transformSync } from 'esbuild';
 import { describe, expect, it } from 'vitest';
 import { parseAssetManifest, parseScene, type AssetManifest, type Scene } from '@helaengine/schema';
 import {
@@ -59,14 +60,19 @@ function textOf(result: ExportPlan, path: string): string {
 /**
  * Parses generated code for real, rather than pattern-matching it.
  *
- * `new Function` compiles a *script*, and the generated file is a *module* — so the import block
- * and any `export` keyword are stripped first. That is a limitation of the only parser available
- * here, not a licence to skip the check: the bug this exists for shipped a `main.js` whose import
- * list had been silently deleted, and every regex assertion in the world passed.
+ * The bug this exists for shipped a `main.js` whose import list had been silently deleted, and
+ * every regex assertion in the world passed.
+ *
+ * esbuild rather than `new Function`, since Sprint 34. `new Function` compiles a *script*, so the
+ * import block and every `export` keyword had to be stripped before it would parse — the module
+ * syntax, which is exactly the part the original bug broke, was the part not being checked. It was
+ * also the single `new Function` in the repository, and a lint rule now forbids those outright:
+ * this product's whole safety story is that a scene document is data and never code, and a rule
+ * with an exception in it is a rule somebody will point at later.
  */
 function parseAsScript(source: string): void {
-  const body = source.replace(/^import[\s\S]*?;\n/, '').replace(/^export /gm, '');
-  new Function(`return async () => {\n${body}\n}`);
+  // Throws on a syntax error, which is the assertion. `esm` keeps import and export meaningful.
+  transformSync(source, { loader: 'js', format: 'esm' });
 }
 
 describe('slugify', () => {

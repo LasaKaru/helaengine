@@ -45,6 +45,39 @@ export default tseslint.config(
       ],
       eqeqeq: ['error', 'smart'],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
+
+      /**
+       * No dynamic code execution, anywhere (Sprint 34).
+       *
+       * This is the sandboxing guarantee from Sprint 9, enforced rather than asserted. The whole
+       * product rests on it: a scene document is *data*, interpreted by a closed vocabulary of
+       * behaviours, triggers, HUD bindings and unlock methods — and the moment any of those can
+       * reach `eval` or `new Function`, a shared project becomes remote code execution in every
+       * collaborator's browser and in every exported game. The AI repair loop makes it sharper
+       * still: a model proposes schema-validated patches, and a patch that could carry code would
+       * be a model writing code into somebody else's game.
+       *
+       * A grep proves it today. A lint rule proves it on every commit, which is the difference
+       * between a security property and a security anecdote.
+       */
+      'no-eval': 'error',
+      'no-implied-eval': 'error',
+      'no-new-func': 'error',
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'eval',
+          message: 'Scene data is never code — see the sandboxing note in this file.',
+        },
+      ],
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'window',
+          property: 'eval',
+          message: 'Scene data is never code — see the sandboxing note in this file.',
+        },
+      ],
     },
   },
   {
