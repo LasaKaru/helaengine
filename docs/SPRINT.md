@@ -1269,16 +1269,16 @@ than left as a test that quietly avoids it.
 
 **Tasks:**
 
-- [ ] Stand up a public docs site (Docusaurus): engine API reference (auto-generated from TSDoc comments where possible), full behavior reference (each built-in behavior type + its params, with examples), export guide (how to host/run an exported project), troubleshooting FAQ
-- [ ] Build in-app onboarding: a guided first-run tour (highlighting asset panel, placement, transform gizmo, save, export) — keep it skippable and short, most users tune out long tours
-- [ ] Record 3-5 short video walkthroughs covering: creating your first scene, adding enemy behaviors, exporting and running your project
-- [ ] Recruit a closed beta cohort (20-50 users) — mix of hobbyist game devs and a few people resembling your target enterprise persona if you have B2B ambitions
-- [ ] Integrate PostHog (or chosen analytics) event tracking on key funnel steps (signup → first project created → first object placed → first save → first export) to identify drop-off points quantitatively, not just anecdotally
-- [ ] Set up a lightweight support channel (Discord, or a simple support email/Intercom) and triage process for beta feedback; maintain a running "top friction points" list reviewed weekly during the beta window
+- [~] Public docs — behaviour reference, export guide and troubleshooting FAQ written, **but no Docusaurus site**. The reference is _generated from the engine's own schemas_ and CI fails when it drifts, which solves the part that actually decays; a site would add search, versioning and a public URL, and also a second app to keep alive and a second place docs live. Argued in `docs/README.md` so it can be overruled. The right moment is when there is an audience needing search — which is the beta cohort below
+- [x] In-app onboarding — five steps, all skippable, flag written on **skip** rather than on completion because a tour you escaped from that greets you again is worse than none. Points at real elements and drops any step whose element is absent, so it never rings empty space
+- [ ] **NOT DONE.** Record 3-5 video walkthroughs. Needs a screen recorder, a voice and a person; none of them exist here
+- [ ] **NOT DONE.** Recruit a closed beta cohort of 20-50 users. Needs people
+- [x] Funnel event tracking on signup → project created → object placed → saved → export. Six events in a **closed vocabulary in the schema**, because a funnel assembled from `object_placed` and `objectPlaced` has a hole that looks exactly like a drop-off. **No PostHog account exists**, so `PostHogSink` is written and unexercised, like `StripeBilling`; `LocalAnalytics` is what runs, and the drop-off table is readable through the dev API
+- [ ] **NOT DONE.** Support channel and triage process. Needs an organisation and people to staff it
 
-**Deliverables:** Public docs, in-app onboarding, closed beta running with instrumented funnel analytics.
+**Deliverables:** Docs and in-app onboarding — delivered. **A running closed beta — not delivered**, and not deliverable here.
 
-**Definition of Done:** The closed beta cohort completes the core create → edit → export flow with a low support-ticket rate on that specific flow (define an acceptable threshold, e.g., under 10% of users needing help on it); funnel analytics clearly show where the biggest drop-off point is, informing what gets fixed before GA.
+**Definition of Done: not met, and half of it is not meetable in this environment.** It rests on a closed beta cohort completing a flow at a measured support-ticket rate. There are no users, no support channel and no tickets. What _is_ built is the half that has to exist before a beta could start: the funnel is instrumented end to end, the drop-off table is computed and inspectable, and `biggestDropOff` answers the plan's question the moment there is data. Point it at a real sink and invite people, and the DoD becomes measurable rather than blocked.
 
 ---
 
