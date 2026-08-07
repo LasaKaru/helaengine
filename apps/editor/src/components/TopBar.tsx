@@ -4,6 +4,7 @@ import { ExportWizard } from './ExportWizard';
 import { VersionHistory } from './VersionHistory';
 import { useProjectStore } from '../store/projectStore';
 import { useSceneStore } from '../store/sceneStore';
+import { useEditorStore } from '../store/editorStore';
 import { useCollabPeers, useHistoryControls } from '../collab/current';
 import { Collaborators } from './Collaborators';
 
@@ -43,6 +44,7 @@ export function TopBar({ manifest }: { manifest?: AssetManifest } = {}): React.J
   const fileNotice = useProjectStore((state) => state.fileNotice);
   const dismissFileNotice = useProjectStore((state) => state.dismissFileNotice);
   const goHome = useProjectStore((state) => state.goHome);
+  const setGraphOpen = useEditorStore((state) => state.setGraphOpen);
 
   return (
     <header className="topbar">
@@ -123,6 +125,13 @@ export function TopBar({ manifest }: { manifest?: AssetManifest } = {}): React.J
             Save as…
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => setGraphOpen(true)}
+          title="Wire up what happens, without writing code"
+        >
+          Graph
+        </button>
         <button
           type="button"
           onClick={() => setShowingHistory(true)}

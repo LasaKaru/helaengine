@@ -8,6 +8,8 @@
   material overrides, and what each setting costs.
 - [**Rigged characters and animation**](ANIMATION.md) — skeletal animation, importing a Mixamo
   character, and why a scene names states rather than clips.
+- [**The node graph**](GRAPH.md) — wiring up what happens in a level without writing code, and the
+  checks a canvas can make that a script file cannot.
 - [**Behaviour reference**](BEHAVIOURS.md) — every behaviour and its parameters. Generated from the
   engine's own schemas, so it cannot disagree with the code that enforces them.
 - [**Exporting and hosting**](EXPORTING.md) — what comes out of Export, how to run it, where to put

@@ -1,5 +1,6 @@
 import type * as THREE from 'three';
 import type {
+  AnimationState,
   BehaviorEntry,
   CheckpointReset,
   ObjectPhysics,
@@ -96,6 +97,24 @@ export interface WorldHandle {
    */
   moveTo(objectId: string, position: THREE.Vector3): void;
 
+  /**
+   * How many of a kind of pickup the player is carrying.
+   *
+   * Added for the graph's `hasItem` condition, and deliberately on the world rather than reaching
+   * into the inventory directly: a condition that had to know about `Inventory` would be a graph
+   * that could not run in a headless test.
+   */
+  itemCount(kind: PickupKind): number;
+
+  /**
+   * Says what an object is doing, so its rig can show it.
+   *
+   * The same call a behaviour makes through its own handle, exposed on the world because a graph
+   * animates an object it names rather than the object it is attached to. Returns whether there
+   * was such an object with an animator.
+   */
+  setAnimationState(objectId: string, state: AnimationState): boolean;
+
   /** Adds an object to the running world. Returns its id, or null if it could not be created. */
   spawn(request: SpawnRequest): string | null;
   /** Removes an object from the running world. */
@@ -122,6 +141,8 @@ export const INERT_WORLD: WorldHandle = {
   lineOfSight: () => true,
   groundHeight: () => 0,
   moveTo: () => {},
+  itemCount: () => 0,
+  setAnimationState: () => false,
   spawn: () => null,
   destroy: () => {},
   emit: () => {},

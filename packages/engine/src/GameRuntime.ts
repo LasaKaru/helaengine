@@ -1,5 +1,12 @@
 import * as THREE from 'three';
-import { SceneObjectSchema, type Player, type Scene, type SceneObject } from '@helaengine/schema';
+import {
+  SceneObjectSchema,
+  type AnimationState,
+  type PickupKind,
+  type Player,
+  type Scene,
+  type SceneObject,
+} from '@helaengine/schema';
 import type { AssetResolver } from './assets.js';
 import { BehaviorRuntime } from './BehaviorRuntime.js';
 import { buildScenePhysics, resolveColliderType } from './physics/buildScenePhysics.js';
@@ -9,6 +16,7 @@ import type { LoadedScene, SceneLoader } from './SceneLoader.js';
 import { TriggerRuntime } from './TriggerRuntime.js';
 import { Inventory } from './combat/Inventory.js';
 import { UnlockRuntime } from './unlock/UnlockRuntime.js';
+import { GraphRuntime, graphHasContent } from './graph/GraphRuntime.js';
 import { WeaponSystem, type ShotHit, type WeaponInput } from './combat/WeaponSystem.js';
 import type { PickupRequest, SpawnRequest, WorldHandle } from './world.js';
 import type { CheckpointReset, SaveState, UnlockKey } from '@helaengine/schema';
@@ -54,6 +62,8 @@ export class GameRuntime implements WorldHandle {
   readonly inventory: Inventory;
   readonly weapons: WeaponSystem;
   readonly unlocks: UnlockRuntime;
+  /** The scene's visual script, or null when it has none. */
+  readonly graph: GraphRuntime | null;
 
   readonly #loader: SceneLoader;
   readonly #loaded: LoadedScene;
@@ -123,6 +133,18 @@ export class GameRuntime implements WorldHandle {
       cast: (origin, direction, range) => this.#castShot(origin, direction, range),
       emit: (event, payload) => this.emit(event, payload),
     });
+
+    // Null when the scene has no events to run, which is every scene saved before graphs existed.
+    // Constructing one anyway would validate an empty document and subscribe to nothing, sixty
+    // times a second, for no reason.
+    this.graph = graphHasContent(options.scene.graph)
+      ? new GraphRuntime({
+          graph: options.scene.graph,
+          world: this,
+          bus: this.behaviors,
+          ...(options.warn ? { warn: options.warn } : {}),
+        })
+      : null;
   }
 
   /** Hands the runtime the character, when one is created after the world is built. */
@@ -153,6 +175,10 @@ export class GameRuntime implements WorldHandle {
     this.#started = true;
     this.behaviors.start();
     this.triggers.start();
+    // Before unlocks and after triggers: an `onStart` chain should reach a world whose triggers
+    // are listening, and a secret hidden by an unlock should be hidden after the graph has had its
+    // say about the same object.
+    this.graph?.start();
     // Last, so that hiding a secret area happens after the behaviours that might be attached to it
     // have initialised — and so an unlock firing on frame one reaches a fully built world.
     this.unlocks.start();
@@ -175,6 +201,9 @@ export class GameRuntime implements WorldHandle {
     this.triggers.update();
     this.behaviors.update(deltaSeconds);
     this.unlocks.update(deltaSeconds, sequenceKeys ?? []);
+    // After the behaviours, so a `wait` that resumes this frame sees the world as it is now rather
+    // than as it was before the enemies moved.
+    this.graph?.update(deltaSeconds);
     // Weapons last: a shot should see the world as it is at the end of the frame the player fired
     // in, not as it was before the enemies moved.
     if (weapons && this.playerAlive) this.weapons.update(deltaSeconds, weapons);
@@ -285,6 +314,9 @@ export class GameRuntime implements WorldHandle {
     if (!this.#started) return;
     this.#started = false;
 
+    // First, so its bus subscriptions are gone before the bus itself is torn down — a listener
+    // left behind would keep a stopped preview reacting to the next one's events.
+    this.graph?.stop();
     this.unlocks.stop();
     this.triggers.stop();
     this.behaviors.stop();
@@ -445,6 +477,32 @@ export class GameRuntime implements WorldHandle {
     // scene whose author never set a body type should still see its enemies move.
     const node = this.#loaded.objects.get(objectId);
     node?.position.copy(position);
+  }
+
+  /**
+   * How much of a kind of thing the player has.
+   *
+   * Three kinds, because `PickupKind` has three, and each answers the question a level designer
+   * would actually ask of it: how many guns, how much spare ammunition for the one in hand, and how
+   * much health. Health overlaps with `playerHealthBelow` deliberately — one is a threshold and one
+   * is a count, and a graph reads better with whichever the author was thinking in.
+   */
+  itemCount(kind: PickupKind): number {
+    switch (kind) {
+      case 'weapon':
+        return this.inventory.carried.length;
+      case 'ammo':
+        return this.inventory.reserve;
+      case 'health':
+        return this.#health;
+    }
+  }
+
+  setAnimationState(objectId: string, state: AnimationState): boolean {
+    const animator = this.#loaded.animator(objectId);
+    if (!animator) return false;
+    animator.play(state);
+    return true;
   }
 
   spawn(request: SpawnRequest): string | null {

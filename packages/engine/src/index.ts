@@ -48,6 +48,8 @@ export {
 } from './behaviors/CheckpointBehavior.js';
 export type { CheckpointParams } from './behaviors/CheckpointBehavior.js';
 export { registerBuiltinBehaviors } from './behaviors/builtins.js';
+export { GraphRuntime, graphHasContent, STEP_BUDGET } from './graph/GraphRuntime.js';
+export type { GraphRuntimeOptions } from './graph/GraphRuntime.js';
 export { applyMaterialOverride } from './materials.js';
 export { PostStack, applyToneMapping, wantsPostProcessing } from './render/PostStack.js';
 export { Animator } from './animation/Animator.js';

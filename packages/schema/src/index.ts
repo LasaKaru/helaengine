@@ -12,6 +12,7 @@ export * from './unlockable.js';
 export * from './save.js';
 export * from './audio.js';
 export * from './trigger.js';
+export * from './graph.js';
 export * from './object.js';
 export * from './scene.js';
 export * from './migrations.js';

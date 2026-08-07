@@ -11,6 +11,7 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { InspectorPanel } from './Panels';
 import { FirstRunTour } from './FirstRunTour';
 import { ShortcutsModal } from './ShortcutsModal';
+import { GraphEditor } from './GraphEditor';
 import { useUploadedAssets } from '../storage/useUploadedAssets';
 import { useImportedAssets } from '../storage/useImportedAssets';
 import { useLocalAssets } from '../storage/useLocalAssets';
@@ -172,6 +173,9 @@ export function EditorWorkspace(): React.JSX.Element {
       </div>
       <DragChip />
       <ShortcutsModal />
+      <ErrorBoundary where="the node graph">
+        <GraphEditor manifest={manifest ?? state.library.manifest} />
+      </ErrorBoundary>
       {/*
         Mounted last, and inside the editor rather than the shell: every element it points at lives
         in this subtree, so rendering it any earlier would measure elements that do not exist yet.

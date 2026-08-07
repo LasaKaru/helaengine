@@ -62,6 +62,8 @@ export interface EditorState {
   gizmoActive: boolean;
   marquee: Marquee | null;
   shortcutsOpen: boolean;
+  /** True while the node graph canvas is open over the workspace. */
+  graphOpen: boolean;
   /** True while behaviours are running in the viewport. */
   playing: boolean;
   /** True while the viewport is in Play Preview: physics on, camera driven by the player. */
@@ -99,6 +101,7 @@ export interface EditorState {
   setGizmoActive(active: boolean): void;
   setMarquee(marquee: Marquee | null): void;
   setShortcutsOpen(open: boolean): void;
+  setGraphOpen(open: boolean): void;
   setPlaying(playing: boolean): void;
   setWalking(walking: boolean): void;
   setPhysicsStatus(status: PhysicsStatus): void;
@@ -122,6 +125,7 @@ export const useEditorStore = create<EditorState>()(
       gizmoActive: false,
       marquee: null,
       shortcutsOpen: false,
+      graphOpen: false,
       playing: false,
       walking: false,
       physicsStatus: 'idle',
@@ -159,6 +163,7 @@ export const useEditorStore = create<EditorState>()(
       setGizmoActive: (gizmoActive) => set({ gizmoActive }, false, 'gizmo/active'),
       setMarquee: (marquee) => set({ marquee }, false, 'selection/marquee'),
       setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }, false, 'ui/shortcuts'),
+      setGraphOpen: (graphOpen) => set({ graphOpen }, false, 'ui/graph'),
       setPlaying: (playing) =>
         // Leaving waypoint editing on during play would keep clicks adding points to a moving path.
         set({ playing, ...(playing ? { editingWaypoints: null } : {}) }, false, 'play/set'),

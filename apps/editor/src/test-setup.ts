@@ -67,3 +67,29 @@ if (typeof URL.createObjectURL !== 'function') {
     live.delete(url);
   };
 }
+
+/**
+ * Pointer capture, which jsdom does not implement either.
+ *
+ * Every drag in this editor — a gizmo, a scrub field, a graph node — takes the pointer so the
+ * gesture survives leaving the element. Without these, the first `pointerdown` of any drag test
+ * throws and takes the surrounding click with it, which reads as a broken selection rather than a
+ * missing DOM method. No-ops are honest here: capture only affects where later events are
+ * delivered, and jsdom delivers them to the target either way.
+ */
+if (typeof Element.prototype.setPointerCapture !== 'function') {
+  const captured = new WeakMap<Element, Set<number>>();
+  Element.prototype.setPointerCapture = function setPointerCapture(pointerId: number): void {
+    const ids = captured.get(this) ?? new Set<number>();
+    ids.add(pointerId);
+    captured.set(this, ids);
+  };
+  Element.prototype.releasePointerCapture = function releasePointerCapture(
+    pointerId: number,
+  ): void {
+    captured.get(this)?.delete(pointerId);
+  };
+  Element.prototype.hasPointerCapture = function hasPointerCapture(pointerId: number): boolean {
+    return captured.get(this)?.has(pointerId) ?? false;
+  };
+}

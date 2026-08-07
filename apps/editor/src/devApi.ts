@@ -185,6 +185,16 @@ export interface DevApi {
   /** Raises an event on the running world's bus, the way a weapon or a script would. */
   emit(event: string, payload?: unknown): boolean;
   /**
+   * A graph variable's current value in the running preview, or null when no graph is running.
+   *
+   * The only externally visible proof that the graph *executed*. Everything else a graph does — a
+   * spawn, a message, some damage — is also reachable by a trigger or a behaviour, so asserting on
+   * one of those would not distinguish "the graph ran" from "something else did".
+   */
+  graphVariable(name: string): number | boolean | string | null;
+  /** Problems the running graph was started with, as `severity: message`. Empty when clean. */
+  graphProblems(): string[];
+  /**
    * Hurts the player, the way an enemy's swing does.
    *
    * Getting a headless browser into a real fight is slow and flaky — it depends on two goblins
@@ -650,6 +660,13 @@ export function exposeDevApi(library: AssetLibrary): void {
       currentGame.emit(event, payload);
       return true;
     },
+
+    graphVariable: (name) => currentGame?.graph?.variable(name) ?? null,
+
+    graphProblems: () =>
+      (currentGame?.graph?.problems ?? []).map(
+        (problem) => `${problem.severity}: ${problem.message}`,
+      ),
 
     simulationStats: () =>
       timing.frames === 0

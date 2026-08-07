@@ -25,6 +25,8 @@ import {
   type Vec3,
   type ObjectAnimation,
   type MaterialOverride,
+  type GraphNode,
+  type GraphVariable,
 } from '@helaengine/schema';
 import { isBuiltinTriggerAsset, triggerDefaults } from '../triggers';
 import {
@@ -120,6 +122,22 @@ export interface SceneState {
   setTerrain(terrain: Partial<Terrain>): void;
   setTerrainData(heightmap: string | null, splatmap: string | null): void;
   setEnvironment(environment: Partial<Environment>): void;
+
+  /**
+   * Graph edits.
+   *
+   * Separate actions rather than one `setGraph`, because each one is an undo step the player of the
+   * editor named for themselves: dragging a node and rewiring a port are different mistakes to want
+   * back. Grouping the drag under one label keeps a pointer-move-per-frame from filling the stack.
+   */
+  addGraphNode(node: GraphNode, position: [number, number]): void;
+  updateGraphNode(node: GraphNode): void;
+  removeGraphNode(nodeId: string): void;
+  moveGraphNode(nodeId: string, position: [number, number]): void;
+  connectGraph(from: string, port: string, to: string): void;
+  disconnectGraph(from: string, port: string, to: string): void;
+  setGraphVariables(variables: GraphVariable[]): void;
+
   setName(name: string): void;
 
   undo(): void;
@@ -578,6 +596,60 @@ export const useSceneStore = create<SceneState>()(
         setEnvironment: (environment) =>
           commit('environment/set', (draft) => {
             Object.assign(draft.environment, environment);
+          }),
+
+        addGraphNode: (node, position) =>
+          commit('graph/addNode', (draft) => {
+            draft.graph.nodes.push(node);
+            draft.graph.layout[node.id] = position;
+          }),
+
+        updateGraphNode: (node) =>
+          commit('graph/updateNode', (draft) => {
+            const at = draft.graph.nodes.findIndex((current) => current.id === node.id);
+            if (at !== -1) draft.graph.nodes[at] = node;
+          }),
+
+        removeGraphNode: (nodeId) =>
+          commit('graph/removeNode', (draft) => {
+            draft.graph.nodes = draft.graph.nodes.filter((node) => node.id !== nodeId);
+            // Edges too. Leaving them would turn a deletion into a validation error the author
+            // never made, and there is no sense in which a wire to a deleted node still means
+            // something.
+            draft.graph.edges = draft.graph.edges.filter(
+              (edge) => edge.from !== nodeId && edge.to !== nodeId,
+            );
+            delete draft.graph.layout[nodeId];
+          }),
+
+        // Grouped, so one drag is one undo rather than one per pointer event.
+        moveGraphNode: (nodeId, position) =>
+          commit(
+            'graph/moveNode',
+            (draft) => {
+              draft.graph.layout[nodeId] = position;
+            },
+            `graph/move/${nodeId}`,
+          ),
+
+        connectGraph: (from, port, to) =>
+          commit('graph/connect', (draft) => {
+            const exists = draft.graph.edges.some(
+              (edge) => edge.from === from && edge.port === port && edge.to === to,
+            );
+            if (!exists) draft.graph.edges.push({ from, port, to });
+          }),
+
+        disconnectGraph: (from, port, to) =>
+          commit('graph/disconnect', (draft) => {
+            draft.graph.edges = draft.graph.edges.filter(
+              (edge) => !(edge.from === from && edge.port === port && edge.to === to),
+            );
+          }),
+
+        setGraphVariables: (variables) =>
+          commit('graph/variables', (draft) => {
+            draft.graph.variables = variables;
           }),
 
         setName: (name) =>

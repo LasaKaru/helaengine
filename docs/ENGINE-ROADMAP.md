@@ -101,17 +101,30 @@ push-out. The Rapier controller exists; the polish is what separates "walks" fro
 
 ### Phase 2 — Make it expressive
 
-**2.3 The node graph.** As argued in §1. Suggested slice for a first version:
+**2.3 The node graph — done.** See [GRAPH.md](GRAPH.md). The slice that shipped:
 
-- Events: on start, on trigger enter/exit, on damage, on pickup, on death, on timer
-- Conditions: comparisons, boolean logic, inventory contains, flag set
-- Actions: everything a trigger can do today, plus set flag, spawn, despawn, play sound, move to,
-  show HUD message
-- Variables: scene-scoped and object-scoped, typed
-- Editor: a canvas with typed ports that refuse invalid connections
+- Events: on start, on event (any name, so triggers and weapons reach the graph through the bus),
+  on timer with optional repeat
+- Conditions: comparisons, and/or/not, inventory contains, flag set, player health below — as a
+  nested tree rather than a chain of nodes, capped at six levels so a hostile file cannot overflow
+  the parser
+- Actions: set and add to variable, emit, spawn, destroy, show/hide, move, set animation, damage,
+  heal, teleport, show message
+- Flow: branch, wait, and an ordered sequence
+- Variables: scene-scoped and typed. Object-scoped ones were dropped — they need a scoping rule in
+  the editor before they are useful, and doors, keys and counters do not need them
+- Editor: a canvas with ports checked against `NODE_OUTPUTS`, and a live problems list
 
 The schema is the deliverable, not the canvas. A graph that validates is a graph the repair loop and
 the smoke gate already understand.
+
+Two static checks are the reason this is worth more than a trigger list. **Instant cycles** — a loop
+with no `wait` in it — are refused before anything runs, with the nodes named; that is a hung tab a
+scripting language could only discover by playing the level. And a **step budget** of 512 nodes per
+event bounds the fan-out through nested `sequence` nodes that cycle detection does not cover.
+
+Still open: on damage, on pickup and on death as first-class event nodes (they are reachable today
+by emitting from a behaviour), playing a sound, and prefab-scoped variables (blocked on 2.4).
 
 **2.4 Prefabs.** An object with children, behaviours and overrides, saved once and placed many times;
 editing the prefab updates every instance. This is the feature that makes a large level buildable by
@@ -216,7 +229,7 @@ scene it is today, and the runtime paths it takes are the ones it takes today.
 ## 5. If only three things get done
 
 1. ~~**Skeletal animation** (2.1).~~ **Done** — see [`ANIMATION.md`](ANIMATION.md).
-2. **The node graph** (2.3). The differentiator, extended rather than abandoned.
+2. ~~**The node graph** (2.3)~~ — shipped. The differentiator, extended rather than abandoned.
 3. **Prefabs** (2.4). What makes a large level survivable.
 
 Next after those: **baked lighting** (2.6), which is the remaining half of the visual work and the

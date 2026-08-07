@@ -9,6 +9,7 @@ import { UiConfigSchema } from './ui.js';
 import { IdSchema } from './primitives.js';
 import { TerrainSchema } from './terrain.js';
 import { UnlockablesSchema } from './unlockable.js';
+import { SceneGraphSchema } from './graph.js';
 
 /**
  * Current scene document version. Bump this whenever a change to `SceneSchema` cannot read an
@@ -27,6 +28,13 @@ export const SceneSchema = z
     player: PlayerSchema,
     inventory: InventorySchema,
     unlockables: UnlockablesSchema,
+    /**
+     * Visual scripting for this level.
+     *
+     * Empty by default, so every scene saved before it existed parses unchanged and behaves
+     * identically — an empty graph is a graph with no events, and a runtime with nothing to run.
+     */
+    graph: SceneGraphSchema.default({}),
     audioConfig: AudioConfigSchema,
     gameConfig: GameConfigSchema,
     uiConfig: UiConfigSchema,
