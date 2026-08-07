@@ -5,6 +5,7 @@ import {
   type ToneMapping,
 } from '@helaengine/schema';
 import { useSceneStore } from '../store/sceneStore';
+import { SWAY_GROUPS } from '@helaengine/schema';
 import { NumberField } from './NumberField';
 
 /**
@@ -38,7 +39,7 @@ export function RenderingPanel(): React.JSX.Element {
   const environment = useSceneStore((state) => state.scene.environment);
   const setEnvironment = useSceneStore((state) => state.setEnvironment);
 
-  const { lighting, postProcessing: post } = environment;
+  const { lighting, postProcessing: post, wind } = environment;
 
   return (
     <section className="panel" aria-label="Rendering">
@@ -236,6 +237,77 @@ export function RenderingPanel(): React.JSX.Element {
             The shadow map is stretched over this distance, so doubling it halves the detail
             everywhere.
           </p>
+        </>
+      )}
+
+      <h3>Wind</h3>
+
+      <NumberField
+        label="Wind strength"
+        value={wind.strength}
+        step={0.05}
+        suffix="m"
+        onChange={(strength) =>
+          setEnvironment({ wind: { ...wind, strength: clamp(strength, 0, 4) } })
+        }
+      />
+      <p className="panel-hint">
+        {wind.strength === 0
+          ? 'Off. Nothing sways, and no shader is patched.'
+          : 'How far a two-metre plant leans at the top.'}
+      </p>
+
+      {wind.strength > 0 && (
+        <>
+          <NumberField
+            label="Wind direction"
+            value={wind.direction}
+            step={5}
+            suffix="°"
+            onChange={(direction) =>
+              // Wrapped rather than clamped: dragging past north should carry on round, not stick.
+              setEnvironment({ wind: { ...wind, direction: ((direction % 360) + 360) % 360 } })
+            }
+          />
+          <NumberField
+            label="Wind speed"
+            value={wind.speed}
+            step={0.05}
+            onChange={(speed) =>
+              setEnvironment({ wind: { ...wind, speed: clamp(speed, 0.05, 4) } })
+            }
+          />
+          <NumberField
+            label="Gustiness"
+            value={wind.gustiness}
+            step={0.05}
+            onChange={(gustiness) =>
+              setEnvironment({ wind: { ...wind, gustiness: clamp(gustiness, 0, 1) } })
+            }
+          />
+
+          <div className="chip-row" role="group" aria-label="Wind affects">
+            {SWAY_GROUPS.map((group) => (
+              <button
+                key={group}
+                type="button"
+                className={wind.affects.includes(group) ? 'active' : ''}
+                aria-pressed={wind.affects.includes(group)}
+                onClick={() =>
+                  setEnvironment({
+                    wind: {
+                      ...wind,
+                      affects: wind.affects.includes(group)
+                        ? wind.affects.filter((current) => current !== group)
+                        : [...wind.affects, group],
+                    },
+                  })
+                }
+              >
+                {group}
+              </button>
+            ))}
+          </div>
         </>
       )}
 

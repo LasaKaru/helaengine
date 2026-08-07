@@ -5,6 +5,7 @@ import { MaterialOverrideSchema } from './rendering.js';
 import { ObjectPhysicsSchema } from './physics.js';
 import { TriggerSchema } from './trigger.js';
 import { IdSchema, TransformSchema } from './primitives.js';
+import { SwayOverrideSchema } from './wind.js';
 
 /**
  * A placed instance in the world.
@@ -35,6 +36,15 @@ export const SceneObjectSchema = z.object({
    * invisible to every scene saved before it existed.
    */
   animation: ObjectAnimationSchema.nullable().default(null),
+  /**
+   * Whether the wind moves this object, and as what.
+   *
+   * `auto` asks the rule in `wind.ts`, which reads the asset id — and which will be wrong
+   * sometimes, because it is a rule over names. This field is how that is fixed: a potted plant
+   * indoors takes `none`, an imported model the rule has never heard of takes a group by name.
+   * Every document written before wind existed says `auto`, and `auto` with no wind is no sway.
+   */
+  sway: SwayOverrideSchema.default('auto'),
   /**
    * Overrides for this instance's material, or null to use whatever the model shipped with.
    *

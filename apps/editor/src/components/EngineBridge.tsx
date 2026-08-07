@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { setWindActive } from '../devApi';
 import { useThree } from '@react-three/fiber';
 import type { LoadedScene, SceneLoader } from '@helaengine/engine';
 import type { Scene } from '@helaengine/schema';
@@ -28,7 +29,24 @@ function structureKey(scene: Scene): string {
     terrain.layers.map((layer) => layer.color).join(','),
   ].join(':');
 
-  return `${terrainKey}#${scene.objects.map((object) => `${object.id}:${object.assetId}`).join('|')}`;
+  /**
+   * Which materials carry the sway program, which is a rebuild rather than a uniform write.
+   *
+   * Only the parts that decide *whether* something sways: turning wind on, changing which groups it
+   * affects, or overriding one object. Strength, direction, speed and gustiness are uniforms and
+   * take the incremental path, which is what lets a slider be dragged without rebuilding the world
+   * sixty times a second.
+   */
+  const windKey = [
+    scene.environment.wind.strength > 0,
+    scene.environment.wind.affects.join(','),
+  ].join(':');
+
+  const objectKey = scene.objects
+    .map((object) => `${object.id}:${object.assetId}:${object.sway}`)
+    .join('|');
+
+  return `${terrainKey}#${windKey}#${objectKey}`;
 }
 
 /** Identifies the terrain's *data* — the part that can change without new geometry being needed. */
@@ -77,6 +95,7 @@ export function EngineBridge({ loader, onLoaded }: EngineBridgeProps): null {
     const loaded = loader.loadInto(threeScene, scene);
     loadedRef.current = loaded;
     appliedTerrain.current = terrainDataKey(scene);
+    setWindActive(loaded.windActive);
     onLoaded?.(loaded);
     return () => {
       loadedRef.current = null;
@@ -108,7 +127,13 @@ export function EngineBridge({ loader, onLoaded }: EngineBridgeProps): null {
   const environmentKey = JSON.stringify(scene.environment);
   useEffect(() => {
     const loaded = loadedRef.current;
-    if (loaded) loader.applyEnvironmentTo(loaded, scene.environment);
+    if (loaded) {
+      loader.applyEnvironmentTo(loaded, scene.environment);
+      // Strength, direction, speed and gustiness are uniforms, so this is a handful of writes. A
+      // false answer means the *set* of swaying materials changed, which `structureKey` has already
+      // picked up — so there is nothing to do here but let that rebuild happen.
+      loaded.setWind(scene.environment.wind);
+    }
     // Read through the key rather than listed, so an unrelated object edit does not rebuild lights.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [environmentKey, loader]);

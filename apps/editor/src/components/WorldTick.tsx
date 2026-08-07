@@ -1,0 +1,29 @@
+import { useFrame } from '@react-three/fiber';
+import type { LoadedScene } from '@helaengine/engine';
+
+/**
+ * Advances the loaded scene's own clocks each frame.
+ *
+ * The engine ticks these inside `Viewport`, which is its own render loop and is what an exported
+ * game runs. The editor does not use `Viewport` — it renders through react-three-fiber — so nothing
+ * here was calling them at all. A swaying plant stood still while you built the level around it and
+ * only came alive in the export, which is the worst way to find out a feature works.
+ *
+ * Deliberately not inside `EngineBridge`: that component is effects over the document and has no
+ * frame loop, and giving it one would mean it re-rendered sixty times a second.
+ *
+ * This does not double up with `BehaviorPreview`. That ticks the *game runtime* — behaviours, AI,
+ * triggers — which is a different clock; the runtime never advances animation or wind itself, for
+ * exactly the reason above.
+ */
+export function WorldTick({ loaded }: { loaded: LoadedScene | null }): null {
+  useFrame((_state, delta) => {
+    if (!loaded) return;
+    // Both are no-ops when the scene has nothing that needs them, so a level with no rigs and no
+    // wind pays two null checks a frame.
+    loaded.updateAnimations(delta);
+    loaded.updateWind(delta);
+  });
+
+  return null;
+}

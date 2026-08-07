@@ -180,6 +180,7 @@ export function TransformGizmo(): React.JSX.Element | null {
       animation: null,
       material: null,
       trigger: null,
+      sway: 'auto' as const,
       metadata: {},
     }));
 

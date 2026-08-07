@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { HexColorSchema } from './primitives.js';
 import { PostProcessingSchema, ShadowSchema, ToneMappingSchema } from './rendering.js';
+import { WindSchema } from './wind.js';
 
 export const FogSchema = z.object({
   color: HexColorSchema.default('#a0c8ff'),
@@ -58,5 +59,12 @@ export const EnvironmentSchema = z.object({
   /** Overall brightness, applied by the tone mapper. Ignored when tone mapping is `none`. */
   exposure: z.number().min(0.1).max(4).default(1),
   postProcessing: PostProcessingSchema.default({}),
+  /**
+   * Wind, off by default.
+   *
+   * Every scene saved before wind existed parses to `strength: 0`, which is not a wind of nothing —
+   * it is the sway system absent. Those scenes render exactly as they did.
+   */
+  wind: WindSchema.default({}),
 });
 export type Environment = z.infer<typeof EnvironmentSchema>;

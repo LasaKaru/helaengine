@@ -27,6 +27,7 @@ import {
   type MaterialOverride,
   type GraphNode,
   type GraphVariable,
+  type SwayOverride,
 } from '@helaengine/schema';
 import { isBuiltinTriggerAsset, triggerDefaults } from '../triggers';
 import {
@@ -102,6 +103,8 @@ export interface SceneState {
   setAnimation(objectId: string, animation: ObjectAnimation | null): void;
   /** Sets or clears an object's material override. */
   setMaterial(objectId: string, material: MaterialOverride | null): void;
+  /** Whether the wind moves this object, and as what. */
+  setSway(objectId: string, sway: SwayOverride): void;
   setPlayer(player: Partial<Player>): void;
   setInventory(inventory: Partial<Inventory>): void;
   addWeapon(): string;
@@ -301,6 +304,9 @@ export const useSceneStore = create<SceneState>()(
                   params: { ...behavior.params },
                 })),
                 physics: { ...source.physics },
+                // A copy sways like the original: duplicating a hedge you told to stand still
+                // should give you a second still hedge, not one that starts waving.
+                sway: source.sway,
                 // A duplicated rig animates like the original. Copied as a value rather than
                 // shared, so retargeting one guard's clips does not retarget every copy of it.
                 animation: source.animation
@@ -437,6 +443,12 @@ export const useSceneStore = create<SceneState>()(
             // Replaced wholesale for the same reason `setAnimation` is: a partial merge cannot
             // express "stop overriding roughness", because `undefined` reads as "leave it alone".
             object.material = material;
+          }),
+
+        setSway: (objectId, sway) =>
+          commit('object/setSway', (draft) => {
+            const object = draft.objects.find((current) => current.id === objectId);
+            if (object) object.sway = sway;
           }),
 
         setGameConfig: (config) =>

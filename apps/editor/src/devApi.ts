@@ -40,6 +40,14 @@ export interface DevApi {
   hideEditorFurniture(): { gridHidden: boolean; triggersHidden: number };
   /** Whether the viewport is composing through the post-processing chain right now. */
   postProcessingActive(): boolean;
+  /**
+   * Whether the viewport's scene has any swaying materials.
+   *
+   * Reported by the loader rather than read off the document, because the two can legitimately
+   * differ: a wind blowing over a level with nothing but rocks in it patches nothing, and the right
+   * answer there is "no wind" — a test reading `environment.wind.strength` would call that a bug.
+   */
+  windActive(): boolean;
   viewportObjectIds(): string[];
   /** Per-object view of what the engine actually built, including whether a GLB or a placeholder. */
   viewportObjects(): Array<{ id: string; assetId: string; isModel: boolean }>;
@@ -306,6 +314,13 @@ export function setCameraPoseHandler(
  */
 let postProcessingActive = false;
 
+let windActive = false;
+
+/** Registered by the bridge when a scene is loaded, so a test can see what the loader decided. */
+export function setWindActive(active: boolean): void {
+  windActive = active;
+}
+
 export function setPostProcessingActive(active: boolean): void {
   postProcessingActive = active;
 }
@@ -435,6 +450,8 @@ export function exposeDevApi(library: AssetLibrary): void {
     },
 
     postProcessingActive: () => postProcessingActive,
+
+    windActive: () => windActive,
 
     objectMaterialColors(objectId) {
       const node = currentLoadedScene?.objects.get(objectId);

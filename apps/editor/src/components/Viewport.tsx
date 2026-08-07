@@ -12,6 +12,7 @@ import { MarqueeOverlay } from './Marquee';
 import { PlacementController } from './PlacementController';
 import { PlacementToolbar } from './PlacementToolbar';
 import { BehaviorPreview, WaypointEditor } from './BehaviorPreview';
+import { WorldTick } from './WorldTick';
 import { PhysicsPreview } from './PhysicsPreview';
 import { SculptController } from './SculptController';
 import { SelectionController } from './SelectionController';
@@ -126,6 +127,7 @@ export function Viewport({ loader, resolver }: ViewportProps): React.JSX.Element
         <PostProcessing />
         <ThumbnailReporter />
         <EngineBridge loader={loader} onLoaded={handleLoaded} />
+        <WorldTick loaded={loadedScene} />
         <PlacementController loader={loader} loadedScene={loadedScene} />
         {/* Behaviours-only play. Walk mode runs them through the game runtime instead, so this
             stays out of the way rather than driving the same objects twice. */}

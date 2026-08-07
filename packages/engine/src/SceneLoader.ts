@@ -7,9 +7,19 @@ import {
   type Scene,
   type SceneObject,
   type Terrain,
+  resolveSway,
+  windIsActive,
+  NO_WIND,
+  type Wind,
 } from '@helaengine/schema';
 import { MISSING_ASSET_ENTRY, type AssetResolver } from './assets.js';
 import { applyMaterialOverride, restoreOriginalMaterials } from './materials.js';
+import {
+  applyWindToObject,
+  createWindUniforms,
+  updateWindUniforms,
+  type WindUniforms,
+} from './render/wind.js';
 import { InstanceManager } from './InstanceManager.js';
 import { modelClips, type ModelSource } from './models.js';
 import { Animator } from './animation/Animator.js';
@@ -198,6 +208,10 @@ export class LoadedScene {
 
   /** Batched static objects, if any. Their nodes live in `objects` but not in the scene graph. */
   readonly instances: InstanceManager | null;
+  /** Wind uniforms, or null when nothing in this scene sways. */
+  #wind: WindUniforms | null;
+  /** The current wind settings, kept in step by `syncEnvironment`. */
+  #windSettings: Wind;
 
   /**
    * Rigged objects, keyed by object id.
@@ -219,6 +233,43 @@ export class LoadedScene {
   }
 
   /** Advances every animator. Called once a frame by the game runtime. */
+  get windActive(): boolean {
+    return this.#wind !== null;
+  }
+
+  /**
+   * Advances the wind by a frame.
+   *
+   * Driven by delta rather than by a clock, so pausing the game stops the world moving — a paused
+   * level whose grass keeps waving looks like the pause did not take. Wrapped at an hour so the
+   * float does not lose precision in a session somebody leaves open all day, and wrapped at a
+   * multiple of 2π so the wave does not jump at the seam.
+   */
+  updateWind(deltaSeconds: number): void {
+    if (!this.#wind) return;
+    const WRAP = Math.PI * 2 * 1000;
+    this.#wind.helaWindTime.value =
+      (this.#wind.helaWindTime.value + deltaSeconds * this.#windSettings.speed * Math.PI * 2) %
+      WRAP;
+    updateWindUniforms(this.#wind, this.#windSettings);
+  }
+
+  /**
+   * Takes new wind settings without rebuilding anything.
+   *
+   * Strength, direction, speed and gustiness are uniforms, so dragging a slider is free. Changing
+   * *which groups* sway is not — it decides which materials carry the program at all — so that one
+   * is reported rather than applied, and the caller reloads.
+   */
+  setWind(wind: Wind): boolean {
+    const groupsChanged =
+      this.#windSettings.affects.join() !== wind.affects.join() ||
+      windIsActive(this.#windSettings) !== windIsActive(wind);
+    this.#windSettings = wind;
+    if (this.#wind) updateWindUniforms(this.#wind, wind);
+    return !groupsChanged;
+  }
+
   updateAnimations(deltaSeconds: number): void {
     for (const animator of this.#animators.values()) animator.update(deltaSeconds);
   }
@@ -295,6 +346,8 @@ export class LoadedScene {
     owned?: Map<string, DisposableResource[]>;
     added: THREE.Object3D[];
     instances?: InstanceManager | null;
+    wind?: WindUniforms | null;
+    windSettings?: Wind;
   }) {
     this.threeScene = init.threeScene;
     this.objects = init.objects;
@@ -304,6 +357,8 @@ export class LoadedScene {
     this.#owned = init.owned ?? new Map();
     this.#added = init.added;
     this.instances = init.instances ?? null;
+    this.#wind = init.wind ?? null;
+    this.#windSettings = init.windSettings ?? NO_WIND;
 
     // Objects placed by the initial load arrive here already built, without passing through
     // `adopt` — so the index has to be seeded, or a scene's animators would only ever be the ones
@@ -706,6 +761,8 @@ export class SceneLoader {
 
     const instances = this.#buildInstances(batched, objects, threeScene, added);
 
+    const wind = this.#applyWind(scene, objects, batched, instances);
+
     const loaded = new LoadedScene({
       threeScene,
       objects,
@@ -714,6 +771,8 @@ export class SceneLoader {
       owned,
       added,
       instances,
+      wind,
+      windSettings: scene.environment.wind,
     });
     loaded.registerEnvironment(environmentNodes, environmentDisposables);
     return loaded;
@@ -740,6 +799,51 @@ export class SceneLoader {
    * is left is scenery, which is also the overwhelming majority of a scene and the entire reason
    * instancing is worth doing.
    */
+  /**
+   * Makes vegetation sway, and returns the uniforms that drive it.
+   *
+   * Returns null when the scene has no wind, and that is the whole cost story: no uniforms are
+   * allocated, no material is patched, no shader is recompiled, and the frame loop has nothing to
+   * update. A level built before wind existed is bit-identical to what it was.
+   *
+   * Batches are handled separately from placed objects because they are a different thing to patch
+   * — one `InstancedMesh` per asset rather than one node per object — and because a batch's group
+   * can only come from the asset, which `#chooseBatched` guarantees by excluding overrides.
+   */
+  #applyWind(
+    scene: Scene,
+    objects: Map<string, THREE.Object3D>,
+    batched: Map<string, string>,
+    instances: InstanceManager | null,
+  ): WindUniforms | null {
+    const wind = scene.environment.wind;
+    if (!windIsActive(wind)) return null;
+
+    const uniforms = createWindUniforms(wind);
+    let patched = 0;
+
+    for (const object of scene.objects) {
+      if (batched.has(object.id)) continue;
+      const node = objects.get(object.id);
+      if (!node) continue;
+
+      const entry = this.#resolver.get(object.assetId);
+      const group = resolveSway(wind, object.sway, object.assetId, entry?.category ?? '');
+      if (group) patched += applyWindToObject(node, uniforms, group);
+    }
+
+    for (const [assetId, meshes] of instances?.batchMeshes ?? []) {
+      const entry = this.#resolver.get(assetId);
+      const group = resolveSway(wind, 'auto', assetId, entry?.category ?? '');
+      if (!group) continue;
+      for (const mesh of meshes) patched += applyWindToObject(mesh, uniforms, group);
+    }
+
+    // Nothing in the scene is vegetation. Reported as no wind rather than as a wind with nothing to
+    // blow, so the frame loop does not spend the level updating a uniform no shader reads.
+    return patched > 0 ? uniforms : null;
+  }
+
   #chooseBatched(scene: Scene): Map<string, string> {
     if (this.#instanceThreshold <= 0) return new Map();
 
@@ -765,6 +869,12 @@ export class SceneLoader {
         // copies different colours. Batching an overridden object would apply whichever override
         // the batch's template happened to carry to all of them — silently, since it still draws.
         object.material === null &&
+        // An `InstancedMesh` has one material, so one batch can only sway one way. Objects with an
+        // explicit sway override are excluded rather than silently taking the batch's answer —
+        // otherwise setting a single hedge to `none` would either do nothing or stop the whole
+        // species moving, depending on build order. The default `auto` is the same for every copy
+        // of an asset, so nothing that would have batched stops batching.
+        object.sway === 'auto' &&
         object.physics.body === 'static';
       if (!eligible) continue;
 

@@ -79,6 +79,13 @@ export class InstanceManager {
     return calls;
   }
 
+  /** Every instanced mesh, by asset. Wind patches these directly — a batch has one material. */
+  get batchMeshes(): ReadonlyMap<string, readonly THREE.InstancedMesh[]> {
+    const meshes = new Map<string, readonly THREE.InstancedMesh[]>();
+    for (const [assetId, batch] of this.#batches) meshes.set(assetId, batch.parts);
+    return meshes;
+  }
+
   get instancedObjectIds(): string[] {
     return [...this.#objectToBatch.keys()];
   }

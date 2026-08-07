@@ -1,5 +1,6 @@
 import type { MaterialOverride, SceneObject } from '@helaengine/schema';
 import { useSceneStore } from '../store/sceneStore';
+import type { SwayOverride } from '@helaengine/schema';
 import { NumberField } from './NumberField';
 
 /**
@@ -29,6 +30,7 @@ const DEFAULTS = {
 
 export function MaterialPanel({ object }: { object: SceneObject }): React.JSX.Element {
   const setMaterial = useSceneStore((state) => state.setMaterial);
+  const setSway = useSceneStore((state) => state.setSway);
   const material = object.material;
 
   const patch = (changes: Partial<MaterialOverride>): void => {
@@ -162,6 +164,25 @@ export function MaterialPanel({ object }: { object: SceneObject }): React.JSX.El
           for anything that does not need it.
         </p>
       )}
+
+      <label className="param-row">
+        <span>Wind</span>
+        <select
+          aria-label="Wind"
+          value={object.sway}
+          onChange={(event) => setSway(object.id, event.target.value as SwayOverride)}
+        >
+          <option value="auto">Automatic</option>
+          <option value="none">Never moves</option>
+          <option value="grass">Like grass</option>
+          <option value="plants">Like a shrub</option>
+          <option value="trees">Like a tree</option>
+        </select>
+      </label>
+      <p className="panel-hint">
+        Automatic decides from the model. Override it for a potted plant indoors, or for an imported
+        model the rule has not heard of.
+      </p>
     </section>
   );
 }

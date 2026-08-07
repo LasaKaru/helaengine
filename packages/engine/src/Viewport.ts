@@ -136,6 +136,9 @@ export class Viewport {
       // in the export as well. Ticking in both places instead would run every clip at double
       // speed in a game export, which is the kind of bug that gets blamed on the model.
       this.#loaded?.updateAnimations(delta);
+      // Wind rides the same delta, for the same reason as animation: a paused level whose grass
+      // keeps waving looks like the pause did not take.
+      this.#loaded?.updateWind(delta);
       if (!this.#loaded) return;
       // One or the other, never both. The composer's last pass writes to the canvas itself, so a
       // direct render afterwards would overwrite the graded frame with the ungraded one — which
