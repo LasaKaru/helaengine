@@ -302,9 +302,21 @@ test.describe('drag to place', () => {
   });
 
   test('search narrows the library', async ({ page }) => {
+    const footer = page.locator('.asset-footer');
+    const total = Number((await footer.textContent())?.match(/of (\d+)/)?.[1]);
+    expect(total).toBeGreaterThan(1);
+
     await page.getByLabel('Search assets').fill('goblin');
-    // Ten ingested assets plus the two built-in trigger volumes.
-    await expect(page.getByText(/1 of 12/)).toBeVisible();
+
+    /**
+     * The narrowing, not the size of the library.
+     *
+     * This used to assert `1 of 12`, which was true when it was written and stopped being true the
+     * day 479 models were imported — a test that had been failing for a reason nobody had changed,
+     * pinning a number that is not what "search narrows the library" is about. The total is read
+     * before filtering instead, so adding an asset cannot break it again.
+     */
+    await expect(footer).toHaveText(new RegExp(`^1 of ${total}\\b`));
     await expect(page.locator('[data-asset-id="enemy_goblin_01"]')).toBeVisible();
   });
 });
