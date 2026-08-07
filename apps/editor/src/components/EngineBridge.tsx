@@ -93,6 +93,42 @@ export function EngineBridge({ loader, onLoaded }: EngineBridgeProps): null {
     loadedRef.current?.syncTransforms(scene);
   }, [scene]);
 
+  /**
+   * Lighting, fog, tone mapping and effects.
+   *
+   * Its own key and its own incremental path, for the same reason terrain has one: a colour picker
+   * moves sixty times a second while it is dragged, and a full rebuild per frame would destroy the
+   * node a gizmo is attached to, mid-drag.
+   *
+   * It exists at all because until now **nothing was keyed on the environment**, so no lighting
+   * change ever reached the viewport. The setting saved, survived a reload and exported correctly,
+   * and did nothing while you were looking at it — which is the worst shape a bug can take, since
+   * everything about it says it worked.
+   */
+  const environmentKey = JSON.stringify(scene.environment);
+  useEffect(() => {
+    const loaded = loadedRef.current;
+    if (loaded) loader.applyEnvironmentTo(loaded, scene.environment);
+    // Read through the key rather than listed, so an unrelated object edit does not rebuild lights.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [environmentKey, loader]);
+
+  /**
+   * Material overrides, per object, in place.
+   *
+   * Keyed on just the overrides so an unrelated transform edit does not re-clone materials — and
+   * incremental for the same reason the environment is: dragging a colour picker must not rebuild
+   * the node a gizmo is attached to, sixty times a second.
+   */
+  const materialKey = JSON.stringify(scene.objects.map((object) => [object.id, object.material]));
+  useEffect(() => {
+    const loaded = loadedRef.current;
+    if (!loaded) return;
+    for (const object of scene.objects) loaded.setMaterial(object.id, object.material);
+    // Read through the key rather than listed, for the reason above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [materialKey]);
+
   // Terrain data changes that did not come from the live sculpt stroke — an undo, a redo, a loaded
   // document — are pushed back into the field. Skipped when the data already matches, so a stroke
   // committing what it just drew does not decode it all over again.

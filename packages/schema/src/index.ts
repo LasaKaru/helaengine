@@ -1,5 +1,6 @@
 export * from './primitives.js';
 export * from './terrain.js';
+export * from './rendering.js';
 export * from './environment.js';
 export * from './behavior.js';
 export * from './animation.js';

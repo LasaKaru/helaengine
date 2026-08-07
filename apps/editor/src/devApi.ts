@@ -38,11 +38,21 @@ export interface DevApi {
   /** Object ids currently instantiated in the Three.js scene, not merely present in the store. */
   /** Hides the editor's own furniture before a screenshot. Reports what it actually hid. */
   hideEditorFurniture(): { gridHidden: boolean; triggersHidden: number };
+  /** Whether the viewport is composing through the post-processing chain right now. */
+  postProcessingActive(): boolean;
   viewportObjectIds(): string[];
   /** Per-object view of what the engine actually built, including whether a GLB or a placeholder. */
   viewportObjects(): Array<{ id: string; assetId: string; isModel: boolean }>;
   /** World X of a node in the viewport — proves a transform edit reached Three.js, not just state. */
   viewportObjectWorldX(objectId: string): number | null;
+  /**
+   * The colours a placed object is actually drawn with, as hex without the `#`.
+   *
+   * Reads the scene graph rather than the document, because a material override's whole risk is
+   * that it reaches the *wrong* objects: materials are shared across every clone of a model, so the
+   * document can say one thing and three other objects can have changed colour.
+   */
+  objectMaterialColors(objectId: string): string[];
   /**
    * Where a node actually is right now.
    *
@@ -276,6 +286,20 @@ export function setCameraPoseHandler(
   cameraPoseHandler = handler;
 }
 
+/**
+ * Whether the viewport is drawing through the post-processing chain.
+ *
+ * Reported rather than inferred from the document, because the two can legitimately differ: a
+ * scene can have `postProcessing.enabled` with every effect switched off, and the right answer
+ * then is *no chain at all* — nobody should pay for a render target and two full-screen passes
+ * that change nothing. A test that read the document would call that a bug.
+ */
+let postProcessingActive = false;
+
+export function setPostProcessingActive(active: boolean): void {
+  postProcessingActive = active;
+}
+
 let currentAudio: AudioSystem | null = null;
 
 /** Records the running audio system, so tests can read what it decided to play. */
@@ -398,6 +422,22 @@ export function exposeDevApi(library: AssetLibrary): void {
         })),
         canUndo: session.canUndo(),
       };
+    },
+
+    postProcessingActive: () => postProcessingActive,
+
+    objectMaterialColors(objectId) {
+      const node = currentLoadedScene?.objects.get(objectId);
+      const colors: string[] = [];
+      node?.traverse((object) => {
+        const mesh = object as { isMesh?: boolean; material?: unknown };
+        if (!mesh.isMesh) return;
+        for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+          const color = (material as { color?: { getHexString(): string } }).color;
+          if (color) colors.push(color.getHexString());
+        }
+      });
+      return colors;
     },
 
     addObject(assetId, position = [0, 0, 0], rotationY = 0) {

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { applyToneMapping, PostStack, wantsPostProcessing } from './render/PostStack.js';
 import type { Scene } from '@helaengine/schema';
 import { OrbitCamera } from './OrbitCamera.js';
 import { type LoadedScene, type SceneLoader } from './SceneLoader.js';
@@ -31,6 +32,7 @@ export class Viewport {
   readonly #resizeObserver: ResizeObserver;
 
   #loaded: LoadedScene | null = null;
+  #post: PostStack | null = null;
   #animationFrame: number | null = null;
   #disposed = false;
 
@@ -59,7 +61,30 @@ export class Viewport {
     this.#loaded?.dispose();
     const loaded = this.#loader.load(scene);
     this.#loaded = loaded;
+
+    // Rebuilt per scene rather than kept and reconfigured: which passes exist depends on which
+    // effects are enabled, so a change is a different chain rather than different numbers. Scenes
+    // are loaded when a project opens or a setting changes, not per frame.
+    this.#post?.dispose();
+    this.#post = null;
+    applyToneMapping(this.renderer, scene.environment);
+
+    if (wantsPostProcessing(scene.environment.postProcessing)) {
+      this.#post = new PostStack(
+        this.renderer,
+        loaded.threeScene,
+        this.camera,
+        scene.environment.postProcessing,
+        { width: this.#container.clientWidth || 1, height: this.#container.clientHeight || 1 },
+      );
+    }
+
     return loaded;
+  }
+
+  /** Whether this viewport is drawing through a post-processing chain. */
+  get hasPostProcessing(): boolean {
+    return this.#post !== null;
   }
 
   get loadedScene(): LoadedScene | null {
@@ -83,6 +108,9 @@ export class Viewport {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height, false);
+    // The composer owns its own render targets, so it has to be told too — otherwise the frame is
+    // rendered at the old size and stretched onto the new canvas.
+    this.#post?.setSize(width, height);
     this.renderer.domElement.style.width = '100%';
     this.renderer.domElement.style.height = '100%';
   }
@@ -108,7 +136,12 @@ export class Viewport {
       // in the export as well. Ticking in both places instead would run every clip at double
       // speed in a game export, which is the kind of bug that gets blamed on the model.
       this.#loaded?.updateAnimations(delta);
-      if (this.#loaded) this.renderer.render(this.#loaded.threeScene, this.camera);
+      if (!this.#loaded) return;
+      // One or the other, never both. The composer's last pass writes to the canvas itself, so a
+      // direct render afterwards would overwrite the graded frame with the ungraded one — which
+      // looks exactly like the effects not working.
+      if (this.#post) this.#post.render(delta);
+      else this.renderer.render(this.#loaded.threeScene, this.camera);
     };
     this.#animationFrame = requestAnimationFrame(tick);
   }
@@ -130,6 +163,8 @@ export class Viewport {
     this.controls.dispose();
     this.#loaded?.dispose();
     this.#loaded = null;
+    this.#post?.dispose();
+    this.#post = null;
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }

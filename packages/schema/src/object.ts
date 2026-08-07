@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { BehaviorSchema } from './behavior.js';
 import { ObjectAnimationSchema } from './animation.js';
+import { MaterialOverrideSchema } from './rendering.js';
 import { ObjectPhysicsSchema } from './physics.js';
 import { TriggerSchema } from './trigger.js';
 import { IdSchema, TransformSchema } from './primitives.js';
@@ -34,6 +35,14 @@ export const SceneObjectSchema = z.object({
    * invisible to every scene saved before it existed.
    */
   animation: ObjectAnimationSchema.nullable().default(null),
+  /**
+   * Overrides for this instance's material, or null to use whatever the model shipped with.
+   *
+   * Per instance rather than per asset, which is the point: one crate painted red should not
+   * repaint every other crate placed from the same asset. It also means an override costs a
+   * material clone, so null — the overwhelming majority — costs nothing.
+   */
+  material: MaterialOverrideSchema.nullable().default(null),
   /**
    * Turns this object into a trigger volume: it stops being something you look at and becomes
    * something that notices. Null for the overwhelming majority of objects.

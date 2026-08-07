@@ -1,12 +1,15 @@
 import * as THREE from 'three';
-import type {
-  AssetManifestEntry,
-  Environment,
-  Scene,
-  SceneObject,
-  Terrain,
+import {
+  SHADOW_MAP_SIZE,
+  type AssetManifestEntry,
+  type Environment,
+  type MaterialOverride,
+  type Scene,
+  type SceneObject,
+  type Terrain,
 } from '@helaengine/schema';
 import { MISSING_ASSET_ENTRY, type AssetResolver } from './assets.js';
+import { applyMaterialOverride, restoreOriginalMaterials } from './materials.js';
 import { InstanceManager } from './InstanceManager.js';
 import { modelClips, type ModelSource } from './models.js';
 import { Animator } from './animation/Animator.js';
@@ -74,6 +77,14 @@ export class MissingAssetError extends Error {
 interface DisposableResource {
   dispose(): void;
 }
+
+/** How the environment is built. One implementation, used by the initial load and by every resync. */
+type EnvironmentBuilder = (
+  threeScene: THREE.Scene,
+  environment: Environment,
+  disposables: DisposableResource[],
+  added: THREE.Object3D[],
+) => void;
 
 /** Box standing in for an asset with no model — sized from the bounds the pipeline measured. */
 function placeholderGeometry(
@@ -212,6 +223,70 @@ export class LoadedScene {
     for (const animator of this.#animators.values()) animator.update(deltaSeconds);
   }
 
+  /**
+   * The lights, fog and background this scene built, so they can be replaced without a full reload.
+   *
+   * Tracked separately from `#added` because they are the one part of a scene that changes on its
+   * own schedule: a colour picker moves sixty times a second while it is dragged, and rebuilding
+   * every object for each frame of that would destroy the node a gizmo is attached to, mid-drag.
+   */
+  readonly #environmentNodes: THREE.Object3D[] = [];
+  readonly #environmentDisposables: DisposableResource[] = [];
+
+  /** Called by the loader as it builds the environment, so the scene knows what to take back. */
+  registerEnvironment(nodes: THREE.Object3D[], disposables: DisposableResource[]): void {
+    this.#environmentNodes.push(...nodes);
+    this.#environmentDisposables.push(...disposables);
+  }
+
+  /**
+   * Applies, changes or clears one object's material override, in place.
+   *
+   * Incremental for the same reason the environment sync is: a colour picker moves sixty times a
+   * second while it is dragged, and rebuilding the object per frame would destroy the node a gizmo
+   * is attached to. It also exists for the same reason — until it did, a material override was
+   * written to the document, saved and exported, and changed nothing in the viewport.
+   */
+  setMaterial(objectId: string, override: MaterialOverride | null): void {
+    const node = this.#objects.get(objectId);
+    if (!node) return;
+
+    for (const material of (node.userData['materialClones'] as THREE.Material[] | undefined) ??
+      []) {
+      material.dispose();
+    }
+    delete node.userData['materialClones'];
+    restoreOriginalMaterials(node);
+
+    if (override) node.userData['materialClones'] = applyMaterialOverride(node, override);
+  }
+
+  /**
+   * Replaces the lights, fog and background from a changed document.
+   *
+   * The environment equivalent of `syncTerrain`, and it exists because until now **no environment
+   * change reached the viewport at all**. The editor rebuilds a scene when objects or terrain
+   * change; a sun colour, an ambient intensity or a shadow quality was written to the document and
+   * silently ignored, because nothing was keyed on it. The setting appeared to work — it was
+   * saved, it survived a reload, it exported — and did nothing while you were looking at it.
+   */
+  syncEnvironment(environment: Environment, build: EnvironmentBuilder): void {
+    for (const node of this.#environmentNodes) {
+      node.removeFromParent();
+      const at = this.#added.indexOf(node);
+      if (at >= 0) this.#added.splice(at, 1);
+    }
+    for (const disposable of this.#environmentDisposables) disposable.dispose();
+    this.#environmentNodes.length = 0;
+    this.#environmentDisposables.length = 0;
+
+    const nodes: THREE.Object3D[] = [];
+    const disposables: DisposableResource[] = [];
+    build(this.threeScene, environment, disposables, nodes);
+    this.#added.push(...nodes);
+    this.registerEnvironment(nodes, disposables);
+  }
+
   constructor(init: {
     threeScene: THREE.Scene;
     objects: Map<string, THREE.Object3D>;
@@ -344,6 +419,16 @@ export class LoadedScene {
     if (owned) {
       if (options.keepResources) node.userData['ownedDisposables'] = owned;
       else for (const disposable of owned) disposable.dispose();
+    }
+
+    // Material clones are per object and reachable from nowhere else, so a session that recolours
+    // fifty objects and deletes them must not keep fifty materials it can never reach again.
+    if (!options.keepResources) {
+      for (const material of (node.userData['materialClones'] as THREE.Material[] | undefined) ??
+        []) {
+        material.dispose();
+      }
+      delete node.userData['materialClones'];
     }
 
     this.instances?.remove(objectId);
@@ -561,7 +646,12 @@ export class SceneLoader {
     const missingAssetIds: string[] = [];
     const added: THREE.Object3D[] = [];
 
-    this.#applyEnvironment(threeScene, scene.environment, disposables, added);
+    // Built into its own lists as well as the scene-wide ones, so `syncEnvironment` can take
+    // exactly these back later without touching anything an object owns.
+    const environmentNodes: THREE.Object3D[] = [];
+    const environmentDisposables: DisposableResource[] = [];
+    this.#applyEnvironment(threeScene, scene.environment, environmentDisposables, environmentNodes);
+    added.push(...environmentNodes);
 
     const terrain = this.#buildTerrain(scene.terrain, disposables);
     threeScene.add(terrain);
@@ -616,7 +706,7 @@ export class SceneLoader {
 
     const instances = this.#buildInstances(batched, objects, threeScene, added);
 
-    return new LoadedScene({
+    const loaded = new LoadedScene({
       threeScene,
       objects,
       missingAssetIds,
@@ -624,6 +714,20 @@ export class SceneLoader {
       owned,
       added,
       instances,
+    });
+    loaded.registerEnvironment(environmentNodes, environmentDisposables);
+    return loaded;
+  }
+
+  /**
+   * Rebuilds the lights, fog and background of an already-loaded scene.
+   *
+   * On the loader rather than on `LoadedScene` because the builder is the loader's, and passing it
+   * across keeps one implementation of "what an environment is" rather than two that have to agree.
+   */
+  applyEnvironmentTo(loaded: LoadedScene, environment: Environment): void {
+    loaded.syncEnvironment(environment, (threeScene, nextEnvironment, disposables, added) => {
+      this.#applyEnvironment(threeScene, nextEnvironment, disposables, added);
     });
   }
 
@@ -657,6 +761,10 @@ export class SceneLoader {
         // silently, because it still draws. Rigged assets are also the ones there are ten of, not
         // two hundred, so nothing is lost by excluding them.
         object.animation === null &&
+        // An `InstancedMesh` draws one geometry with one material, so a batch cannot give two
+        // copies different colours. Batching an overridden object would apply whichever override
+        // the batch's template happened to carry to all of them — silently, since it still draws.
+        object.material === null &&
         object.physics.body === 'static';
       if (!eligible) continue;
 
@@ -833,6 +941,13 @@ export class SceneLoader {
     if (object.trigger) node.userData['isTrigger'] = true;
     node.add(visual);
 
+    // Materials are cloned per object, so the ones this creates belong to this object alone and
+    // land on its own disposal list — freeing them on delete is what keeps a session that
+    // recolours fifty objects from holding fifty materials it can never reach again.
+    if (object.material && !object.trigger) {
+      node.userData['materialClones'] = applyMaterialOverride(visual, object.material);
+    }
+
     // Built here rather than by the game runtime, because the animator has to be bound to *this*
     // clone's skeleton and this is the only place that clone exists. The runtime finds it through
     // `LoadedScene.animators`.
@@ -901,12 +1016,24 @@ export class SceneLoader {
       );
     }
 
-    const { sun, ambient } = environment.lighting;
-    const ambientLight = new THREE.AmbientLight(0xffffff, ambient);
+    const { sun, ambient, ambientColor, hemisphere, shadows } = environment.lighting;
+    const ambientLight = new THREE.AmbientLight(new THREE.Color(ambientColor), ambient);
     ambientLight.name = 'ambient';
     threeScene.add(ambientLight);
     added.push(ambientLight);
     disposables.push(ambientLight);
+
+    if (hemisphere) {
+      const hemisphereLight = new THREE.HemisphereLight(
+        new THREE.Color(hemisphere.skyColor),
+        new THREE.Color(hemisphere.groundColor),
+        hemisphere.intensity,
+      );
+      hemisphereLight.name = 'hemisphere';
+      threeScene.add(hemisphereLight);
+      added.push(hemisphereLight);
+      disposables.push(hemisphereLight);
+    }
 
     const sunLight = new THREE.DirectionalLight(new THREE.Color(sun.color), sun.intensity);
     sunLight.name = 'sun';
@@ -918,14 +1045,25 @@ export class SceneLoader {
       distance * Math.sin(elevation),
       distance * Math.cos(elevation) * Math.cos(azimuth),
     );
-    sunLight.castShadow = true;
-    sunLight.shadow.mapSize.set(2048, 2048);
-    sunLight.shadow.camera.near = 1;
-    sunLight.shadow.camera.far = 400;
-    sunLight.shadow.camera.left = -100;
-    sunLight.shadow.camera.right = 100;
-    sunLight.shadow.camera.top = 100;
-    sunLight.shadow.camera.bottom = -100;
+
+    sunLight.castShadow = shadows.quality !== 'off';
+    if (sunLight.castShadow) {
+      const size = SHADOW_MAP_SIZE[shadows.quality];
+      sunLight.shadow.mapSize.set(size, size);
+      sunLight.shadow.bias = shadows.bias;
+      // The shadow camera is an orthographic box centred on the origin, and `distance` is its
+      // width. The whole map is stretched over it, so doubling this halves the resolution
+      // everywhere — which is why it is a setting rather than something derived from scene size.
+      const half = shadows.distance / 2;
+      sunLight.shadow.camera.near = 1;
+      sunLight.shadow.camera.far = shadows.distance * 2;
+      sunLight.shadow.camera.left = -half;
+      sunLight.shadow.camera.right = half;
+      sunLight.shadow.camera.top = half;
+      sunLight.shadow.camera.bottom = -half;
+      sunLight.shadow.camera.updateProjectionMatrix();
+    }
+
     threeScene.add(sunLight);
     threeScene.add(sunLight.target);
     added.push(sunLight, sunLight.target);

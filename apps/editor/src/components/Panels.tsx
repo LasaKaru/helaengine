@@ -13,6 +13,8 @@ import { useEditorStore } from '../store/editorStore';
 import { useSceneStore } from '../store/sceneStore';
 import { BehaviorPanel } from './BehaviorPanel';
 import { AnimationPanel } from './AnimationPanel';
+import { RenderingPanel } from './RenderingPanel';
+import { MaterialPanel } from './MaterialPanel';
 import { GameUiPanel } from './GameUiPanel';
 import { TriggerPanel } from './TriggerPanel';
 import { NumberField } from './NumberField';
@@ -515,8 +517,10 @@ export function InspectorPanel({ manifest }: { manifest: AssetManifest }): React
       {single && !single.trigger && <PhysicsSection object={single} />}
       {single && !single.trigger && <BehaviorPanel object={single} />}
       {single && !single.trigger && <AnimationPanel object={single} manifest={manifest} />}
+      {single && !single.trigger && <MaterialPanel object={single} />}
 
       <TerrainPanel />
+      <RenderingPanel />
       <GamePanel />
       <WeaponsPanel />
       <SecretsPanel />

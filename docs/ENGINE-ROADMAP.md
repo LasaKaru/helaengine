@@ -129,14 +129,20 @@ persistent player state across them, a hub. Mostly schema work; the runtime alre
 Lightmaps baked in the editor and shipped as textures would transform how a scene looks at no runtime
 cost — which matters more here than anywhere else, because the target is a browser.
 
-**2.7 A post-processing stack.** Bloom, ambient occlusion, colour grading, anti-aliasing, as a closed
+**2.7 A post-processing stack. — DONE**, along with lighting controls and material overrides. See
+[`RENDERING.md`](RENDERING.md). Bloom, vignette and colour grading as a closed vocabulary on Three's
+own passes; shadow quality, tone mapping, ambient colour and a hemisphere fill; and per-object
+material overrides. Building it exposed that **no environment change had ever reached the editor's
+viewport** — saved, exported and silently ignored while you looked at it.
+
+_Originally written as:_ Bloom, ambient occlusion, colour grading, anti-aliasing, as a closed
 vocabulary of effects with typed parameters. `postprocessing` is the obvious library. Cheap to build,
 large visual return, and directly relevant to the export visual regression currently open in
 `docs/SPRINT.md`.
 
-**2.8 A material system.** Objects currently take the material inside their model. Authored
-materials — colour, roughness, metalness, emissive, a texture slot — placed in the schema and
-reusable across objects.
+**2.8 A material system. — PARTLY DONE.** Per-object overrides exist (colour, roughness, metalness,
+emissive, opacity, wireframe, double-sided). What remains is a _named_ material reused across many
+objects — the thing to build before somebody hand-edits fifty overrides — and a texture slot.
 
 **2.9 Level of detail and occlusion culling.** Instancing exists and works. LOD and culling are what
 let a scene get ten times bigger, and they are what the stress-test template is for.
@@ -213,9 +219,8 @@ scene it is today, and the runtime paths it takes are the ones it takes today.
 2. **The node graph** (2.3). The differentiator, extended rather than abandoned.
 3. **Prefabs** (2.4). What makes a large level survivable.
 
-Next after those, and cheaper than any of them: **lighting and post-processing** (2.6, 2.7) and
-**authored materials** (2.8). They change how everything looks for a fraction of the work, and the
-schema additions are small.
+Next after those: **baked lighting** (2.6), which is the remaining half of the visual work and the
+one with the largest return for a browser target — lightmaps cost nothing at runtime.
 
 Those three change what can be built with the engine. Everything else on this page changes how
 nicely it can be built — which matters, but only afterwards.

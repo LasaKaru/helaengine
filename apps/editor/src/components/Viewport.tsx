@@ -5,6 +5,7 @@ import { useEditorStore } from '../store/editorStore';
 import { useSceneStore } from '../store/sceneStore';
 import type { AssetResolver, LoadedScene, SceneLoader } from '@helaengine/engine';
 import { setCamera, setCameraPoseHandler, setLoadedScene, setRenderer } from '../devApi';
+import { PostProcessing } from './PostProcessing';
 import { useProjectStore } from '../store/projectStore';
 import { EngineBridge } from './EngineBridge';
 import { MarqueeOverlay } from './Marquee';
@@ -122,6 +123,7 @@ export function Viewport({ loader, resolver }: ViewportProps): React.JSX.Element
         data-testid="viewport-canvas"
       >
         <CameraReporter />
+        <PostProcessing />
         <ThumbnailReporter />
         <EngineBridge loader={loader} onLoaded={handleLoaded} />
         <PlacementController loader={loader} loadedScene={loadedScene} />

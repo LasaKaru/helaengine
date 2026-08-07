@@ -48,6 +48,8 @@ export {
 } from './behaviors/CheckpointBehavior.js';
 export type { CheckpointParams } from './behaviors/CheckpointBehavior.js';
 export { registerBuiltinBehaviors } from './behaviors/builtins.js';
+export { applyMaterialOverride } from './materials.js';
+export { PostStack, applyToneMapping, wantsPostProcessing } from './render/PostStack.js';
 export { Animator } from './animation/Animator.js';
 export { cloneModel, hasSkeleton } from './animation/clone.js';
 export { SaveStore, saveKey } from './save/SaveStore.js';

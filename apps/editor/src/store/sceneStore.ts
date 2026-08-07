@@ -24,6 +24,7 @@ import {
   type UiConfig,
   type Vec3,
   type ObjectAnimation,
+  type MaterialOverride,
 } from '@helaengine/schema';
 import { isBuiltinTriggerAsset, triggerDefaults } from '../triggers';
 import {
@@ -97,6 +98,8 @@ export interface SceneState {
   setTrigger(objectId: string, trigger: Partial<Trigger>): void;
   /** Turns animation on or off for an object, and edits its clip bindings. */
   setAnimation(objectId: string, animation: ObjectAnimation | null): void;
+  /** Sets or clears an object's material override. */
+  setMaterial(objectId: string, material: MaterialOverride | null): void;
   setPlayer(player: Partial<Player>): void;
   setInventory(inventory: Partial<Inventory>): void;
   addWeapon(): string;
@@ -285,6 +288,9 @@ export const useSceneStore = create<SceneState>()(
                 animation: source.animation
                   ? { ...source.animation, clips: { ...source.animation.clips } }
                   : null,
+                // Copied as a value rather than shared: recolouring one copy must not recolour
+                // the object it was copied from.
+                material: source.material ? { ...source.material } : null,
                 // A duplicated trigger keeps its wiring: copying a spawn point should give you a
                 // second spawn point, not an inert box.
                 trigger: source.trigger
@@ -404,6 +410,15 @@ export const useSceneStore = create<SceneState>()(
             // merge would make "clear the walk clip" impossible to express — `undefined` would read
             // as "leave it alone", which is the opposite of what the field being emptied means.
             object.animation = animation;
+          }),
+
+        setMaterial: (objectId, material) =>
+          commit('object/setMaterial', (draft) => {
+            const object = draft.objects.find((item) => item.id === objectId);
+            if (!object) return;
+            // Replaced wholesale for the same reason `setAnimation` is: a partial merge cannot
+            // express "stop overriding roughness", because `undefined` reads as "leave it alone".
+            object.material = material;
           }),
 
         setGameConfig: (config) =>

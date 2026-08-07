@@ -808,3 +808,130 @@ describe('SceneLoader animation', () => {
     expect(loaded.animatedCount).toBe(0);
   });
 });
+
+/**
+ * Lighting the document asks for, built into the scene.
+ *
+ * Worth testing rather than eyeballing because most of it is invisible until it is wrong in a way
+ * nobody attributes to the setting: a shadow map at the wrong size looks like a modelling problem,
+ * and a shadow camera that is too small looks like objects at the edge of the level not casting.
+ */
+function environmentOf(overrides: Record<string, unknown>): Scene {
+  return parseScene({ sceneId: 'scene_test', version: 1, objects: [], environment: overrides });
+}
+
+function lightNamed(loaded: ReturnType<SceneLoader['load']>, name: string): THREE.Light | null {
+  return (loaded.threeScene.getObjectByName(name) as THREE.Light | undefined) ?? null;
+}
+
+describe('SceneLoader lighting', () => {
+  it('keeps the old look when a document says nothing new', () => {
+    // Every scene saved before these settings existed parses with the defaults, and has to look
+    // exactly as it did. White ambient, shadows on, no hemisphere light.
+    const loaded = makeLoader().load(environmentOf({}));
+    const ambient = lightNamed(loaded, 'ambient');
+    expect(ambient?.color.getHexString()).toBe('ffffff');
+    expect(lightNamed(loaded, 'hemisphere')).toBeNull();
+    expect(lightNamed(loaded, 'sun')?.castShadow).toBe(true);
+  });
+
+  it('tints the ambient fill', () => {
+    const loaded = makeLoader().load(
+      environmentOf({ lighting: { ambient: 0.6, ambientColor: '#88bbff' } }),
+    );
+    const ambient = lightNamed(loaded, 'ambient');
+    expect(ambient?.color.getHexString()).toBe('88bbff');
+    expect(ambient?.intensity).toBe(0.6);
+  });
+
+  it('adds a hemisphere light only when the document asks for one', () => {
+    const loaded = makeLoader().load(
+      environmentOf({
+        lighting: { hemisphere: { skyColor: '#a0c8ff', groundColor: '#3a2a1a', intensity: 0.7 } },
+      }),
+    );
+    const light = lightNamed(loaded, 'hemisphere') as THREE.HemisphereLight | null;
+    expect(light?.color.getHexString()).toBe('a0c8ff');
+    expect(light?.groundColor.getHexString()).toBe('3a2a1a');
+  });
+
+  it('sizes the shadow map from the quality step', () => {
+    const low = makeLoader().load(environmentOf({ lighting: { shadows: { quality: 'low' } } }));
+    const high = makeLoader().load(environmentOf({ lighting: { shadows: { quality: 'high' } } }));
+    expect(lightNamed(low, 'sun')?.shadow?.mapSize.x).toBe(1024);
+    // Sixteen times the texture memory of `low`, which is why this is a choice rather than a
+    // default somebody discovers on a phone.
+    expect(lightNamed(high, 'sun')?.shadow?.mapSize.x).toBe(4096);
+  });
+
+  it('turns shadows off entirely rather than making them cheap', () => {
+    const loaded = makeLoader().load(environmentOf({ lighting: { shadows: { quality: 'off' } } }));
+    // A real option: shadows are the single most expensive thing in this renderer, and a flat-lit
+    // stylised scene reads as deliberate.
+    expect(lightNamed(loaded, 'sun')?.castShadow).toBe(false);
+  });
+
+  it('stretches the shadow camera over the distance asked for', () => {
+    const loaded = makeLoader().load(
+      environmentOf({ lighting: { shadows: { quality: 'medium', distance: 400 } } }),
+    );
+    const shadow = lightNamed(loaded, 'sun')?.shadow as THREE.DirectionalLightShadow | undefined;
+    const camera = shadow?.camera as THREE.OrthographicCamera | undefined;
+    expect(camera?.right).toBe(200);
+    expect(camera?.left).toBe(-200);
+  });
+});
+
+describe('SceneLoader material overrides', () => {
+  const overridden = {
+    id: 'obj_0001',
+    assetId: 'tree_pine_02',
+    material: { color: '#ff0000' },
+  };
+
+  it('frees an overridden object’s materials when it is deleted', async () => {
+    const loader = makeModelLoader(new FakeModelSource());
+    const scene = makeScene([overridden]);
+    await loader.preload(scene);
+    const loaded = loader.load(scene);
+
+    const node = loaded.objects.get('obj_0001');
+    const materials: THREE.Material[] = [];
+    node?.traverse((object) => {
+      const mesh = object as THREE.Mesh;
+      if (mesh.isMesh) materials.push(mesh.material as THREE.Material);
+    });
+    expect(materials).toHaveLength(1);
+
+    let disposed = 0;
+    for (const material of materials) {
+      material.addEventListener('dispose', () => {
+        disposed += 1;
+      });
+    }
+
+    // A session that recolours fifty objects and deletes them must not hold fifty materials it can
+    // never reach again — the same leak the trigger-volume outlines had.
+    loaded.release('obj_0001');
+    expect(disposed).toBe(1);
+  });
+
+  it('never batches an overridden object, however many there are', async () => {
+    // An `InstancedMesh` draws one material, so a batch cannot give two copies different colours.
+    // Batching would apply the template's colour to all of them, silently.
+    const loader = new SceneLoader({
+      resolver: new ManifestAssetResolver(manifestWithModels),
+      modelSource: new FakeModelSource(),
+      warn: () => {},
+      instanceThreshold: 4,
+    });
+    const scene = makeScene(
+      Array.from({ length: 10 }, (_, index) => ({
+        ...overridden,
+        id: `obj_${String(index + 1).padStart(4, '0')}`,
+      })),
+    );
+    await loader.preload(scene);
+    expect(loader.load(scene).instances).toBeNull();
+  });
+});

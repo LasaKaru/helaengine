@@ -199,6 +199,7 @@ test.describe('export edge cases', () => {
             behaviors: [],
             physics: { body: 'static', collider: 'auto' },
             animation: null,
+            material: null,
             trigger: null,
             metadata: {},
           },
