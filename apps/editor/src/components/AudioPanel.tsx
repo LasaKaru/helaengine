@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import type { AssetManifest, SfxBinding } from '@helaengine/schema';
-import { SfxBindingSchema } from '@helaengine/schema';
+import type { AmbienceLayer, AssetManifest, SfxBinding } from '@helaengine/schema';
+import { SfxBindingSchema, ambienceVolume } from '@helaengine/schema';
 import { useSceneStore } from '../store/sceneStore';
 import { NumberField } from './NumberField';
 
@@ -171,6 +171,18 @@ export function AudioPanel({ manifest }: { manifest: AssetManifest }): React.JSX
   );
 
   const setSfx = (sfx: SfxBinding[]): void => setAudioConfig({ sfx });
+  const setAmbience = (ambience: AmbienceLayer[]): void => setAudioConfig({ ambience });
+
+  /** Clips tagged as ambience, so the dropdown is beds rather than every gunshot in the library. */
+  const ambienceClips = useMemo(
+    () =>
+      manifest.assets
+        .filter((asset) => asset.category === 'audio' && asset.tags.includes('ambience'))
+        .map((asset) => ({ id: asset.id, name: asset.name })),
+    [manifest],
+  );
+
+  const windStrength = useSceneStore((state) => state.scene.environment.wind.strength);
 
   return (
     <section className="panel" aria-label="Audio">
@@ -235,6 +247,107 @@ export function AudioPanel({ manifest }: { manifest: AssetManifest }): React.JSX
               }
             />
           </div>
+
+          <h3>Ambience</h3>
+          {audio.ambience.length === 0 && (
+            <p className="panel-hint">
+              Looping beds — wind, birds, water. Several play at once, so a river in a forest sounds
+              like both.
+            </p>
+          )}
+
+          {audio.ambience.map((layer, index) => (
+            <div className="scatter-layer" key={layer.assetId}>
+              <div className="behavior-head">
+                <select
+                  aria-label={`Ambience ${index + 1} clip`}
+                  value={layer.assetId}
+                  onChange={(event) =>
+                    setAmbience(
+                      audio.ambience.map((current, at) =>
+                        at === index ? { ...current, assetId: event.target.value } : current,
+                      ),
+                    )
+                  }
+                >
+                  {ambienceClips.map((clip) => (
+                    <option key={clip.id} value={clip.id}>
+                      {clip.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  aria-label={`Remove ambience ${index + 1}`}
+                  onClick={() => setAmbience(audio.ambience.filter((_x, at) => at !== index))}
+                >
+                  Remove
+                </button>
+              </div>
+
+              <NumberField
+                label={`Ambience ${index + 1} volume`}
+                scrubLabel="Volume"
+                value={layer.volume}
+                step={0.02}
+                onChange={(volume) =>
+                  setAmbience(
+                    audio.ambience.map((current, at) =>
+                      at === index
+                        ? { ...current, volume: Math.min(1, Math.max(0, volume)) }
+                        : current,
+                    ),
+                  )
+                }
+              />
+
+              <NumberField
+                label={`Ambience ${index + 1} follows wind`}
+                scrubLabel="Follows wind"
+                value={layer.followWind}
+                step={0.05}
+                onChange={(followWind) =>
+                  setAmbience(
+                    audio.ambience.map((current, at) =>
+                      at === index
+                        ? { ...current, followWind: Math.min(1, Math.max(0, followWind)) }
+                        : current,
+                    ),
+                  )
+                }
+              />
+              <p className="panel-hint">
+                {layer.followWind === 0
+                  ? 'Plays at the same volume whatever the weather.'
+                  : `Silent in still air, ${Math.round(layer.followWind * 100)}% tied to the wind. ` +
+                    `Right now: ${Math.round(ambienceVolume(layer, windStrength) * 100)}%.`}
+              </p>
+            </div>
+          ))}
+
+          <button
+            type="button"
+            aria-label="Add ambience"
+            disabled={ambienceClips.length === 0 || audio.ambience.length >= 6}
+            onClick={() =>
+              setAmbience([
+                ...audio.ambience,
+                // The first clip not already in the list: layers are keyed by asset, so offering a
+                // duplicate would silently replace the one already there.
+                {
+                  assetId: (
+                    ambienceClips.find(
+                      (clip) => !audio.ambience.some((layer) => layer.assetId === clip.id),
+                    ) ?? ambienceClips[0]!
+                  ).id,
+                  volume: 0.5,
+                  followWind: 0,
+                },
+              ])
+            }
+          >
+            Add ambience
+          </button>
 
           <h3>Sounds</h3>
           {audio.sfx.length === 0 && (

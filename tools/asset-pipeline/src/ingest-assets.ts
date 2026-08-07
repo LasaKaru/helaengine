@@ -259,9 +259,18 @@ async function ingestAudio(
 
   await fs.writeFile(path.join(audioDir, outputName), outputBytes);
 
-  // A clip long enough to be a bed is looped; a short one is a one-shot. A guess, but a good one,
-  // and the metadata file can override it the day it is wrong.
-  const looping = metadata.declared ? assetId.includes('music') : (duration ?? 0) > 3;
+  /**
+   * Whether the clip loops.
+   *
+   * A declared asset says so with a `loop` tag; an undeclared one is guessed from its length, on the
+   * grounds that anything over three seconds is a bed rather than a one-shot.
+   *
+   * This used to read `assetId.includes('music')` for declared clips, which was true when music was
+   * the only looping thing that shipped and became wrong the moment ambience beds arrived — they are
+   * the definition of a loop and came out as one-shots, so a twelve-second wind bed played once and
+   * then left silence. Reading the tag asks the metadata what it already declares.
+   */
+  const looping = metadata.declared ? (metadata.tags ?? []).includes('loop') : (duration ?? 0) > 3;
 
   const entry: AssetManifestEntry = {
     id: assetId,

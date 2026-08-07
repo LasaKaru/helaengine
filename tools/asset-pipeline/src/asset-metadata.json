@@ -1,4 +1,59 @@
 {
+  "audio_ambience_birds": {
+    "name": "Birds Ambience",
+    "category": "audio",
+    "tags": ["ambience", "nature", "loop"],
+    "colliderType": "none",
+    "placeholderColor": "#7a6fd0",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "audio_ambience_cave": {
+    "name": "Cave Ambience",
+    "category": "audio",
+    "tags": ["ambience", "cave", "loop"],
+    "colliderType": "none",
+    "placeholderColor": "#7a6fd0",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "audio_ambience_night": {
+    "name": "Night Ambience",
+    "category": "audio",
+    "tags": ["ambience", "night", "loop"],
+    "colliderType": "none",
+    "placeholderColor": "#7a6fd0",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "audio_ambience_water": {
+    "name": "Water Ambience",
+    "category": "audio",
+    "tags": ["ambience", "water", "loop"],
+    "colliderType": "none",
+    "placeholderColor": "#7a6fd0",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "audio_ambience_wind": {
+    "name": "Wind Ambience",
+    "category": "audio",
+    "tags": ["ambience", "wind", "loop"],
+    "colliderType": "none",
+    "placeholderColor": "#7a6fd0",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
   "audio_music_combat": {
     "name": "Combat Music",
     "category": "audio",
@@ -43,6 +98,17 @@
     "sourceUrl": "https://github.com/LasaKaru/helaengine",
     "origin": "first-party"
   },
+  "audio_sfx_click": {
+    "name": "UI Click",
+    "category": "audio",
+    "tags": ["sfx", "ui"],
+    "colliderType": "none",
+    "placeholderColor": "#7a6fd0",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
   "audio_sfx_damage": {
     "name": "Damage Hit",
     "category": "audio",
@@ -58,6 +124,61 @@
     "name": "Death Sting",
     "category": "audio",
     "tags": ["sfx", "combat"],
+    "colliderType": "none",
+    "placeholderColor": "#7a6fd0",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "audio_sfx_door": {
+    "name": "Door",
+    "category": "audio",
+    "tags": ["sfx", "world"],
+    "colliderType": "none",
+    "placeholderColor": "#7a6fd0",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "audio_sfx_footstep": {
+    "name": "Footstep",
+    "category": "audio",
+    "tags": ["sfx", "movement"],
+    "colliderType": "none",
+    "placeholderColor": "#7a6fd0",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "audio_sfx_heal": {
+    "name": "Heal",
+    "category": "audio",
+    "tags": ["sfx", "pickup"],
+    "colliderType": "none",
+    "placeholderColor": "#7a6fd0",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "audio_sfx_jump": {
+    "name": "Jump",
+    "category": "audio",
+    "tags": ["sfx", "movement"],
+    "colliderType": "none",
+    "placeholderColor": "#7a6fd0",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "audio_sfx_land": {
+    "name": "Land",
+    "category": "audio",
+    "tags": ["sfx", "movement"],
     "colliderType": "none",
     "placeholderColor": "#7a6fd0",
     "license": "MIT",
@@ -102,6 +223,17 @@
     "name": "Weapon Shot",
     "category": "audio",
     "tags": ["sfx", "weapon", "combat"],
+    "colliderType": "none",
+    "placeholderColor": "#7a6fd0",
+    "license": "MIT",
+    "author": "HelaEngine contributors",
+    "sourceUrl": "https://github.com/LasaKaru/helaengine",
+    "origin": "first-party"
+  },
+  "audio_sfx_swing": {
+    "name": "Weapon Swing",
+    "category": "audio",
+    "tags": ["sfx", "combat"],
     "colliderType": "none",
     "placeholderColor": "#7a6fd0",
     "license": "MIT",

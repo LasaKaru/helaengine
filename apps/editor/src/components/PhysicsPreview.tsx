@@ -347,6 +347,17 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
     audio.current?.setConfig(audioConfig);
   }, [audioConfig]);
 
+  /**
+   * Ambience that follows the wind.
+   *
+   * Keyed on the strength alone rather than the whole environment, so dragging a colour picker does
+   * not walk the bed list sixty times a second.
+   */
+  const windStrength = useSceneStore((state) => state.scene.environment.wind.strength);
+  useEffect(() => {
+    audio.current?.setWindStrength(windStrength);
+  }, [windStrength]);
+
   // One input layer for every source. The engine owns it, because an exported game running on a
   // phone needs the same virtual joystick and has no React to build it with.
   useEffect(() => {

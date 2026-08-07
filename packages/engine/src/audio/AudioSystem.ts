@@ -3,6 +3,7 @@ import type * as THREE from 'three';
 import type { AudioConfig, MixerSettings, MusicState, SfxBinding } from '@helaengine/schema';
 import type { EventBus } from '../TriggerRuntime.js';
 import { MusicPlayer, type MusicTrack } from './MusicPlayer.js';
+import { AmbiencePlayer } from './AmbiencePlayer.js';
 
 /** The slice of a one-shot sound this needs. Same reasoning as `MusicTrack`. */
 export interface SfxVoice {
@@ -23,6 +24,7 @@ export interface AudioSystemOptions {
   /** Where the listener is. Positional sounds are placed relative to it. */
   listener?(): { position: THREE.Vector3; forward: THREE.Vector3 } | null;
   createMusic?: (url: string) => MusicTrack;
+  createAmbience?: (url: string) => MusicTrack;
   createSfx?: (url: string, binding: SfxBinding) => SfxVoice;
   /** Injected for tests; `performance.now` in a browser. */
   now?: () => number;
@@ -46,6 +48,7 @@ const COMBAT_EVENTS = new Set(['enemyAlerted', 'enemyAttacked', 'playerDamaged',
  */
 export class AudioSystem {
   readonly music: MusicPlayer;
+  readonly ambience: AmbiencePlayer;
 
   #config: AudioConfig;
   readonly #bus: EventBus;
@@ -82,6 +85,12 @@ export class AudioSystem {
             : {}),
         }) as unknown as SfxVoice);
 
+    this.ambience = new AmbiencePlayer({
+      resolve: options.resolve,
+      ...(options.createAmbience ? { create: options.createAmbience } : {}),
+    });
+    this.ambience.setLayers(options.config.ambience);
+
     this.music = new MusicPlayer({
       config: options.config.music,
       resolve: options.resolve,
@@ -102,7 +111,19 @@ export class AudioSystem {
   setConfig(config: AudioConfig): void {
     this.#config = config;
     this.music.setConfig(config.music);
+    this.ambience.setLayers(config.ambience);
     this.#applyVolumes();
+  }
+
+  /**
+   * Passes the wind through to the beds.
+   *
+   * Taken as a number rather than a `Wind`, so the audio package does not need to know what a wind
+   * *is* — only how hard it is blowing. That keeps the one coupling between sound and rendering to
+   * a single float.
+   */
+  setWindStrength(strength: number): void {
+    this.ambience.setWindStrength(strength);
   }
 
   /**
@@ -121,6 +142,8 @@ export class AudioSystem {
   start(): void {
     if (this.#started) return;
     this.#started = true;
+
+    this.ambience.play();
 
     this.#unsubscribes.push(
       this.#bus.onAny((event, payload) => {
@@ -189,11 +212,18 @@ export class AudioSystem {
     this.#recent.clear();
     this.#sinceCombat = null;
     this.music.dispose();
+    this.ambience.dispose();
   }
 
   #applyVolumes(): void {
     const master = this.#config.masterVolume * this.#mixer.master;
     this.music.setVolume(master * this.#config.musicVolume * this.#mixer.music);
+    // Ambience rides the music slider rather than getting one of its own: a player who turns the
+    // music down is asking for a quieter background, and a third slider they have to find is not a
+    // feature.
+    this.ambience.setVolume(
+      master * this.#config.ambienceVolume * this.#config.musicVolume * this.#mixer.music,
+    );
     // Howler's global volume covers the one-shots, which are created and thrown away too fast to
     // be worth tracking individually.
     (Howler as unknown as { volume(level: number): void }).volume?.(

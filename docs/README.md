@@ -8,6 +8,8 @@
   material overrides, and what each setting costs.
 - [**Rigged characters and animation**](ANIMATION.md) — skeletal animation, importing a Mixamo
   character, and why a scene names states rather than clips.
+- [**Making a world feel alive**](WORLD.md) — wind and swaying vegetation, ground cover placed by
+  rule, world size, look presets and ambient sound.
 - [**The node graph**](GRAPH.md) — wiring up what happens in a level without writing code, and the
   checks a canvas can make that a script file cannot.
 - [**Behaviour reference**](BEHAVIOURS.md) — every behaviour and its parameters. Generated from the

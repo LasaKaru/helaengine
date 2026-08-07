@@ -174,6 +174,256 @@ const CLIPS: Clip[] = [
         { wave: (t) => Math.sin(2 * Math.PI * (220 - t * 120) * t), envelope: decay(2) },
       ]),
   },
+
+  // --- Ambience beds ---
+  //
+  // Long, seamless loops rather than short ones. A four-second bed repeats fifteen times a minute
+  // and the ear finds the seam within two of them; twelve seconds is long enough that the loop
+  // stops being a rhythm. `bed()` fades both ends so the wrap does not click.
+  {
+    /**
+     * Wind: filtered noise whose brightness rises and falls.
+     *
+     * A one-pole low-pass over white noise is the whole trick. Unfiltered noise is a hiss, and a
+     * hiss is a broken speaker; rolling the top off and then *moving* the cutoff is what the ear
+     * hears as air rather than as static.
+     */
+    id: 'audio_ambience_wind',
+    build: () => {
+      const source = noise(1337);
+      let filtered = 0;
+      return render(
+        12,
+        [
+          {
+            wave: (t) => {
+              // Two slow LFOs at an irrational ratio, so the gusting never lines up with itself.
+              const gust = 0.5 + 0.5 * Math.sin(t * 0.7) * Math.sin(t * 0.31 + 1.2);
+              const cutoff = 0.04 + gust * 0.1;
+              filtered += (source() - filtered) * cutoff;
+              return filtered * (0.5 + gust) * 3.2;
+            },
+            envelope: bed(2),
+          },
+        ],
+        0.42,
+      );
+    },
+  },
+  {
+    // Birds: sparse chirps over a very quiet air bed. Sparse is the point — a continuous dawn
+    // chorus is a nature documentary, not a level somebody has to stand in for an hour.
+    id: 'audio_ambience_birds',
+    build: () => {
+      const source = noise(4242);
+      let filtered = 0;
+      return render(
+        12,
+        [
+          {
+            wave: () => {
+              filtered += (source() - filtered) * 0.05;
+              return filtered * 1.4;
+            },
+            envelope: bed(2),
+          },
+          {
+            wave: (t) => {
+              // A chirp every ~1.7s, each a short rising warble. The offset per chirp is derived
+              // from its index, so they are not evenly spaced.
+              const index = Math.floor(t / 1.7);
+              const local = t - index * 1.7 - (index % 3) * 0.13;
+              if (local < 0 || local > 0.22) return 0;
+              const pitch = 2400 + Math.sin(local * 90) * 500 + (index % 5) * 120;
+              return Math.sin(2 * Math.PI * pitch * local) * (1 - local / 0.22) ** 2;
+            },
+            envelope: bed(2),
+          },
+        ],
+        0.3,
+      );
+    },
+  },
+  {
+    // Water: brighter, faster-moving noise than wind, with a low burble under it.
+    id: 'audio_ambience_water',
+    build: () => {
+      const source = noise(909);
+      let filtered = 0;
+      return render(
+        12,
+        [
+          {
+            wave: (t) => {
+              filtered += (source() - filtered) * (0.18 + 0.06 * Math.sin(t * 2.3));
+              return filtered * 2.4;
+            },
+            envelope: bed(2),
+          },
+          {
+            wave: (t) => Math.sin(2 * Math.PI * 90 * t) * 0.25 * (0.5 + 0.5 * Math.sin(t * 1.7)),
+            envelope: bed(2),
+          },
+        ],
+        0.4,
+      );
+    },
+  },
+  {
+    // Night: a low hum with crickets. Quieter and darker than the day beds.
+    id: 'audio_ambience_night',
+    build: () => {
+      const source = noise(7);
+      let filtered = 0;
+      return render(
+        12,
+        [
+          {
+            wave: () => {
+              filtered += (source() - filtered) * 0.02;
+              return filtered * 1.6;
+            },
+            envelope: bed(2),
+          },
+          {
+            // Crickets: a fast pulse train that comes and goes.
+            wave: (t) => {
+              const chorus = Math.max(0, Math.sin(t * 0.6));
+              const pulse = Math.sin(2 * Math.PI * 4200 * t) * Math.max(0, Math.sin(t * 220));
+              return pulse * chorus * 0.35;
+            },
+            envelope: bed(2),
+          },
+        ],
+        0.28,
+      );
+    },
+  },
+  {
+    // Cave: a deep drone and a very occasional drip. Almost nothing, which is what makes it read as
+    // underground rather than as a room with a fan in it.
+    id: 'audio_ambience_cave',
+    build: () =>
+      render(
+        12,
+        [
+          { wave: sine(58), envelope: bed(2.5) },
+          { wave: (t) => Math.sin(2 * Math.PI * 87 * t) * 0.4, envelope: bed(2.5) },
+          {
+            wave: (t) => {
+              const local = t % 3.9;
+              if (local > 0.16) return 0;
+              return (
+                Math.sin(2 * Math.PI * (1400 - local * 2600) * local) * (1 - local / 0.16) ** 3
+              );
+            },
+            envelope: bed(2.5),
+          },
+        ],
+        0.34,
+      ),
+  },
+
+  // --- More effects ---
+  {
+    // Footstep: a very short filtered noise burst. Pitch and length are all that separate a step on
+    // grass from one on stone, and this is the grass one.
+    id: 'audio_sfx_footstep',
+    build: () => {
+      const source = noise(21);
+      let filtered = 0;
+      return render(
+        0.12,
+        [
+          {
+            wave: () => {
+              filtered += (source() - filtered) * 0.28;
+              return filtered * 3;
+            },
+            envelope: decay(4),
+          },
+        ],
+        0.5,
+      );
+    },
+  },
+  {
+    // Jump: a short rising blip. Rising for up, falling for landing — the pair reads as one motion.
+    id: 'audio_sfx_jump',
+    build: () =>
+      render(0.18, [
+        { wave: (t) => Math.sin(2 * Math.PI * (320 + t * 900) * t), envelope: decay(2) },
+      ]),
+  },
+  {
+    id: 'audio_sfx_land',
+    build: () => {
+      const source = noise(88);
+      let filtered = 0;
+      return render(0.22, [
+        { wave: (t) => Math.sin(2 * Math.PI * (260 - t * 500) * t), envelope: decay(3) },
+        {
+          wave: () => {
+            filtered += (source() - filtered) * 0.2;
+            return filtered * 2;
+          },
+          envelope: decay(5),
+        },
+      ]);
+    },
+  },
+  {
+    // Swing: a whoosh, which is noise swept from bright to dark. The sweep is the whole sound.
+    id: 'audio_sfx_swing',
+    build: () => {
+      const source = noise(555);
+      let filtered = 0;
+      return render(0.3, [
+        {
+          wave: (t) => {
+            filtered += (source() - filtered) * Math.max(0.02, 0.35 - t * 1.1);
+            return filtered * 3.5;
+          },
+          envelope: (t, duration) => Math.sin((t / duration) * Math.PI) ** 2,
+        },
+      ]);
+    },
+  },
+  {
+    // Door: a low scrape with a latch at the end.
+    id: 'audio_sfx_door',
+    build: () => {
+      const source = noise(31);
+      let filtered = 0;
+      return render(0.65, [
+        {
+          wave: () => {
+            filtered += (source() - filtered) * 0.06;
+            return filtered * 2.5;
+          },
+          envelope: (t, duration) => (t < duration - 0.12 ? 0.6 : 0),
+        },
+        {
+          wave: (t) => Math.sin(2 * Math.PI * 900 * t),
+          envelope: (t, duration) => (t > duration - 0.1 ? decay(3)(t - (duration - 0.1), 0.1) : 0),
+        },
+      ]);
+    },
+  },
+  {
+    // Heal: the pickup sound's optimism, slower and warmer.
+    id: 'audio_sfx_heal',
+    build: () =>
+      render(0.5, [
+        { wave: (t) => Math.sin(2 * Math.PI * (440 + t * 300) * t), envelope: decay(1.5) },
+        { wave: (t) => Math.sin(2 * Math.PI * (554 + t * 300) * t), envelope: decay(1.5) },
+      ]),
+  },
+  {
+    // UI click: as short as a sound can be and still be heard. Anything longer feels laggy.
+    id: 'audio_sfx_click',
+    build: () => render(0.05, [{ wave: sine(1200), envelope: decay(2) }], 0.4),
+  },
 ];
 
 async function main(): Promise<void> {

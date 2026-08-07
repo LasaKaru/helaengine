@@ -105,6 +105,7 @@ export { UnlockRuntime } from './unlock/UnlockRuntime.js';
 export type { UnlockRuntimeOptions } from './unlock/UnlockRuntime.js';
 export { createDetector, TRIGGER_ENTERED } from './unlock/detectors.js';
 export type { UnlockDetector } from './unlock/detectors.js';
+export { AmbiencePlayer } from './audio/AmbiencePlayer.js';
 export { GameRuntime, startScene } from './GameRuntime.js';
 export type { GameRuntimeOptions } from './GameRuntime.js';
 export { TriggerRuntime } from './TriggerRuntime.js';

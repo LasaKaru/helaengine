@@ -232,6 +232,8 @@ viewport.onFrame((delta) => {
   const playing = shell.screen === 'playing';
   audio.setSuspended(!playing);
   audio.update(delta, playing ? undefined : 'menu');
+  // Ambience that opted in follows the wind, so a gale is heard as well as seen.
+  audio.setWindStrength(scene.environment.wind.strength);
 
   input.update(delta);
   if (!playing) {

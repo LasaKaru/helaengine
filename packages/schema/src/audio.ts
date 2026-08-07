@@ -64,10 +64,57 @@ export const SfxBindingSchema = z.object({
 });
 export type SfxBinding = z.infer<typeof SfxBindingSchema>;
 
+/**
+ * A looping bed of sound: wind, birds, water, the hum of a cave.
+ *
+ * Separate from music because it answers a different question. Music is a *state* — menu, explore,
+ * combat — and exactly one plays at a time; ambience is a *place*, and several layers stack, which
+ * is how a river in a forest sounds like both at once.
+ *
+ * Separate from sfx because those are triggered by events and these never stop. Folding either pair
+ * together would mean one system with two mutually exclusive halves.
+ */
+export const AmbienceLayerSchema = z.object({
+  assetId: IdSchema,
+  volume: z.number().min(0).max(1).default(0.5),
+  /**
+   * Ties the volume to the wind.
+   *
+   * At zero the layer plays at `volume` regardless. At one it is silent in still air and reaches
+   * `volume` in a gale. This is the one place the audio and the renderer share a setting, and it is
+   * worth the coupling: wind you can see but not hear reads as a rendering trick, and a howling
+   * gale over motionless grass reads as a broken level.
+   */
+  followWind: z.number().min(0).max(1).default(0),
+});
+export type AmbienceLayer = z.infer<typeof AmbienceLayerSchema>;
+
+/**
+ * The volume a layer should actually play at.
+ *
+ * `windStrength` is in metres of lean, and `WindSchema` caps it at four — so a quarter of it is the
+ * fraction used here. Kept as a function rather than computed in the runtime because the editor
+ * shows the same number, and two implementations of "how loud is this really" would disagree the
+ * first time either changed.
+ */
+export function ambienceVolume(layer: AmbienceLayer, windStrength: number): number {
+  if (layer.followWind <= 0) return layer.volume;
+  const gale = Math.min(1, Math.max(0, windStrength / 4));
+  return layer.volume * (1 - layer.followWind + layer.followWind * gale);
+}
+
 export const AudioConfigSchema = z
   .object({
     music: MusicSchema,
     sfx: z.array(SfxBindingSchema).max(48).default([]),
+    /**
+     * Looping beds, played together.
+     *
+     * Empty by default, so every scene saved before ambience existed parses unchanged and is as
+     * silent as it was.
+     */
+    ambience: z.array(AmbienceLayerSchema).max(6).default([]),
+    ambienceVolume: z.number().min(0).max(1).default(0.7),
     /** Author-set defaults. The player's own mixer settings ride on top and are not saved here. */
     masterVolume: z.number().min(0).max(1).default(1),
     musicVolume: z.number().min(0).max(1).default(0.6),
