@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { BehaviorSchema } from './behavior.js';
+import { ObjectAnimationSchema } from './animation.js';
 import { ObjectPhysicsSchema } from './physics.js';
 import { TriggerSchema } from './trigger.js';
 import { IdSchema, TransformSchema } from './primitives.js';
@@ -25,6 +26,14 @@ export const SceneObjectSchema = z.object({
   behaviors: z.array(BehaviorSchema).max(32).default([]),
   /** How this instance collides. Defaults defer to the asset manifest, so most objects say nothing. */
   physics: ObjectPhysicsSchema,
+  /**
+   * How this object's rig is animated, or null for anything that is not rigged.
+   *
+   * Null by default and null for almost everything: a rock has no skeleton, and a field that every
+   * object had to carry would be noise in every document. It is also what makes this addition
+   * invisible to every scene saved before it existed.
+   */
+  animation: ObjectAnimationSchema.nullable().default(null),
   /**
    * Turns this object into a trigger volume: it stops being something you look at and becomes
    * something that notices. Null for the overwhelming majority of objects.

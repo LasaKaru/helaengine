@@ -124,6 +124,16 @@ async function ingestOne(
 
   const document = await io.read(sourcePath);
   const { polyCount, bounds } = measure(document);
+
+  // Read before the transform chain runs. Nothing below is supposed to rename or remove an
+  // animation, but the manifest is what the editor trusts, and reading the source is the version
+  // that cannot be wrong about what the artist authored.
+  const animations = document
+    .getRoot()
+    .listAnimations()
+    .map((animation) => animation.getName())
+    .filter((name) => name.length > 0);
+  const skinned = document.getRoot().listSkins().length > 0;
   warnings.push(...auditConventions(bounds, lowestPoint(document)));
 
   const budget = checkPolyBudget(metadata.category, polyCount);
@@ -175,6 +185,8 @@ async function ingestOne(
       colliderType: metadata.colliderType,
       polyCount,
       bounds,
+      animations,
+      skinned,
       placeholderColor: metadata.placeholderColor,
       // Attribution travels with the entry, because the manifest is what an export reads to write
       // its CREDITS file. Anything dropped here is attribution silently stripped from every game
@@ -262,6 +274,11 @@ async function ingestAudio(
     defaultScale: [1, 1, 1],
     colliderType: 'none',
     bounds: [1, 1, 1],
+    // A sound has neither, and both fields are non-optional on the entry. Written out rather than
+    // left to a schema default, because this object is typed as an `AssetManifestEntry` directly
+    // and never passes through `parse`.
+    animations: [],
+    skinned: false,
     placeholderColor: '#7a6fd0',
     ...(metadata.license === undefined ? {} : { license: metadata.license }),
     ...(metadata.author === undefined ? {} : { author: metadata.author }),

@@ -2,6 +2,7 @@ export * from './primitives.js';
 export * from './terrain.js';
 export * from './environment.js';
 export * from './behavior.js';
+export * from './animation.js';
 export * from './game.js';
 export * from './ui.js';
 export * from './physics.js';

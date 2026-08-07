@@ -95,6 +95,19 @@ export class Viewport {
       const delta = this.#clock.getDelta();
       const elapsed = this.#clock.elapsedTime;
       for (const callback of this.#frameCallbacks) callback(delta, elapsed);
+      // Animations advance here rather than inside the game runtime, and the placement is the
+      // whole design rather than convenience.
+      //
+      // *After* the callbacks, because a callback is where the game runtime lives: an animator
+      // plays the state it was last told about, so ticking it first would show every character one
+      // frame behind its own behaviour.
+      //
+      // *Here* rather than in the runtime, because this is the only loop all three cases share. A
+      // static export has no game runtime at all, and neither does the editor's viewport — so a
+      // torch or a windmill would stand still while you built the level around it, and stand still
+      // in the export as well. Ticking in both places instead would run every clip at double
+      // speed in a game export, which is the kind of bug that gets blamed on the model.
+      this.#loaded?.updateAnimations(delta);
       if (this.#loaded) this.renderer.render(this.#loaded.threeScene, this.camera);
     };
     this.#animationFrame = requestAnimationFrame(tick);

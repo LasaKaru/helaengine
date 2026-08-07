@@ -64,6 +64,11 @@ export function registerImportedAssets(assets: AssetPayload[]): void {
       colliderType: 'box',
       bounds: [1, 1, 1],
       placeholderColor: '#8a7ca8',
+      // Unknown until the model is loaded, and this runs before that. An imported rig therefore
+      // shows no clips in the inspector until it is re-ingested — recorded here rather than
+      // guessed, because an empty list is the truth about what has been measured.
+      animations: [],
+      skinned: false,
       // An asset that arrived inside somebody's project file. Whoever built that file is the
       // authority on its terms, and this browser has no way to ask — so it is recorded as a
       // customer asset with nothing claimed about its licence, which is the truth.

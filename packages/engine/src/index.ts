@@ -48,6 +48,8 @@ export {
 } from './behaviors/CheckpointBehavior.js';
 export type { CheckpointParams } from './behaviors/CheckpointBehavior.js';
 export { registerBuiltinBehaviors } from './behaviors/builtins.js';
+export { Animator } from './animation/Animator.js';
+export { cloneModel, hasSkeleton } from './animation/clone.js';
 export { SaveStore, saveKey } from './save/SaveStore.js';
 export { CoopClient } from './net/CoopClient.js';
 export type { CoopClientOptions, CoopTransport, CoopInput, CoopStatus } from './net/CoopClient.js';
@@ -74,7 +76,7 @@ export { pickTerrain, pickObject } from './picking.js';
 export type { SurfaceHit } from './picking.js';
 export { ManifestAssetResolver, MISSING_ASSET_ENTRY } from './assets.js';
 export type { AssetResolver } from './assets.js';
-export { GltfModelSource, disposeObjectTree } from './models.js';
+export { GltfModelSource, disposeObjectTree, modelClips, setModelClips } from './models.js';
 export type { ModelSource, GltfModelSourceOptions } from './models.js';
 export { OrbitCamera } from './OrbitCamera.js';
 export type { OrbitCameraOptions } from './OrbitCamera.js';

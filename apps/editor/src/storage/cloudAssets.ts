@@ -150,6 +150,11 @@ export class CloudAssets {
       colliderType: 'box',
       ...(asset.polyCount === null ? {} : { polyCount: asset.polyCount }),
       bounds: [1, 1, 1],
+      // Not measured server-side yet, so an uploaded rig's clips do not appear in the inspector's
+      // dropdowns. Empty rather than absent: the field says what has been measured, and nothing
+      // has.
+      animations: [],
+      skinned: false,
       placeholderColor: '#7c8fa8',
       // Attribution, carried into the manifest so an export credits an uploaded asset the same way
       // it credits a curated one. Dropping it here would mean the API recorded a licence, the

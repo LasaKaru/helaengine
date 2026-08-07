@@ -3089,6 +3089,7 @@ test.describe('release gate', () => {
             },
             behaviors: [],
             physics: { body: 'static' as const, collider: 'auto' as const },
+            animation: null,
             trigger: null,
             metadata: {},
           });

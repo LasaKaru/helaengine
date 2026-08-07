@@ -82,6 +82,11 @@ export class GltfModelSource implements ModelSource {
         mesh.castShadow = true;
         mesh.receiveShadow = true;
       });
+      // The clips live on the `GLTF` result, not on the scene, so anything that only kept
+      // `gltf.scene` — as this did until rigged models arrived — silently threw every animation
+      // away at load. Parked on the shared model so each placement can read them without a second
+      // fetch: clips are immutable and safe to share, unlike the skeleton they drive.
+      setModelClips(model, gltf.animations ?? []);
       this.#loaded.add(model);
       return model;
     });
@@ -100,6 +105,24 @@ export class GltfModelSource implements ModelSource {
     this.#dracoLoader.dispose();
     this.#ktx2Loader?.dispose();
   }
+}
+
+/**
+ * Where a loaded model's animation clips are kept.
+ *
+ * `userData` rather than a side map, so the clips travel with the model through every code path
+ * that already passes an `Object3D` around — including a `ModelSource` implemented by a test.
+ */
+const CLIPS_KEY = 'helaengineClips';
+
+export function setModelClips(model: THREE.Object3D, clips: THREE.AnimationClip[]): void {
+  model.userData[CLIPS_KEY] = clips;
+}
+
+/** The clips a model carries, or an empty array. Never null, so callers need no guard. */
+export function modelClips(model: THREE.Object3D): readonly THREE.AnimationClip[] {
+  const clips = model.userData[CLIPS_KEY] as THREE.AnimationClip[] | undefined;
+  return clips ?? [];
 }
 
 /** Releases every geometry and material under an object. */

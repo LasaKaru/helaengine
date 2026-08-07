@@ -66,6 +66,8 @@ export const BUILTIN_ASSET_ENTRIES: AssetManifestEntry[] = [
     bounds: [1, 1, 1],
     placeholderColor: '#f2c14e',
     origin: 'first-party',
+    animations: [],
+    skinned: false,
   },
   {
     id: 'logic_trigger_sphere',
@@ -77,6 +79,8 @@ export const BUILTIN_ASSET_ENTRIES: AssetManifestEntry[] = [
     bounds: [1, 1, 1],
     placeholderColor: '#f2c14e',
     origin: 'first-party',
+    animations: [],
+    skinned: false,
   },
 ];
 
@@ -90,6 +94,8 @@ export const MISSING_ASSET_ENTRY: AssetManifestEntry = {
   id: 'missing',
   name: 'Missing asset',
   origin: 'first-party',
+  animations: [],
+  skinned: false,
   category: 'props',
   tags: [],
   defaultScale: [1, 1, 1],

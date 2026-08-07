@@ -1473,6 +1473,18 @@
     "sourceUrl": "https://kenney.nl/assets/castle-kit",
     "origin": "third-party"
   },
+  "enemy_fox": {
+    "name": "Fox",
+    "category": "enemies",
+    "tags": ["animal", "rigged", "animated"],
+    "colliderType": "capsule",
+    "placeholderColor": "#c8762e",
+    "license": "CC0-1.0 (model), CC-BY-4.0 (rig and animation)",
+    "author": "PixelMannen (model); tomkranis (rigging and animation); AsoboStudio and scurest (glTF conversion)",
+    "sourceUrl": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/Fox",
+    "origin": "third-party",
+    "defaultScale": [0.01, 0.01, 0.01]
+  },
   "enemy_goblin_01": {
     "name": "Goblin",
     "category": "enemies",

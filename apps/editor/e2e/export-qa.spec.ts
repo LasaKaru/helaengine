@@ -198,6 +198,7 @@ test.describe('export edge cases', () => {
             transform: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
             behaviors: [],
             physics: { body: 'static', collider: 'auto' },
+            animation: null,
             trigger: null,
             metadata: {},
           },

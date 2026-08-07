@@ -8,7 +8,9 @@ import type {
 } from '@helaengine/schema';
 import { MISSING_ASSET_ENTRY, type AssetResolver } from './assets.js';
 import { InstanceManager } from './InstanceManager.js';
-import type { ModelSource } from './models.js';
+import { modelClips, type ModelSource } from './models.js';
+import { Animator } from './animation/Animator.js';
+import { cloneModel } from './animation/clone.js';
 import { LAYER_COUNT, TerrainField } from './TerrainField.js';
 
 const DEG2RAD = Math.PI / 180;
@@ -186,6 +188,30 @@ export class LoadedScene {
   /** Batched static objects, if any. Their nodes live in `objects` but not in the scene graph. */
   readonly instances: InstanceManager | null;
 
+  /**
+   * Rigged objects, keyed by object id.
+   *
+   * Maintained as objects are adopted and released rather than derived on demand, because the
+   * frame loop reads it: scanning 500 objects sixty times a second to find the four rigged ones is
+   * work with an answer that only changes when something spawns or dies.
+   */
+  readonly #animators = new Map<string, Animator>();
+
+  /** The animator for one object, for callers that drive a specific character. */
+  animator(objectId: string): Animator | undefined {
+    return this.#animators.get(objectId);
+  }
+
+  /** How many objects in this scene are animated. */
+  get animatedCount(): number {
+    return this.#animators.size;
+  }
+
+  /** Advances every animator. Called once a frame by the game runtime. */
+  updateAnimations(deltaSeconds: number): void {
+    for (const animator of this.#animators.values()) animator.update(deltaSeconds);
+  }
+
   constructor(init: {
     threeScene: THREE.Scene;
     objects: Map<string, THREE.Object3D>;
@@ -203,6 +229,14 @@ export class LoadedScene {
     this.#owned = init.owned ?? new Map();
     this.#added = init.added;
     this.instances = init.instances ?? null;
+
+    // Objects placed by the initial load arrive here already built, without passing through
+    // `adopt` — so the index has to be seeded, or a scene's animators would only ever be the ones
+    // spawned after it loaded.
+    for (const [id, node] of this.#objects) {
+      const animator = node.userData['animator'] as Animator | undefined;
+      if (animator) this.#animators.set(id, animator);
+    }
   }
 
   /**
@@ -283,6 +317,9 @@ export class LoadedScene {
 
     const owned = [...parked, ...disposables];
     if (owned.length > 0) this.#owned.set(objectId, owned);
+
+    const animator = node.userData['animator'] as Animator | undefined;
+    if (animator) this.#animators.set(objectId, animator);
   }
 
   /**
@@ -311,6 +348,10 @@ export class LoadedScene {
 
     this.instances?.remove(objectId);
     this.#objects.delete(objectId);
+    // Removed whether or not its resources were freed: a pooled node keeps its animator parked on
+    // `userData` and `adopt` re-registers it, so leaving the entry here would drive an animator
+    // belonging to an object that is no longer in the world.
+    this.#animators.delete(objectId);
     node.removeFromParent();
     const at = this.#added.indexOf(node);
     if (at >= 0) this.#added.splice(at, 1);
@@ -610,6 +651,12 @@ export class SceneLoader {
         !hasChildren.has(object.id) &&
         object.behaviors.length === 0 &&
         object.trigger === null &&
+        // An animated object cannot be batched. An `InstancedMesh` draws one geometry many times
+        // with per-instance matrices; a skinned mesh's pose lives in bone matrices the batch has no
+        // way to vary, so instancing a rigged asset renders every copy in the same pose — and
+        // silently, because it still draws. Rigged assets are also the ones there are ten of, not
+        // two hundred, so nothing is lost by excluding them.
+        object.animation === null &&
         object.physics.body === 'static';
       if (!eligible) continue;
 
@@ -759,7 +806,7 @@ export class SceneLoader {
     const visual = object.trigger
       ? buildTriggerVisual(object.trigger.shape, owned)
       : model
-        ? model.clone(true)
+        ? cloneModel(model, entry.skinned)
         : new THREE.Mesh(
             placeholderGeometry(entry, geometryCache, disposables),
             placeholderMaterial(entry, materialCache, disposables),
@@ -785,6 +832,28 @@ export class SceneLoader {
     // exported project never renders them at all.
     if (object.trigger) node.userData['isTrigger'] = true;
     node.add(visual);
+
+    // Built here rather than by the game runtime, because the animator has to be bound to *this*
+    // clone's skeleton and this is the only place that clone exists. The runtime finds it through
+    // `LoadedScene.animators`.
+    if (object.animation && model) {
+      const clips = modelClips(model);
+      if (clips.length > 0) {
+        const animator = new Animator(visual, clips, object.animation);
+        node.userData['animator'] = animator;
+        owned.push(animator);
+        for (const name of animator.missing) {
+          this.#warn(
+            `object "${object.id}" binds animation clip "${name}", which is not in asset ` +
+              `"${entry.id}" (it has: ${clips.map((clip) => clip.name).join(', ') || 'none'})`,
+          );
+        }
+      } else {
+        this.#warn(
+          `object "${object.id}" is animated but asset "${entry.id}" contains no animation clips`,
+        );
+      }
+    }
 
     applyTransform(node, object);
     return node;

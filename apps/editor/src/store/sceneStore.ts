@@ -23,6 +23,7 @@ import {
   type UiButton,
   type UiConfig,
   type Vec3,
+  type ObjectAnimation,
 } from '@helaengine/schema';
 import { isBuiltinTriggerAsset, triggerDefaults } from '../triggers';
 import {
@@ -94,6 +95,8 @@ export interface SceneState {
   setBehaviorParams(objectId: string, index: number, params: Record<string, unknown>): void;
   setObjectPhysics(objectId: string, physics: Partial<ObjectPhysics>): void;
   setTrigger(objectId: string, trigger: Partial<Trigger>): void;
+  /** Turns animation on or off for an object, and edits its clip bindings. */
+  setAnimation(objectId: string, animation: ObjectAnimation | null): void;
   setPlayer(player: Partial<Player>): void;
   setInventory(inventory: Partial<Inventory>): void;
   addWeapon(): string;
@@ -277,6 +280,11 @@ export const useSceneStore = create<SceneState>()(
                   params: { ...behavior.params },
                 })),
                 physics: { ...source.physics },
+                // A duplicated rig animates like the original. Copied as a value rather than
+                // shared, so retargeting one guard's clips does not retarget every copy of it.
+                animation: source.animation
+                  ? { ...source.animation, clips: { ...source.animation.clips } }
+                  : null,
                 // A duplicated trigger keeps its wiring: copying a spawn point should give you a
                 // second spawn point, not an inert box.
                 trigger: source.trigger
@@ -386,6 +394,16 @@ export const useSceneStore = create<SceneState>()(
               object.trigger = triggerDefaults(object.assetId);
             }
             Object.assign(object.trigger, trigger);
+          }),
+
+        setAnimation: (objectId, animation) =>
+          commit('object/setAnimation', (draft) => {
+            const object = draft.objects.find((item) => item.id === objectId);
+            if (!object) return;
+            // Replaced wholesale rather than merged. A clip binding is a small object and a partial
+            // merge would make "clear the walk clip" impossible to express — `undefined` would read
+            // as "leave it alone", which is the opposite of what the field being emptied means.
+            object.animation = animation;
           }),
 
         setGameConfig: (config) =>

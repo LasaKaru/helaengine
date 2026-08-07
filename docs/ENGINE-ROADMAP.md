@@ -73,25 +73,22 @@ makes the next easier.
 
 ### Phase 1 — Make characters move (the largest single gap)
 
-**2.1 Skeletal animation.** _The most important item on this page._
+**2.1 Skeletal animation. — DONE.** See [`ANIMATION.md`](ANIMATION.md).
 
-Every character in every HelaEngine game is currently a statue that slides. An enemy that chases you
-without a walk cycle reads as broken to a player before they can name why. No amount of lighting,
-scripting or tooling compensates for it, and nothing else on this list is as visible.
+Characters are no longer statues that slid. A scene binds six semantic states — idle, walk, run,
+attack, hit, die — to clip names in the model, the enemy AI drives them from the state machine it
+already had, and the ingest pipeline measures which clips a model contains so the editor can offer
+them as dropdowns. Verified end to end against a real Draco-compressed skinned glTF in a browser.
 
-- glTF skinned meshes and animation clips through the existing asset pipeline (`three` already
-  imports them; `AnimationMixer` already exists)
-- An animation state machine in the schema — a closed vocabulary of states and transitions, driven by
-  the same conditions triggers already use. `packages/engine/src/ai/StateMachine.ts` is the shape to
-  follow
-- Blending between clips, root motion optional
-- Editor: a preview scrubber on the asset card
+**What remains here** is the part that needs blending rather than switching: root motion, blend
+trees, player animation, and foot IK. Listed at the end of `ANIMATION.md` rather than repeated
+here.
 
-**Blocked on content, not code.** No CC0 pack sourced so far ships animated characters —
-`docs/SPRINT.md` records this. Options, in order of cost: Mixamo (free, requires an Adobe account,
-licence needs reading); Quaternius (CC0, has animated characters); commissioning a small set. **This
-is a sourcing decision to make before the engineering starts**, because the schema should be shaped
-by real clips.
+**The content question is answered by the importer rather than by a pack.** Mixamo is the practical
+source of rigged humanoids, and it needs an FBX-to-glTF step this environment cannot rehearse — so
+the engine is built to accept whatever a user brings, and the conversion is documented rather than
+automated. Bundling animated CC0 characters is still worth doing (Quaternius is the obvious source);
+it is now a content decision with no engineering blocking it.
 
 **2.2 A character controller worth the name.** Slopes, steps, crouch clearance, ledge handling,
 push-out. The Rapier controller exists; the polish is what separates "walks" from "feels right".
@@ -206,9 +203,13 @@ scene it is today, and the runtime paths it takes are the ones it takes today.
 
 ## 5. If only three things get done
 
-1. **Skeletal animation** (2.1). Sourcing decision first, then the schema.
+1. ~~**Skeletal animation** (2.1).~~ **Done** — see [`ANIMATION.md`](ANIMATION.md).
 2. **The node graph** (2.3). The differentiator, extended rather than abandoned.
 3. **Prefabs** (2.4). What makes a large level survivable.
+
+Next after those, and cheaper than any of them: **lighting and post-processing** (2.6, 2.7) and
+**authored materials** (2.8). They change how everything looks for a fraction of the work, and the
+schema additions are small.
 
 Those three change what can be built with the engine. Everything else on this page changes how
 nicely it can be built — which matters, but only afterwards.

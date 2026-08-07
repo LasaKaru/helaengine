@@ -2,6 +2,8 @@
 
 ## If you are using it
 
+- [**Rigged characters and animation**](ANIMATION.md) — skeletal animation, importing a Mixamo
+  character, and why a scene names states rather than clips.
 - [**Behaviour reference**](BEHAVIOURS.md) — every behaviour and its parameters. Generated from the
   engine's own schemas, so it cannot disagree with the code that enforces them.
 - [**Exporting and hosting**](EXPORTING.md) — what comes out of Export, how to run it, where to put

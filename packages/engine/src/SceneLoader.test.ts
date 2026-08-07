@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { parseAssetManifest, parseScene, type Scene } from '@helaengine/schema';
 import { ManifestAssetResolver } from './assets.js';
 import { MissingAssetError, SceneLoader } from './SceneLoader.js';
+import { setModelClips } from './models.js';
 
 const manifest = parseAssetManifest({
   version: 1,
@@ -666,5 +667,144 @@ describe('LoadedScene terrain', () => {
 
     flat.dispose();
     sculpted.dispose();
+  });
+});
+
+/**
+ * The last link in the animation chain: a scene document reaching a running `Animator`.
+ *
+ * The `Animator` itself and the skinned clone have their own tests; what this covers is the
+ * wiring, which is where nothing would have been noticed. A scene that binds clips and gets no
+ * animator produces a level that looks exactly like a level with no animation in it.
+ */
+const animatedManifest = parseAssetManifest({
+  version: 1,
+  assets: [
+    {
+      id: 'enemy_fox',
+      name: 'Fox',
+      category: 'enemies',
+      glbPath: 'models/enemy_fox.glb',
+      animations: ['Survey', 'Walk', 'Run'],
+      skinned: true,
+    },
+    { id: 'rock_small_01', name: 'Rock', category: 'rocks', glbPath: 'models/rock_small_01.glb' },
+  ],
+});
+
+/** A model carrying clips, the way `GltfModelSource` returns one. */
+class AnimatedModelSource {
+  async load(assetId: string): Promise<THREE.Object3D> {
+    const group = new THREE.Group();
+    group.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial()));
+    setModelClips(group, [
+      new THREE.AnimationClip('Survey', 1, [
+        new THREE.VectorKeyframeTrack('.position', [0, 1], [0, 0, 0, 0, 1, 0]),
+      ]),
+      new THREE.AnimationClip('Run', 1, [
+        new THREE.VectorKeyframeTrack('.position', [0, 1], [0, 0, 0, 0, 2, 0]),
+      ]),
+    ]);
+    group.userData['fromModel'] = assetId;
+    return group;
+  }
+  dispose(): void {}
+}
+
+function animatedLoader(warn: (message: string) => void = () => {}): SceneLoader {
+  return new SceneLoader({
+    resolver: new ManifestAssetResolver(animatedManifest),
+    modelSource: new AnimatedModelSource(),
+    warn,
+  });
+}
+
+const foxObject = {
+  id: 'obj_0001',
+  assetId: 'enemy_fox',
+  animation: { clips: { idle: 'Survey', run: 'Run' } },
+};
+
+describe('SceneLoader animation', () => {
+  it('builds an animator for an object that binds clips', async () => {
+    const loader = animatedLoader();
+    const scene = makeScene([foxObject]);
+    await loader.preload(scene);
+    const loaded = loader.load(scene);
+
+    const animator = loaded.animator('obj_0001');
+    expect(animator).toBeDefined();
+    expect(animator?.state).toBe('idle');
+    expect(loaded.animatedCount).toBe(1);
+  });
+
+  it('builds none for an object that does not ask for one', async () => {
+    const loader = animatedLoader();
+    const scene = makeScene([{ id: 'obj_0001', assetId: 'enemy_fox' }]);
+    await loader.preload(scene);
+    expect(loader.load(scene).animatedCount).toBe(0);
+  });
+
+  it('advances every animator on one call', async () => {
+    const loader = animatedLoader();
+    const scene = makeScene([foxObject, { ...foxObject, id: 'obj_0002' }]);
+    await loader.preload(scene);
+    const loaded = loader.load(scene);
+
+    loaded.animator('obj_0001')?.play('run');
+    loaded.updateAnimations(0.5);
+
+    // The second one was never told to run. If the two shared a skeleton — the failure the
+    // manifest's `skinned` flag exists to prevent — telling one to run would have moved both.
+    expect(loaded.animator('obj_0001')?.state).toBe('run');
+    expect(loaded.animator('obj_0002')?.state).toBe('idle');
+  });
+
+  it('warns by name when a bound clip is not in the model', async () => {
+    const warnings: string[] = [];
+    const loader = animatedLoader((message) => warnings.push(message));
+    const scene = makeScene([
+      { id: 'obj_0001', assetId: 'enemy_fox', animation: { clips: { idle: 'Sprint' } } },
+    ]);
+    await loader.preload(scene);
+    loader.load(scene);
+
+    // The useful message names both sides: what was asked for, and what the model actually has.
+    expect(warnings.join('\n')).toContain('"Sprint"');
+    expect(warnings.join('\n')).toContain('Survey, Run');
+  });
+
+  it('never batches an animated object, however many there are', async () => {
+    // Instancing a rigged asset draws every copy in the same pose, and does it silently because it
+    // still draws. Twelve is well over the default threshold of eight.
+    const loader = new SceneLoader({
+      resolver: new ManifestAssetResolver(animatedManifest),
+      modelSource: new AnimatedModelSource(),
+      warn: () => {},
+      instanceThreshold: 4,
+    });
+    const scene = makeScene(
+      Array.from({ length: 12 }, (_, index) => ({
+        ...foxObject,
+        id: `obj_${String(index + 1).padStart(4, '0')}`,
+      })),
+    );
+    await loader.preload(scene);
+    const loaded = loader.load(scene);
+
+    expect(loaded.animatedCount).toBe(12);
+    expect(loaded.instances).toBeNull();
+  });
+
+  it('forgets an animator when its object is released', async () => {
+    const loader = animatedLoader();
+    const scene = makeScene([foxObject]);
+    await loader.preload(scene);
+    const loaded = loader.load(scene);
+
+    loaded.release('obj_0001');
+    expect(loaded.animator('obj_0001')).toBeUndefined();
+    // Would otherwise drive a character that is no longer in the world, every frame, forever.
+    expect(loaded.animatedCount).toBe(0);
   });
 });

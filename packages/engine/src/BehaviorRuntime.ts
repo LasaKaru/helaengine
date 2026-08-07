@@ -1,6 +1,7 @@
 import type { BehaviorEntry, Scene, SceneObject } from '@helaengine/schema';
 import type { Behavior, BehaviorContext, GameObject } from './behaviors/Behavior.js';
 import { behaviorRegistry, type BehaviorRegistry } from './behaviors/BehaviorRegistry.js';
+import type { AnimationState } from '@helaengine/schema';
 import type { LoadedScene } from './SceneLoader.js';
 import { INERT_WORLD, type WorldHandle } from './world.js';
 
@@ -217,6 +218,11 @@ export class BehaviorRuntime {
       if (owner) this.#releaseControl(owner);
     };
     const hasControl = (): boolean => (owner ? this.#claims.get(objectId)?.owner === owner : false);
+    // Looked up per call rather than captured: an object can be recycled out of and back into the
+    // pool, and a captured animator would be the one belonging to its previous life.
+    const setAnimationState = (state: AnimationState): void => {
+      this.#loaded.animator(objectId)?.play(state);
+    };
 
     return {
       id: objectId,
@@ -230,6 +236,7 @@ export class BehaviorRuntime {
       requestControl,
       releaseControl,
       hasControl,
+      setAnimationState,
     };
   }
 

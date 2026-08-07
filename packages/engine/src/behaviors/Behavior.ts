@@ -1,5 +1,6 @@
 import type * as THREE from 'three';
 import type { z } from 'zod';
+import type { AnimationState } from '@helaengine/schema';
 import type { WorldHandle } from '../world.js';
 
 /**
@@ -35,6 +36,19 @@ export interface GameObject {
   releaseControl(): void;
   /** Whether this behaviour currently holds the movement claim. */
   hasControl(): boolean;
+
+  /**
+   * Says what this object is doing, so its rig can show it.
+   *
+   * A *state*, never a clip: the behaviour knows the enemy is chasing, and which clip that means is
+   * the scene document's business. That separation is what lets one AI behaviour animate a fox, a
+   * skeleton and a Mixamo character correctly without knowing any of their clip names.
+   *
+   * A no-op on an object with no rig, which is almost all of them — so a behaviour can call it
+   * unconditionally rather than guarding, and an unrigged enemy behaves exactly as it did before
+   * animation existed.
+   */
+  setAnimationState(state: AnimationState): void;
 }
 
 export interface BehaviorContext {

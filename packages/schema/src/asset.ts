@@ -52,6 +52,27 @@ export const AssetManifestEntrySchema = z.object({
 
   /** Triangle count of the ingested mesh, used for budget warnings and LOD decisions. */
   polyCount: z.number().int().nonnegative().optional(),
+
+  /**
+   * Animation clip names inside the GLB, measured at ingest.
+   *
+   * Recorded here rather than discovered at runtime because the editor needs them before the model
+   * is loaded: the inspector offers a dropdown per animation state, and a dropdown that can only be
+   * populated after downloading a 5 MB character is a dropdown that is empty when somebody looks at
+   * it. Empty for the overwhelming majority of assets, which is why it defaults rather than being
+   * required — every asset in the library predates this field.
+   */
+  animations: z.array(z.string().max(200)).default([]),
+  /**
+   * Whether the model has a skeleton.
+   *
+   * Not inferable from `animations` being non-empty: a GLB can animate a node's transform with no
+   * skin at all — a rotating fan, a bobbing pickup — and such a model clones correctly the ordinary
+   * way. A *skinned* model does not, and cloning it the ordinary way produces every instance
+   * sharing one skeleton, so they all animate identically and in the wrong place. The loader needs
+   * to know which it is holding.
+   */
+  skinned: z.boolean().default(false),
   /** Measured bounding size in metres. Also the placeholder box size before a GLB exists. */
   bounds: Vec3Schema.default([1, 1, 1]),
   /** Placeholder tint, and the fallback material colour when a model fails to load. */

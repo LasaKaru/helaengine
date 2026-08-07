@@ -12,6 +12,7 @@ import { SaveStore } from '@helaengine/engine';
 import { useEditorStore } from '../store/editorStore';
 import { useSceneStore } from '../store/sceneStore';
 import { BehaviorPanel } from './BehaviorPanel';
+import { AnimationPanel } from './AnimationPanel';
 import { GameUiPanel } from './GameUiPanel';
 import { TriggerPanel } from './TriggerPanel';
 import { NumberField } from './NumberField';
@@ -513,6 +514,7 @@ export function InspectorPanel({ manifest }: { manifest: AssetManifest }): React
       {single?.trigger && <TriggerPanel object={single} manifest={manifest} />}
       {single && !single.trigger && <PhysicsSection object={single} />}
       {single && !single.trigger && <BehaviorPanel object={single} />}
+      {single && !single.trigger && <AnimationPanel object={single} manifest={manifest} />}
 
       <TerrainPanel />
       <GamePanel />
