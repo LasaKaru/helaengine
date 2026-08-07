@@ -14,6 +14,7 @@ import {
 } from '@helaengine/schema';
 import { MISSING_ASSET_ENTRY, type AssetResolver } from './assets.js';
 import { applyMaterialOverride, restoreOriginalMaterials } from './materials.js';
+import { buildScatter, buildScatterMeshes } from './scatter/ScatterField.js';
 import {
   applyWindToObject,
   createWindUniforms,
@@ -212,6 +213,7 @@ export class LoadedScene {
   #wind: WindUniforms | null;
   /** The current wind settings, kept in step by `syncEnvironment`. */
   #windSettings: Wind;
+  readonly #scatterCount: number;
 
   /**
    * Rigged objects, keyed by object id.
@@ -233,6 +235,11 @@ export class LoadedScene {
   }
 
   /** Advances every animator. Called once a frame by the game runtime. */
+  /** How many scattered instances this scene grew, across every layer. */
+  get scatterCount(): number {
+    return this.#scatterCount;
+  }
+
   get windActive(): boolean {
     return this.#wind !== null;
   }
@@ -348,6 +355,7 @@ export class LoadedScene {
     instances?: InstanceManager | null;
     wind?: WindUniforms | null;
     windSettings?: Wind;
+    scatterCount?: number;
   }) {
     this.threeScene = init.threeScene;
     this.objects = init.objects;
@@ -359,6 +367,7 @@ export class LoadedScene {
     this.instances = init.instances ?? null;
     this.#wind = init.wind ?? null;
     this.#windSettings = init.windSettings ?? NO_WIND;
+    this.#scatterCount = init.scatterCount ?? 0;
 
     // Objects placed by the initial load arrive here already built, without passing through
     // `adopt` — so the index has to be seeded, or a scene's animators would only ever be the ones
@@ -605,10 +614,16 @@ export class SceneLoader {
     if (!this.#modelSource) return { requested: 0, loaded: 0, failed };
 
     const wanted = new Map<string, string>();
-    for (const object of scene.objects) {
-      const entry = this.#resolver.get(object.assetId);
+    const want = (assetId: string): void => {
+      const entry = this.#resolver.get(assetId);
       if (entry?.glbPath && !this.#models.has(entry.id)) wanted.set(entry.id, entry.glbPath);
-    }
+    };
+
+    for (const object of scene.objects) want(object.assetId);
+    // Scatter layers name models nothing else in the document references. Without this a field
+    // would ask the cache for a model no pass ever fetched, and simply never grow — silently, since
+    // an empty field renders perfectly well.
+    for (const layer of scene.scatter) if (layer.enabled) want(layer.assetId);
 
     const total = wanted.size;
     let completed = 0;
@@ -761,7 +776,9 @@ export class SceneLoader {
 
     const instances = this.#buildInstances(batched, objects, threeScene, added);
 
-    const wind = this.#applyWind(scene, objects, batched, instances);
+    const scatter = this.#buildScatter(scene, terrain, threeScene, added, disposables);
+
+    const wind = this.#applyWind(scene, objects, batched, instances, scatter);
 
     const loaded = new LoadedScene({
       threeScene,
@@ -773,6 +790,12 @@ export class SceneLoader {
       instances,
       wind,
       windSettings: scene.environment.wind,
+      scatterCount: [...scatter.values()].reduce(
+        // One layer makes one batch per mesh in its model, and every batch holds the same instances
+        // — so counting batches would multiply a two-part plant by two.
+        (total, meshes) => total + (meshes[0]?.count ?? 0),
+        0,
+      ),
     });
     loaded.registerEnvironment(environmentNodes, environmentDisposables);
     return loaded;
@@ -815,6 +838,7 @@ export class SceneLoader {
     objects: Map<string, THREE.Object3D>,
     batched: Map<string, string>,
     instances: InstanceManager | null,
+    scatter: Map<string, THREE.InstancedMesh[]>,
   ): WindUniforms | null {
     const wind = scene.environment.wind;
     if (!windIsActive(wind)) return null;
@@ -839,9 +863,82 @@ export class SceneLoader {
       for (const mesh of meshes) patched += applyWindToObject(mesh, uniforms, group);
     }
 
+    // Scattered vegetation is the case wind exists for. It has no per-object override — a scatter
+    // layer is one rule, so the rule's own asset decides — and it is instanced, which is why the
+    // shader had to learn about `instanceMatrix` before any of this looked right.
+    for (const [assetId, meshes] of scatter) {
+      const entry = this.#resolver.get(assetId);
+      const group = resolveSway(wind, 'auto', assetId, entry?.category ?? '');
+      if (!group) continue;
+      for (const mesh of meshes) patched += applyWindToObject(mesh, uniforms, group);
+    }
+
     // Nothing in the scene is vegetation. Reported as no wind rather than as a wind with nothing to
     // blow, so the frame loop does not spend the level updating a uniform no shader reads.
     return patched > 0 ? uniforms : null;
+  }
+
+  /**
+   * Expands every scatter layer into instanced meshes.
+   *
+   * Needs the terrain, which is why it runs after it is built rather than alongside the objects:
+   * every candidate is tested against the height field, and a scatter layer over a terrain that
+   * does not exist yet would grow a flat field on a hilly map.
+   *
+   * A layer whose asset is missing is skipped with a warning rather than substituted. The
+   * missing-asset placeholder is a magenta box, and forty thousand magenta boxes is not a more
+   * useful error than none.
+   */
+  #buildScatter(
+    scene: Scene,
+    terrain: THREE.Object3D,
+    threeScene: THREE.Scene,
+    added: THREE.Object3D[],
+    disposables: DisposableResource[],
+  ): Map<string, THREE.InstancedMesh[]> {
+    const byAsset = new Map<string, THREE.InstancedMesh[]>();
+    if (scene.scatter.length === 0) return byAsset;
+
+    const field = terrain.userData['terrainField'] as TerrainField | undefined;
+    if (!field) return byAsset;
+
+    const root = new THREE.Object3D();
+    root.name = 'scatter';
+    let total = 0;
+
+    for (const layer of scene.scatter) {
+      if (!layer.enabled) continue;
+
+      const entry = this.#resolver.get(layer.assetId);
+      if (!entry) {
+        this.#warn(`scatter layer "${layer.name}" names unknown asset "${layer.assetId}"; skipped`);
+        continue;
+      }
+
+      // Straight from the loader's own model cache. A layer whose model has not been fetched yet
+      // grows nothing this pass and everything on the next: `preload` bumps the epoch that rebuilds
+      // the scene, which is the same path a placed object takes.
+      const template = this.#models.get(entry.id);
+      if (!template) continue;
+
+      const placements = buildScatter(layer, { terrain: field, size: scene.terrain.size });
+      const meshes = buildScatterMeshes(template, placements);
+      if (meshes.length === 0) continue;
+
+      for (const mesh of meshes) {
+        root.add(mesh);
+        // The geometry and materials belong to the cached template; only the batch is ours.
+        disposables.push(mesh);
+      }
+      byAsset.set(layer.assetId, [...(byAsset.get(layer.assetId) ?? []), ...meshes]);
+      total += placements.length;
+    }
+
+    if (total > 0) {
+      threeScene.add(root);
+      added.push(root);
+    }
+    return byAsset;
   }
 
   #chooseBatched(scene: Scene): Map<string, string> {

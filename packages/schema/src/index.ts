@@ -15,6 +15,7 @@ export * from './trigger.js';
 export * from './graph.js';
 export * from './object.js';
 export * from './wind.js';
+export * from './scatter.js';
 export * from './scene.js';
 export * from './project.js';
 export * from './migrations.js';

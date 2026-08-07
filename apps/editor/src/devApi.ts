@@ -48,6 +48,8 @@ export interface DevApi {
    * answer there is "no wind" — a test reading `environment.wind.strength` would call that a bug.
    */
   windActive(): boolean;
+  /** Scattered instances the loader actually grew, across every layer. */
+  scatterCount(): number;
   viewportObjectIds(): string[];
   /** Per-object view of what the engine actually built, including whether a GLB or a placeholder. */
   viewportObjects(): Array<{ id: string; assetId: string; isModel: boolean }>;
@@ -315,10 +317,15 @@ export function setCameraPoseHandler(
 let postProcessingActive = false;
 
 let windActive = false;
+let scatterCount = 0;
 
 /** Registered by the bridge when a scene is loaded, so a test can see what the loader decided. */
 export function setWindActive(active: boolean): void {
   windActive = active;
+}
+
+export function setScatterCount(count: number): void {
+  scatterCount = count;
 }
 
 export function setPostProcessingActive(active: boolean): void {
@@ -452,6 +459,8 @@ export function exposeDevApi(library: AssetLibrary): void {
     postProcessingActive: () => postProcessingActive,
 
     windActive: () => windActive,
+
+    scatterCount: () => scatterCount,
 
     objectMaterialColors(objectId) {
       const node = currentLoadedScene?.objects.get(objectId);

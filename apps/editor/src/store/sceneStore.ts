@@ -4,6 +4,7 @@ import { devtools } from 'zustand/middleware';
 import {
   CURRENT_SCENE_VERSION,
   SceneSchema,
+  ScatterLayerSchema,
   UnlockableSchema,
   WeaponSchema,
   type Environment,
@@ -28,6 +29,7 @@ import {
   type GraphNode,
   type GraphVariable,
   type SwayOverride,
+  type ScatterLayer,
 } from '@helaengine/schema';
 import { isBuiltinTriggerAsset, triggerDefaults } from '../triggers';
 import {
@@ -125,6 +127,11 @@ export interface SceneState {
   setTerrain(terrain: Partial<Terrain>): void;
   setTerrainData(heightmap: string | null, splatmap: string | null): void;
   setEnvironment(environment: Partial<Environment>): void;
+
+  /** Vegetation scatter layers. */
+  addScatterLayer(assetId: string): string;
+  updateScatterLayer(layerId: string, patch: Partial<ScatterLayer>): void;
+  removeScatterLayer(layerId: string): void;
 
   /**
    * Graph edits.
@@ -662,6 +669,34 @@ export const useSceneStore = create<SceneState>()(
         setGraphVariables: (variables) =>
           commit('graph/variables', (draft) => {
             draft.graph.variables = variables;
+          }),
+
+        addScatterLayer: (assetId) => {
+          const id = `scatter_${Math.random().toString(36).slice(2, 8)}`;
+          commit('scatter/add', (draft) => {
+            draft.scatter.push(
+              ScatterLayerSchema.parse({
+                id,
+                assetId,
+                name: 'Ground cover',
+                // A different seed per layer, or two layers of the same asset produce one field
+                // drawn twice — every blade exactly inside another.
+                seed: Math.floor(Math.random() * 100_000),
+              }),
+            );
+          });
+          return id;
+        },
+
+        updateScatterLayer: (layerId, patch) =>
+          commit('scatter/update', (draft) => {
+            const layer = draft.scatter.find((current) => current.id === layerId);
+            if (layer) Object.assign(layer, patch);
+          }),
+
+        removeScatterLayer: (layerId) =>
+          commit('scatter/remove', (draft) => {
+            draft.scatter = draft.scatter.filter((layer) => layer.id !== layerId);
           }),
 
         setName: (name) =>

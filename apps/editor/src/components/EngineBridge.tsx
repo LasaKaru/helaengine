@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { setWindActive } from '../devApi';
+import { setScatterCount, setWindActive } from '../devApi';
 import { useThree } from '@react-three/fiber';
 import type { LoadedScene, SceneLoader } from '@helaengine/engine';
 import type { Scene } from '@helaengine/schema';
@@ -42,11 +42,13 @@ function structureKey(scene: Scene): string {
     scene.environment.wind.affects.join(','),
   ].join(':');
 
+  const scatterKey = JSON.stringify(scene.scatter);
+
   const objectKey = scene.objects
     .map((object) => `${object.id}:${object.assetId}:${object.sway}`)
     .join('|');
 
-  return `${terrainKey}#${windKey}#${objectKey}`;
+  return `${terrainKey}#${windKey}#${scatterKey}#${objectKey}`;
 }
 
 /** Identifies the terrain's *data* — the part that can change without new geometry being needed. */
@@ -96,6 +98,7 @@ export function EngineBridge({ loader, onLoaded }: EngineBridgeProps): null {
     loadedRef.current = loaded;
     appliedTerrain.current = terrainDataKey(scene);
     setWindActive(loaded.windActive);
+    setScatterCount(loaded.scatterCount);
     onLoaded?.(loaded);
     return () => {
       loadedRef.current = null;

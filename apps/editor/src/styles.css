@@ -2382,3 +2382,32 @@ body,
 .graph-problems li.warning {
   color: var(--warn);
 }
+
+/* ---- Ground cover ---- */
+
+.scatter-layer {
+  margin-bottom: 10px;
+  padding: 10px;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.scatter-name {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.scatter-problem {
+  margin: 6px 0 0;
+  color: #f0a3a2;
+  font-size: 11px;
+}

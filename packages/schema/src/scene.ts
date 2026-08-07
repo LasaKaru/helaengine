@@ -10,6 +10,7 @@ import { IdSchema } from './primitives.js';
 import { TerrainSchema } from './terrain.js';
 import { UnlockablesSchema } from './unlockable.js';
 import { SceneGraphSchema } from './graph.js';
+import { ScatterSchema } from './scatter.js';
 
 /**
  * Current scene document version. Bump this whenever a change to `SceneSchema` cannot read an
@@ -35,6 +36,13 @@ export const SceneSchema = z
      * identically — an empty graph is a graph with no events, and a runtime with nothing to run.
      */
     graph: SceneGraphSchema.default({}),
+    /**
+     * Vegetation placed by rule rather than by hand.
+     *
+     * Empty by default, so every scene written before scatter existed parses unchanged and grows
+     * nothing — an empty list is a list of no rules, which expands to no instances.
+     */
+    scatter: ScatterSchema,
     audioConfig: AudioConfigSchema,
     gameConfig: GameConfigSchema,
     uiConfig: UiConfigSchema,
