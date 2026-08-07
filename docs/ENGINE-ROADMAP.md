@@ -84,6 +84,12 @@ them as dropdowns. Verified end to end against a real Draco-compressed skinned g
 trees, player animation, and foot IK. Listed at the end of `ANIMATION.md` rather than repeated
 here.
 
+**Importing your own models — DONE.** See [`IMPORTING-MODELS.md`](IMPORTING-MODELS.md). A `.glb`
+dropped on the editor is measured, stored in IndexedDB beside the projects, and behaves like a
+shipped asset everywhere downstream — with no account and no server. Fixing this turned up a real
+bug in the exporter: uploaded and imported models were written into the zip under their blob or API
+URL, so every custom model in an export was a grey box.
+
 **The content question is answered by the importer rather than by a pack.** Mixamo is the practical
 source of rigged humanoids, and it needs an FBX-to-glTF step this environment cannot rehearse — so
 the engine is built to accept whatever a user brings, and the conversion is documented rather than

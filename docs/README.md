@@ -2,6 +2,8 @@
 
 ## If you are using it
 
+- [**Using your own models**](IMPORTING-MODELS.md) — importing `.glb` files from disk, what gets
+  measured, and where they live.
 - [**Rigged characters and animation**](ANIMATION.md) — skeletal animation, importing a Mixamo
   character, and why a scene names states rather than clips.
 - [**Behaviour reference**](BEHAVIOURS.md) — every behaviour and its parameters. Generated from the

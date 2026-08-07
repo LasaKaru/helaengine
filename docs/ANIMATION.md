@@ -68,15 +68,18 @@ engine loads — so the conversion step is real:
 3. Convert to glTF. Blender does it: File → Import → FBX, then File → Export → glTF 2.0. Combining
    several clips onto one rig is a Blender step — export them as separate actions with **Group by
    NLA Track** on, and each becomes a named glTF animation.
-4. Drop the `.glb` in `raw-assets/`, add an entry to `asset-metadata.json`, and run
-   `pnpm ingest-assets`.
+4. **Import it.** Either drop the `.glb` on the editor's **Import models** panel — no account, no
+   pipeline run, and the clip names appear in the dropdowns immediately — or, to add it to the
+   shipped library, put it in `raw-assets/`, add an entry to `asset-metadata.json` and run
+   `pnpm ingest-assets`. See [`IMPORTING-MODELS.md`](IMPORTING-MODELS.md).
 
 **Check the licence for your use.** Mixamo's terms are permissive for use in projects, and they are
 Adobe's to change; read them rather than taking this sentence as advice.
 
 **Scale is the thing that goes wrong.** Mixamo characters are authored in centimetres, so a
-character arrives 175 units tall. Set `defaultScale` to `[0.01, 0.01, 0.01]` in the metadata, exactly
-as `enemy_fox` does, or the first thing you place will be a skyscraper.
+character arrives 175 units tall. The import panel spots this and says so; set the object's scale
+to 0.01, or `defaultScale` to `[0.01, 0.01, 0.01]` in the metadata if you are adding it to the
+shipped library, exactly as `enemy_fox` does. Otherwise the first thing you place is a skyscraper.
 
 ---
 

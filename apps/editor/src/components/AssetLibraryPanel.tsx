@@ -8,6 +8,8 @@ import {
 } from '@helaengine/schema';
 import { ASSET_BASE_URL } from '../engine/assetLibrary';
 import type { UploadedAssets } from '../storage/useUploadedAssets';
+import type { LocalAssets } from '../storage/useLocalAssets';
+import { ImportModels } from './ImportModels';
 import { useEditorStore } from '../store/editorStore';
 import { SceneTree } from './SceneTree';
 import { UpgradePrompt } from './UpgradePrompt';
@@ -264,10 +266,13 @@ function MyAssets({ uploads }: { uploads: UploadedAssets }): React.JSX.Element |
 export function AssetLibraryPanel({
   manifest,
   uploads,
+  local,
 }: {
   manifest: AssetManifest;
   /** Absent in tests and anywhere the panel is rendered without an account behind it. */
   uploads?: UploadedAssets;
+  /** Absent in tests. Unlike `uploads`, this needs no account — only a browser. */
+  local?: LocalAssets;
 }): React.JSX.Element {
   const search = useEditorStore((state) => state.assetSearch);
   const setSearch = useEditorStore((state) => state.setAssetSearch);
@@ -394,6 +399,8 @@ export function AssetLibraryPanel({
           {visible.length} of {placeable.length} · drag onto the terrain to place
         </p>
       </section>
+
+      {local && <ImportModels assets={local.stored} onChanged={local.reload} />}
 
       {uploads && <MyAssets uploads={uploads} />}
 

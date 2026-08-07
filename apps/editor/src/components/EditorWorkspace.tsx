@@ -13,6 +13,7 @@ import { FirstRunTour } from './FirstRunTour';
 import { ShortcutsModal } from './ShortcutsModal';
 import { useUploadedAssets } from '../storage/useUploadedAssets';
 import { useImportedAssets } from '../storage/useImportedAssets';
+import { useLocalAssets } from '../storage/useLocalAssets';
 import { TopBar } from './TopBar';
 import { Viewport } from './Viewport';
 
@@ -42,6 +43,7 @@ export function EditorWorkspace(): React.JSX.Element {
   const library = state.status === 'ready' ? state.library : null;
   const uploads = useUploadedAssets(library);
   const imported = useImportedAssets(library);
+  const local = useLocalAssets(library);
 
   /**
    * The curated library plus this organisation's own, as one manifest.
@@ -57,16 +59,21 @@ export function EditorWorkspace(): React.JSX.Element {
    */
   const manifest = useMemo(() => {
     if (!library) return null;
-    if (uploads.entries.length === 0 && imported.length === 0) return library.manifest;
+    if (uploads.entries.length === 0 && imported.length === 0 && local.entries.length === 0) {
+      return library.manifest;
+    }
 
     const byId = new Map(library.manifest.assets.map((asset) => [asset.id, asset]));
     for (const entry of uploads.entries) byId.set(entry.id, entry);
+    // Models imported from disk carry a `local_` prefix, so they cannot collide with anything
+    // above and the order between them and uploads never matters.
+    for (const entry of local.entries) byId.set(entry.id, entry);
     // Imported last: a project opened from a file brought its own copy of the model, and that copy
     // is the one that scene was built against. An account asset sharing the id may be a different
     // model entirely.
     for (const entry of imported) byId.set(entry.id, entry);
     return { ...library.manifest, assets: [...byId.values()] };
-  }, [library, uploads.entries, imported]);
+  }, [library, uploads.entries, imported, local.entries]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -150,7 +157,11 @@ export function EditorWorkspace(): React.JSX.Element {
           like this, a broken panel is a broken panel.
         */}
         <ErrorBoundary where="the asset library">
-          <AssetLibraryPanel manifest={manifest ?? state.library.manifest} uploads={uploads} />
+          <AssetLibraryPanel
+            manifest={manifest ?? state.library.manifest}
+            uploads={uploads}
+            local={local}
+          />
         </ErrorBoundary>
         <ErrorBoundary where="the level view">
           <Viewport loader={state.library.loader} resolver={state.library.resolver} />

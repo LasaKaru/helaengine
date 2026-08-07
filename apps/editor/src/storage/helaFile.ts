@@ -58,11 +58,25 @@ function referencedUiAssetIds(scene: Scene): Set<string> {
  * the opener already has.
  */
 async function collectCustomAssets(scene: Scene): Promise<AssetPayload[]> {
-  const client = cloudAssets();
-  if (!client) return [];
-
   const wanted = referencedAssetIds(scene);
   const payloads: AssetPayload[] = [];
+
+  // Models imported from disk come first, and they come without an account. Leaving them out would
+  // mean a `.hela` file that opens on the author's own machine and shows placeholders on anybody
+  // else's — the failure a project file exists to prevent, and the one most likely to happen now
+  // that importing needs no server.
+  for (const stored of await db.localAssets.toArray()) {
+    if (!wanted.has(stored.id)) continue;
+    payloads.push({
+      assetId: stored.id,
+      name: stored.name,
+      category: stored.category,
+      bytes: new Uint8Array(await stored.data.arrayBuffer()),
+    });
+  }
+
+  const client = cloudAssets();
+  if (!client) return payloads;
 
   for (const asset of await client.list()) {
     // Curated rows have no organisation and are not embedded; a pending or failed upload has no
