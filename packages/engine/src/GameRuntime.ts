@@ -6,6 +6,7 @@ import {
   type Player,
   type Scene,
   type SceneObject,
+  type CarriedState,
 } from '@helaengine/schema';
 import type { AssetResolver } from './assets.js';
 import { BehaviorRuntime } from './BehaviorRuntime.js';
@@ -94,6 +95,19 @@ export class GameRuntime implements WorldHandle {
   #damageCooldown = 0;
   /** Seconds until a dead player is put back on their feet, or null when they are alive. */
   #respawnIn: number | null = null;
+
+  /**
+   * A level change the graph has asked for, waiting for the host to act on it.
+   *
+   * A field the host polls rather than a callback the runtime fires. Loading a level tears down the
+   * very objects whose update is on the stack at the moment the request is made, so doing it there
+   * would be freeing memory a running behaviour is holding. The host reads this between frames,
+   * where there is nothing in flight to invalidate.
+   *
+   * First request wins. A frame in which two doors both fire is a level design question with no
+   * right answer, and picking the last one would make it depend on document order.
+   */
+  #pendingLevel: { levelId: string; carryState: boolean } | null = null;
 
   constructor(options: GameRuntimeOptions) {
     this.#loader = options.loader;
@@ -496,6 +510,63 @@ export class GameRuntime implements WorldHandle {
       case 'health':
         return this.#health;
     }
+  }
+
+  /**
+   * The level change waiting to happen, or null.
+   *
+   * Read between frames by whatever owns the frame loop — `PhysicsPreview` in the editor, `main.js`
+   * in an export. Clearing it is the host's job, by way of `takeLevelRequest`.
+   */
+  get pendingLevel(): { levelId: string; carryState: boolean } | null {
+    return this.#pendingLevel;
+  }
+
+  requestLevel(levelId: string, carryState: boolean): void {
+    if (levelId === '') return;
+    // First wins: see `#pendingLevel`.
+    this.#pendingLevel ??= { levelId, carryState };
+  }
+
+  /** Takes the pending request and clears it, so one door cannot fire twice. */
+  takeLevelRequest(): { levelId: string; carryState: boolean } | null {
+    const request = this.#pendingLevel;
+    this.#pendingLevel = null;
+    return request;
+  }
+
+  /**
+   * What the player takes with them.
+   *
+   * Health is clamped by the *next* level rather than here, because this runtime does not know what
+   * that level allows — a player leaving a 200 HP level for a 100 HP one arrives at 100, and the
+   * decision belongs to whoever is being entered.
+   */
+  captureCarriedState(): CarriedState {
+    return {
+      health: this.#health,
+      weapons: this.inventory.snapshot(),
+      currentWeaponId: this.inventory.current?.weapon.id ?? null,
+      unlockedIds: this.unlocks.unlockedIds,
+      variables: this.graph?.variables() ?? {},
+    };
+  }
+
+  /**
+   * Puts carried state into a freshly started level.
+   *
+   * Applied after `start`, so the level's own defaults exist to clamp against and its graph has
+   * declared its variables. A variable the new level does not declare is dropped rather than
+   * created: a level has to be openable on its own, and one that silently inherited an undeclared
+   * variable would only run correctly when reached from the right direction.
+   */
+  applyCarriedState(state: CarriedState): void {
+    if (state.health !== null) {
+      this.#health = Math.min(Math.max(state.health, 1), this.#playerSettings.health);
+    }
+    this.inventory.restore(state.weapons, state.currentWeaponId);
+    this.unlocks.restore(state.unlockedIds);
+    this.graph?.restoreVariables(state.variables);
   }
 
   setAnimationState(objectId: string, state: AnimationState): boolean {

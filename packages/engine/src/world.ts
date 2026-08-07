@@ -115,6 +115,16 @@ export interface WorldHandle {
    */
   setAnimationState(objectId: string, state: AnimationState): boolean;
 
+  /**
+   * Asks the host to end this level and start another.
+   *
+   * A request rather than a call that does it. Loading a level needs an asset loader, a render
+   * target and control of the frame loop; the runtime has none of those, and a runtime that did
+   * would be one a scene document could steer into fetching whatever it named. The host — the
+   * editor's preview, or an exported game's `main.js` — reads `pendingLevel` and decides.
+   */
+  requestLevel(levelId: string, carryState: boolean): void;
+
   /** Adds an object to the running world. Returns its id, or null if it could not be created. */
   spawn(request: SpawnRequest): string | null;
   /** Removes an object from the running world. */
@@ -143,6 +153,7 @@ export const INERT_WORLD: WorldHandle = {
   moveTo: () => {},
   itemCount: () => 0,
   setAnimationState: () => false,
+  requestLevel: () => {},
   spawn: () => null,
   destroy: () => {},
   emit: () => {},

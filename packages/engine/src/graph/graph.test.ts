@@ -501,3 +501,127 @@ describe('GraphRuntime', () => {
     expect(bus.emitted).toHaveLength(1);
   });
 });
+
+/**
+ * Level transitions.
+ *
+ * The graph asks; it does not act. These pin that separation, because the tempting shortcut — have
+ * the interpreter load the level itself — would give a document a way to steer a fetch, and would
+ * tear down the objects whose update is on the stack at the moment the request is made.
+ */
+describe('loadLevel', () => {
+  const door = (levelId: string, carryState = true): SceneGraph =>
+    graph({
+      nodes: [
+        { id: 'start', type: 'onStart' },
+        { id: 'go', type: 'loadLevel', levelId, carryState },
+      ],
+      edges: [{ from: 'start', port: 'then', to: 'go' }],
+    });
+
+  it('asks the world rather than doing anything itself', () => {
+    const asked: Array<[string, boolean]> = [];
+    world = { ...INERT_WORLD, requestLevel: (levelId, carry) => asked.push([levelId, carry]) };
+
+    runtimeFor(door('caves')).start();
+    expect(asked).toEqual([['caves', true]]);
+  });
+
+  it('carries the flag the author set', () => {
+    const asked: Array<[string, boolean]> = [];
+    world = { ...INERT_WORLD, requestLevel: (levelId, carry) => asked.push([levelId, carry]) };
+
+    runtimeFor(door('caves', false)).start();
+    expect(asked).toEqual([['caves', false]]);
+  });
+
+  it('refuses to run with no level chosen', () => {
+    const asked: string[] = [];
+    world = { ...INERT_WORLD, requestLevel: (levelId) => asked.push(levelId) };
+
+    runtimeFor(door('')).start();
+    // The blank is a validation error, so the graph never starts — a door that silently goes
+    // nowhere is the failure this is here to prevent.
+    expect(asked).toEqual([]);
+    expect(warnings.join('\n')).toContain('no level chosen');
+  });
+
+  it('runs nothing after itself', () => {
+    // `loadLevel` has no outputs, so there is nothing to wire — but a node that fell through to the
+    // `then` port would run the next chain inside a level that is being torn down.
+    const asked: string[] = [];
+    world = { ...INERT_WORLD, requestLevel: (levelId) => asked.push(levelId) };
+
+    const subject = graph({
+      nodes: [
+        { id: 'start', type: 'onStart' },
+        { id: 'go', type: 'loadLevel', levelId: 'caves', carryState: true },
+        { id: 'after', type: 'emit', event: 'shouldNotHappen', payload: {} },
+      ],
+      edges: [
+        { from: 'start', port: 'then', to: 'go' },
+        // Refused by validation, which is the point: there is no port to attach this to.
+        { from: 'go', port: 'then', to: 'after' },
+      ],
+    });
+    const runtime = runtimeFor(subject);
+    expect(runtime.runnable).toBe(false);
+    runtime.start();
+    expect(bus.emitted.map((entry) => entry.event)).not.toContain('shouldNotHappen');
+  });
+});
+
+describe('carrying variables between levels', () => {
+  const withVariables = (
+    variables: Array<{
+      name: string;
+      type: 'number' | 'boolean' | 'text';
+      initial: string | number | boolean;
+    }>,
+  ): SceneGraph => graph({ variables, nodes: [{ id: 'start', type: 'onStart' }] });
+
+  it('hands out a snapshot, not the live map', () => {
+    const runtime = runtimeFor(withVariables([{ name: 'score', type: 'number', initial: 5 }]));
+    runtime.start();
+    const carried = runtime.variables();
+    // Held across a teardown by the caller, so `stop` must not empty it under them.
+    runtime.stop();
+    expect(carried).toEqual({ score: 5 });
+  });
+
+  it('keeps a variable the next level declares', () => {
+    const runtime = runtimeFor(withVariables([{ name: 'score', type: 'number', initial: 0 }]));
+    runtime.start();
+    runtime.restoreVariables({ score: 42 });
+    expect(runtime.variable('score')).toBe(42);
+  });
+
+  it('drops one it does not', () => {
+    const runtime = runtimeFor(withVariables([{ name: 'score', type: 'number', initial: 0 }]));
+    runtime.start();
+    runtime.restoreVariables({ score: 42, secretsFound: 3 });
+
+    // A level has to be openable on its own. Inheriting an undeclared variable would make it behave
+    // differently depending on which door the player came through.
+    expect(runtime.variable('secretsFound')).toBeUndefined();
+    expect(runtime.variable('score')).toBe(42);
+  });
+
+  it('drops one whose type does not match', () => {
+    const runtime = runtimeFor(withVariables([{ name: 'score', type: 'number', initial: 7 }]));
+    runtime.start();
+    runtime.restoreVariables({ score: 'lots' });
+
+    // Two levels spelling `score` differently is a mistake, and taking the text would put a string
+    // where every comparison in this level expects a number.
+    expect(runtime.variable('score')).toBe(7);
+  });
+
+  it('ignores a restore before the graph has started', () => {
+    const runtime = runtimeFor(withVariables([{ name: 'score', type: 'number', initial: 0 }]));
+    runtime.restoreVariables({ score: 42 });
+    // `start` writes every initial value, so restoring first would be overwritten anyway — silently
+    // producing a level that lost the player's progress.
+    expect(runtime.variable('score')).toBeUndefined();
+  });
+});

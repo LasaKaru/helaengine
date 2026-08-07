@@ -106,6 +106,36 @@ export class GraphRuntime {
     return this.#variables.get(name);
   }
 
+  /**
+   * Every variable's current value, for carrying into the next level.
+   *
+   * A plain object rather than the live map: the caller is going to hold this across a teardown,
+   * and handing out the map would hand out something `stop` is about to clear.
+   */
+  variables(): Record<string, number | boolean | string> {
+    return Object.fromEntries(this.#variables);
+  }
+
+  /**
+   * Puts carried variables back, keeping only the ones this graph declares.
+   *
+   * Called after `start`, which is what makes the filter meaningful: `start` has already written
+   * every declared variable's initial value, so anything not in the map here is a name this level
+   * never heard of. Accepting it would mean a level that behaves differently depending on which
+   * door the player came through.
+   */
+  restoreVariables(values: Record<string, number | boolean | string>): void {
+    if (!this.#started) return;
+    for (const [name, value] of Object.entries(values)) {
+      // Type checked as well as name: a level that declares `score` as a number should not inherit
+      // a `score` that is text because an earlier level spelled it differently.
+      const current = this.#variables.get(name);
+      if (current !== undefined && typeof current === typeof value) {
+        this.#variables.set(name, value);
+      }
+    }
+  }
+
   start(): void {
     if (this.#started) return;
 
@@ -294,6 +324,28 @@ export class GraphRuntime {
         // wants it — the HUD, a subtitle track, a test — and the graph stays independent of the UI.
         this.#bus.emit('hudMessage', { text: node.text, seconds: node.seconds });
         break;
+
+      case 'loadLevel':
+        // Requested, not performed. Loading a level needs an asset loader and a render target, and
+        // an interpreter that had either would be able to do things a document should not be able
+        // to ask for. Nothing follows: `loadLevel` has no outputs, and this level is about to stop
+        // existing.
+        this.#world.requestLevel(node.levelId, node.carryState);
+        return;
+
+      default: {
+        /**
+         * Makes the switch exhaustive, rather than merely looking it.
+         *
+         * Without this arm a node type added to the schema compiles fine here and falls through to
+         * `#follow`, which finds no edges and does nothing — a new feature that silently does
+         * nothing in every existing game, discovered by a player rather than by the compiler. The
+         * safety argument for a closed vocabulary is only worth something if both ends are closed.
+         */
+        const unreachable: never = node;
+        void unreachable;
+        return;
+      }
     }
 
     this.#follow(node.id, 'then', budget);

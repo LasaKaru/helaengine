@@ -57,7 +57,19 @@ function wirePath(from: [number, number], to: [number, number]): string {
   return `M ${from[0]} ${from[1]} C ${from[0] + reach} ${from[1]}, ${to[0] - reach} ${to[1]}, ${to[0]} ${to[1]}`;
 }
 
-export function GraphEditor({ manifest }: { manifest: AssetManifest }): React.JSX.Element | null {
+interface GraphEditorProps {
+  manifest: AssetManifest;
+  /**
+   * The other levels in this game, for `loadLevel` to point at.
+   *
+   * Passed in rather than read from a store, because the graph canvas edits *one* level and the
+   * level set is the project's business. Empty for a one-level game, which is what every project
+   * built before levels existed is.
+   */
+  levels?: ReadonlyArray<{ id: string; name: string }>;
+}
+
+export function GraphEditor({ manifest, levels = [] }: GraphEditorProps): React.JSX.Element | null {
   const open = useEditorStore((state) => state.graphOpen);
   const setOpen = useEditorStore((state) => state.setGraphOpen);
 
@@ -124,6 +136,7 @@ export function GraphEditor({ manifest }: { manifest: AssetManifest }): React.JS
         assetId: spawnable[0]?.id,
         objectId: objectIds[0],
         variableName: graph.variables[0]?.name,
+        levelId: levels[0]?.id,
       }),
       [60 + column * (NODE_WIDTH + 80), 60 + row * 160],
     );
@@ -374,7 +387,7 @@ export function GraphEditor({ manifest }: { manifest: AssetManifest }): React.JS
                 <p className="graph-selected-id">{selected.id}</p>
                 <GraphNodeFields
                   node={selected}
-                  context={{ variables: graph.variables, objectIds, assets: spawnable }}
+                  context={{ variables: graph.variables, objectIds, assets: spawnable, levels }}
                   onChange={(next: GraphNode) => updateGraphNode(next)}
                 />
 

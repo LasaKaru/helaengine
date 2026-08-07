@@ -25,6 +25,7 @@ export const NODE_GROUPS: ReadonlyArray<{ label: string; types: readonly GraphNo
   { label: 'Objects', types: ['spawn', 'destroy', 'setHidden', 'moveObject', 'setAnimation'] },
   { label: 'Player', types: ['damagePlayer', 'healPlayer', 'teleportPlayer'] },
   { label: 'Signals', types: ['emit', 'showMessage'] },
+  { label: 'Levels', types: ['loadLevel'] },
 ];
 
 /** What the palette calls each type. */
@@ -47,12 +48,14 @@ export const NODE_LABELS: Readonly<Record<GraphNodeType, string>> = {
   healPlayer: 'Heal player',
   teleportPlayer: 'Teleport player',
   showMessage: 'Show message',
+  loadLevel: 'Load level',
 };
 
 /** Which of the three colours a node's header takes. Events read as starts, flow as decisions. */
 export function nodeFamily(type: GraphNodeType): 'event' | 'flow' | 'action' {
   if (EVENT_NODES.includes(type)) return 'event';
-  if (type === 'branch' || type === 'wait' || type === 'sequence') return 'flow';
+  if (type === 'branch' || type === 'wait' || type === 'sequence' || type === 'loadLevel')
+    return 'flow';
   return 'action';
 }
 
@@ -61,6 +64,7 @@ export interface NodeContext {
   assetId?: string;
   objectId?: string;
   variableName?: string;
+  levelId?: string;
 }
 
 /**
@@ -120,6 +124,10 @@ export function newNode(type: GraphNodeType, id: string, context: NodeContext = 
       return { id, type, position: [0, 0, 0] };
     case 'showMessage':
       return { id, type, text: 'Hello', seconds: 3 };
+    case 'loadLevel':
+      // Never the level it is being added to: a door back to where you already are is never what
+      // was meant, and the blank is reported rather than silently wrong.
+      return { id, type, levelId: context.levelId ?? '', carryState: true };
   }
 }
 
@@ -159,6 +167,8 @@ export function describeNode(node: GraphNode): string {
       return node.position.map((part) => part.toFixed(1)).join(', ');
     case 'showMessage':
       return `"${node.text}"`;
+    case 'loadLevel':
+      return `${node.levelId || '—'}${node.carryState ? '' : ', fresh start'}`;
   }
 }
 

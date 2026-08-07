@@ -214,6 +214,20 @@ export const GraphNodeSchema = z.discriminatedUnion('type', [
   }),
   z.object({ id: IdSchema, type: z.literal('healPlayer'), amount: z.number().min(0).max(10_000) }),
   z.object({ id: IdSchema, type: z.literal('teleportPlayer'), position: Vec3Schema }),
+  /**
+   * Ends this level and starts another.
+   *
+   * The chain stops here — anything wired after it would be running in a level that is being torn
+   * down. The runtime signals the request rather than performing it: loading a level needs an asset
+   * loader and a render target, neither of which the interpreter has or should have.
+   */
+  z.object({
+    id: IdSchema,
+    type: z.literal('loadLevel'),
+    levelId: UnsetIdSchema,
+    /** Whether the player keeps their health, weapons and the graph's variables. */
+    carryState: z.boolean().default(true),
+  }),
   z.object({
     id: IdSchema,
     type: z.literal('showMessage'),
@@ -251,6 +265,8 @@ export const NODE_OUTPUTS: Readonly<Record<GraphNodeType, readonly string[]>> = 
   healPlayer: ['then'],
   teleportPlayer: ['then'],
   showMessage: ['then'],
+  // Nothing follows a level change: the level this node lives in is about to stop existing.
+  loadLevel: [],
 };
 
 /** Node types that start a chain. Nothing may connect *into* one. */
@@ -447,6 +463,7 @@ export function validateGraph(graph: SceneGraph): GraphProblem[] {
   for (const node of graph.nodes) {
     if (node.type === 'branch') checkCondition(node.condition, node.id);
     if (node.type === 'spawn') checkSet(node.assetId, node.id, 'asset');
+    if (node.type === 'loadLevel') checkSet(node.levelId, node.id, 'level');
     if (
       node.type === 'destroy' ||
       node.type === 'setHidden' ||

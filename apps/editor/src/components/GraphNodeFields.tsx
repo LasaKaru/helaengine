@@ -25,6 +25,8 @@ export interface FieldContext {
   variables: readonly GraphVariable[];
   objectIds: readonly string[];
   assets: ReadonlyArray<{ id: string; name: string }>;
+  /** Every level in the project except the one being edited. A door back here is never meant. */
+  levels: ReadonlyArray<{ id: string; name: string }>;
 }
 
 /** A dropdown of declared variables. Free text would let a typo become a validation error later. */
@@ -422,7 +424,7 @@ export function GraphNodeFields({
   context: FieldContext;
   onChange(next: GraphNode): void;
 }): React.JSX.Element | null {
-  const { variables, objectIds, assets } = context;
+  const { variables, objectIds, assets, levels } = context;
 
   switch (node.type) {
     case 'onStart':
@@ -655,6 +657,39 @@ export function GraphNodeFields({
           value={node.position}
           onChange={(position) => onChange({ ...node, position })}
         />
+      );
+
+    case 'loadLevel':
+      return (
+        <>
+          <label className="param-row">
+            <span>Level</span>
+            <select
+              aria-label="Level"
+              value={node.levelId}
+              onChange={(event) => onChange({ ...node, levelId: event.target.value })}
+            >
+              <option value="">Pick a level…</option>
+              {levels.map((level) => (
+                <option key={level.id} value={level.id}>
+                  {level.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="param-check">
+            <input
+              type="checkbox"
+              aria-label="Carry state"
+              checked={node.carryState}
+              onChange={(event) => onChange({ ...node, carryState: event.target.checked })}
+            />
+            Keep health, weapons and variables
+          </label>
+          {levels.length === 0 && (
+            <p className="panel-hint">This game has only one level. Add another to link to it.</p>
+          )}
+        </>
       );
 
     case 'showMessage':
