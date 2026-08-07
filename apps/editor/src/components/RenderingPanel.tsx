@@ -5,7 +5,7 @@ import {
   type ToneMapping,
 } from '@helaengine/schema';
 import { useSceneStore } from '../store/sceneStore';
-import { SWAY_GROUPS } from '@helaengine/schema';
+import { LOOKS, LOOK_DESCRIPTION, LOOK_LABEL, SWAY_GROUPS, applyLook } from '@helaengine/schema';
 import { NumberField } from './NumberField';
 
 /**
@@ -44,6 +44,25 @@ export function RenderingPanel(): React.JSX.Element {
   return (
     <section className="panel" aria-label="Rendering">
       <h2>Rendering</h2>
+
+      <h3>Look</h3>
+      <div className="chip-row" role="group" aria-label="Look">
+        {LOOKS.map((look) => (
+          <button
+            key={look}
+            type="button"
+            aria-label={LOOK_LABEL[look]}
+            title={LOOK_DESCRIPTION[look]}
+            onClick={() => setEnvironment(applyLook(environment, look))}
+          >
+            {LOOK_LABEL[look]}
+          </button>
+        ))}
+      </div>
+      <p className="panel-hint">
+        A starting point, written into the settings below. Nothing remembers which one you pressed —
+        every field stays yours to edit and to undo.
+      </p>
 
       <h3>Lighting</h3>
 

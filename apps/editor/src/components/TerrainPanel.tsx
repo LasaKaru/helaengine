@@ -6,6 +6,9 @@ import { NumberField } from './NumberField';
 const SCULPT_MODES: SculptMode[] = ['raise', 'lower', 'smooth', 'flatten'];
 const SEGMENT_CHOICES = [32, 64, 128, 256];
 
+/** World sizes offered, in metres. Square, because a rectangular default confuses more than helps. */
+const SIZE_CHOICES = [64, 128, 256, 512, 1024];
+
 /**
  * Terrain settings and brush controls.
  *
@@ -16,6 +19,7 @@ const SEGMENT_CHOICES = [32, 64, 128, 256];
 export function TerrainPanel(): React.JSX.Element {
   const terrain = useSceneStore((state) => state.scene.terrain);
   const setTerrain = useSceneStore((state) => state.setTerrain);
+  const objects = useSceneStore((state) => state.scene.objects);
   const tool = useEditorStore((state) => state.tool);
   const brush = useEditorStore((state) => state.brush);
   const setBrush = useEditorStore((state) => state.setBrush);
@@ -94,6 +98,59 @@ export function TerrainPanel(): React.JSX.Element {
         <dt>Sculpted</dt>
         <dd>{terrain.heightmap ? 'yes' : 'no'}</dd>
       </dl>
+
+      <label className="terrain-resolution">
+        <span>World size</span>
+        <select
+          aria-label="World size"
+          value={terrain.size[0] === terrain.size[1] ? String(terrain.size[0]) : ''}
+          onChange={(event) => {
+            const size = Number(event.target.value);
+            if (!size) return;
+
+            /**
+             * The heightmap survives, because it is a grid of normalised heights stretched over the
+             * extent rather than samples at fixed world positions. Resizing scales the landscape
+             * horizontally and keeps every hill.
+             *
+             * Placed objects do not: they hold world coordinates, so shrinking the world can leave
+             * them beyond its edge. Warned about rather than moved — silently dragging somebody's
+             * level inward to fit is a worse surprise than an object over the void.
+             */
+            const outside = objects.filter(
+              (object) =>
+                Math.abs(object.transform.position[0]) > size / 2 ||
+                Math.abs(object.transform.position[2]) > size / 2,
+            ).length;
+
+            if (
+              outside > 0 &&
+              !window.confirm(
+                `${outside} object${outside === 1 ? '' : 's'} would end up outside the terrain. ` +
+                  'Resize anyway?',
+              )
+            ) {
+              return;
+            }
+            setTerrain({ size: [size, size] });
+          }}
+        >
+          {terrain.size[0] !== terrain.size[1] && (
+            <option value="">
+              {terrain.size[0]} × {terrain.size[1]} m
+            </option>
+          )}
+          {SIZE_CHOICES.map((size) => (
+            <option key={size} value={size}>
+              {size} × {size} m
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="panel-hint">
+        Sculpting is kept and stretched to fit. Ground cover follows, so a bigger world grows more
+        of it at the same density.
+      </p>
 
       <label className="terrain-resolution">
         <span>Resolution</span>
