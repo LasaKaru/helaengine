@@ -54,6 +54,16 @@ php -S localhost:8000
 
 Then open `http://localhost:8000`.
 
+## Shipping it as a Windows program instead
+
+If you would rather hand somebody a file than a link, `pnpm package-desktop <folder>` wraps this
+same export — unchanged, byte for byte — in a double-clickable `.exe`. The player needs no browser,
+no server and no internet. It costs about 270 MB of Chromium and an unsigned-executable warning on
+first run, both of which are covered in [**Shipping a Windows `.exe`**](DESKTOP-EXPORT.md).
+
+The web export stays the better choice whenever a link will do: it is 4 MB rather than 111, and it
+plays instantly.
+
 ## Hosting it
 
 The folder is entirely static, so anything that serves files works. In rough order of least effort:

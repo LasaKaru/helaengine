@@ -1,0 +1,62 @@
+name: Desktop packaging
+
+# Packages a real build and runs it.
+#
+# Separate from `ci.yml` because it downloads a 100 MB Electron distribution and needs a virtual
+# display. Putting that in the job every pull request waits on would make every pull request wait on
+# it — so it runs only when something that shapes a desktop build changes.
+#
+# It covers the Windows target as far as Linux can: the packaging is one code path and the shell is
+# one file, so the linux-x64 build exercises everything except which archive was unpacked. What is
+# genuinely Windows-only — the version resource and the icon — is checked by rewriting a real
+# `electron.exe` and reading the bytes back.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'tools/desktop/**'
+      - 'packages/export/**'
+      - '.github/workflows/desktop.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: Package a build and play it
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Two platforms' distributions, ~200 MB, keyed on the pinned version. Without this every run
+      # spends two minutes downloading the same two files from GitHub releases.
+      - name: Cache the Electron distributions
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/helaengine/electron
+          key: electron-${{ runner.os }}-${{ hashFiles('tools/desktop/src/plan.ts') }}
+
+      - name: Package and play
+        # `xvfb-run` because the packaged game opens a real window; the point of the test is that it
+        # opens one. `--enable-unsafe-swiftshader` because a CI runner has no GPU, and software
+        # WebGL is opt-in since Chromium 128 — without it the game boots to a context-less canvas
+        # and fails in a way that looks like the shell's fault.
+        run: xvfb-run -a pnpm --filter @helaengine/desktop test
+        env:
+          HELA_DESKTOP_E2E: '1'

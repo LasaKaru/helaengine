@@ -6,6 +6,8 @@
   engine's own schemas, so it cannot disagree with the code that enforces them.
 - [**Exporting and hosting**](EXPORTING.md) — what comes out of Export, how to run it, where to put
   it.
+- [**Shipping a Windows `.exe`**](DESKTOP-EXPORT.md) — turning an export into a program players
+  double-click, and the three things to know before you do.
 - [**Troubleshooting**](TROUBLESHOOTING.md) — things that go wrong and what they actually mean.
 - [**Running on Windows**](RUNNING-ON-WINDOWS.md).
 
@@ -13,6 +15,8 @@
 
 - [**Guide**](GUIDE.md) — what each sprint delivered, and what it did not.
 - [**Sprint plan**](SPRINT.md) — the plan itself, ticked as it is met.
+- [**Engine roadmap**](ENGINE-ROADMAP.md) — the path from here toward a general-purpose engine,
+  what not to build, and why arbitrary scripting is the one thing that cannot be added.
 - [**Asset conventions**](ASSET-CONVENTIONS.md) — budgets, naming, colliders, importing a pack.
 - [**Performance**](PERFORMANCE.md) — the engine's frame rate against the stress scene.
 - [**Load and capacity**](LOAD-TESTING.md) — the platform under concurrent use, and where it stops

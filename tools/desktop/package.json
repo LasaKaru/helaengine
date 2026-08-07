@@ -1,0 +1,23 @@
+{
+  "name": "@helaengine/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Wraps an export folder in an Electron shell, producing a double-clickable game. Reads the export; never rebuilds it.",
+  "scripts": {
+    "package-desktop": "tsx src/cli.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "resedit": "^3.0.2",
+    "extract-zip": "^2.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8",
+    "playwright": "^1.62.0"
+  }
+}

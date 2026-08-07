@@ -407,6 +407,47 @@ schema-validated auto-repair loop, and whatever was changed is disclosed. Detail
 
 ---
 
+---
+
+## 5b. Beyond the sprint plan
+
+The plan above ends at GA. Two pieces of work sit after it and are recorded here so the ADR log stays
+the place decisions live.
+
+### Desktop builds — done
+
+`pnpm package-desktop <export-folder>` wraps an export in an Electron shell and produces a
+double-clickable `.exe`. Written up in `docs/DESKTOP-EXPORT.md`.
+
+**The architectural decision worth recording: the export goes in unchanged.** Not re-bundled, no
+paths rewritten — copied byte for byte into `resources/app/game/`. So the desktop build is the same
+game as the web build rather than a near-relative, an export that passed the release gate has
+already been tested where it counts, and there is no second renderer to keep in step. That is the
+pattern for every future platform target: **wrap the artefact, never fork it.**
+
+Two smaller decisions with reasons that will not be obvious later. The shell serves files over a
+registered `hela://` scheme rather than a localhost HTTP server, because a server costs a Windows
+Firewall prompt on first launch, a port that may be taken, and a game briefly reachable from the
+local network. And the renderer runs with no Node integration, context isolation on and sandbox on,
+because a game ships assets its author did not write — the browser export gives that content no
+filesystem access, and a careless desktop wrapper silently takes the guarantee away.
+
+Verified by packaging a real template and playing it: menu → Play → walked 13.99 m, 100 HP, physics
+started, zero assets failed to load.
+
+### The path to a general-purpose engine
+
+`docs/ENGINE-ROADMAP.md`. The decision it turns on, and the one to re-read before anybody proposes a
+scripting language: **the closed vocabulary is not a limitation to be lifted.** The pre-delivery
+gate, safe collaboration, the repair loop and safe-to-host exports all rest on a scene being data
+rather than code. The expressiveness gap closes with a node graph that compiles to a validated
+document — the Blueprints model, not the C# model — which keeps every one of those properties.
+
+Ranked first on that roadmap, and the largest visible gap in the product today: **skeletal
+animation**. It is blocked on sourcing animated CC0 characters, not on engineering.
+
+---
+
 ## 6. Ongoing (every sprint, not a phase)
 
 - [ ] Write/maintain automated tests alongside features, not after (unit for engine/behaviors, integration for API, e2e for critical editor flows)

@@ -31,7 +31,8 @@
     "smoke:test": "pnpm --filter @helaengine/smoke smoke:test",
     "trace": "pnpm --filter @helaengine/trace trace",
     "api": "pnpm --filter @helaengine/api start",
-    "portable": "pnpm --filter @helaengine/editor build && node tools/portable/build.mjs"
+    "portable": "pnpm --filter @helaengine/editor build && node tools/portable/build.mjs",
+    "package-desktop": "pnpm --filter @helaengine/desktop package-desktop"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

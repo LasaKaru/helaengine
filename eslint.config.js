@@ -198,6 +198,34 @@ export default tseslint.config(
     },
   },
   {
+    /**
+     * The Electron shell shipped inside every desktop build.
+     *
+     * CommonJS on purpose and not by accident: Electron's main process loads `main.cjs` directly
+     * from `resources/app`, with no build step between this file and the one a player runs. That is
+     * the property worth having — the shell can be read in the shipped game — and it means
+     * `require`, `__dirname` and `module` are correct here rather than legacy.
+     *
+     * Linted rather than ignored, unlike the portable launcher, because `resolve-within.cjs` is the
+     * one file in this repository whose failure is a security failure.
+     */
+    files: ['tools/desktop/src/shell/**/*.cjs'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: {
+        require: 'readonly',
+        module: 'writable',
+        __dirname: 'readonly',
+        console: 'readonly',
+        URL: 'readonly',
+        Response: 'readonly',
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+  {
     files: ['**/*.test.ts', 'scripts/**/*.ts', '**/vite.config.ts'],
     rules: {
       'no-console': 'off',
