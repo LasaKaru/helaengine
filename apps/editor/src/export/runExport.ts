@@ -1,6 +1,12 @@
 import type { AssetManifest, Scene } from '@helaengine/schema';
 import { ASSET_BASE_URL } from '../engine/assetLibrary';
-import { buildExport, slugify, type ExportOptions, type ExportPlan } from '@helaengine/export';
+import {
+  buildExport,
+  isPortableAssetPath,
+  slugify,
+  type ExportOptions,
+  type ExportPlan,
+} from '@helaengine/export';
 import type { ExportMode } from '@helaengine/export';
 import { downloadZip, zipExport } from './zip';
 
@@ -62,7 +68,12 @@ export async function planExport(
     manifest,
     options,
     runtimeSource,
-    readAsset: (path) => fetchBytes(`${ASSET_BASE_URL}${path}`),
+    // A path from the shipped library is relative and resolves against the asset folder. An
+    // uploaded or imported asset carries an absolute URL — the API's origin, or a `blob:` — and
+    // gluing the asset base in front of it produces a 404 that surfaces as "could not read". The
+    // export renames these on the way in; this is the matching half that fetches them.
+    readAsset: (path) =>
+      isPortableAssetPath(path) ? fetchBytes(`${ASSET_BASE_URL}${path}`) : fetchBytes(path),
   });
 }
 

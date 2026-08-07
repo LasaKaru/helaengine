@@ -6,6 +6,7 @@ import {
   collectUsedAssets,
   DEFAULT_EXPORT_OPTIONS,
   formatBytes,
+  isPortableAssetPath,
   SIZE_DANGER_BYTES,
   SIZE_WARN_BYTES,
   slugify,
@@ -480,5 +481,126 @@ describe('troubleshooting docs', () => {
     // And not the failure that cannot happen: rapier3d-compat inlines its WASM as base64, so a
     // game export has no physics `.wasm` for a host to mis-serve.
     expect(text).not.toContain('rapier_wasm');
+  });
+});
+
+/**
+ * Assets whose files are not in the export's own folder.
+ *
+ * An uploaded asset's `glbPath` is an absolute URL at the API's origin; one imported from a `.hela`
+ * file is a `blob:` URL that dies with the browser tab. Both used to be copied into the zip
+ * verbatim, producing a file named `assets/blob:http://localhost/abc-123` and a shipped manifest
+ * still pointing at the blob — an export that succeeded with no warnings and in which every custom
+ * model was a grey box.
+ */
+describe('assets from outside the library', () => {
+  const foreign = (glbPath: string): AssetManifest =>
+    parseAssetManifest({
+      version: 1,
+      assets: [{ id: 'my_character', name: 'Mine', category: 'enemies', glbPath }],
+    });
+
+  const oneObject = parseScene({
+    sceneId: 'scene_test',
+    version: 1,
+    objects: [{ id: 'obj_0001', assetId: 'my_character' }],
+  });
+
+  async function planFor(manifest: AssetManifest) {
+    const asked: string[] = [];
+    const plan = await buildExport({
+      scene: oneObject,
+      manifest,
+      options: { ...DEFAULT_EXPORT_OPTIONS, mode: 'static' },
+      runtimeSource: '// engine',
+      readAsset: async (path) => {
+        asked.push(path);
+        return new Uint8Array([1, 2, 3]);
+      },
+    });
+    return { plan, asked };
+  }
+
+  function shippedManifest(plan: ExportPlan): AssetManifest {
+    const entry = plan.files.find((file) => file.path === 'assets/manifest.json');
+    return JSON.parse(entry?.text ?? '{}') as AssetManifest;
+  }
+
+  it('gives a blob URL a real path inside the zip', async () => {
+    const { plan, asked } = await planFor(foreign('blob:http://localhost/abc-123'));
+
+    expect(plan.files.map((file) => file.path)).toContain('assets/models/my-character.glb');
+    expect(plan.files.map((file) => file.path)).not.toContain(
+      'assets/blob:http://localhost/abc-123',
+    );
+    // Read from where the file is, written where the manifest says it is.
+    expect(asked).toContain('blob:http://localhost/abc-123');
+  });
+
+  it('rewrites the shipped manifest to match, or the loader looks in the wrong place', async () => {
+    const { plan } = await planFor(foreign('blob:http://localhost/abc-123'));
+    expect(shippedManifest(plan).assets[0]?.glbPath).toBe('models/my-character.glb');
+  });
+
+  it('does the same for an uploaded asset served from an API origin', async () => {
+    const { plan } = await planFor(foreign('https://api.example.com/v1/assets/xyz.glb'));
+    expect(shippedManifest(plan).assets[0]?.glbPath).toBe('models/my-character.glb');
+    expect(plan.files.map((file) => file.path)).toContain('assets/models/my-character.glb');
+  });
+
+  it('keeps the extension the source actually had', async () => {
+    const audio = parseAssetManifest({
+      version: 1,
+      assets: [
+        {
+          id: 'my_track',
+          name: 'Track',
+          category: 'audio',
+          audioPath: 'https://api.example.com/v1/assets/xyz.ogg?v=3',
+        },
+      ],
+    });
+    const scene = parseScene({
+      sceneId: 'scene_test',
+      version: 1,
+      objects: [],
+      audioConfig: { music: { exploreTrackAssetId: 'my_track' } },
+    });
+    const plan = await buildExport({
+      scene,
+      manifest: audio,
+      options: { ...DEFAULT_EXPORT_OPTIONS, mode: 'game' },
+      runtimeSource: '// engine',
+      readAsset: async () => new Uint8Array([1]),
+    });
+    // The query string is not part of the extension. An asset served with a cache-busting `?v=3`
+    // would otherwise be written as `xyz.ogg?v=3`, which is not a filename on Windows.
+    expect(shippedManifest(plan).assets[0]?.audioPath).toBe('audio/my-track.ogg');
+  });
+
+  it('leaves an ordinary library path exactly as it was', async () => {
+    const { plan, asked } = await planFor(foreign('models/tree_pine_02.glb'));
+    expect(shippedManifest(plan).assets[0]?.glbPath).toBe('models/tree_pine_02.glb');
+    expect(asked).toContain('models/tree_pine_02.glb');
+    expect(plan.files.map((file) => file.path)).toContain('assets/models/tree_pine_02.glb');
+  });
+
+  it('refuses a path that would escape the export folder', async () => {
+    // Not hypothetical once assets can come from a file somebody was sent: a `.hela` file is a zip,
+    // and a zip is where path traversal lives.
+    expect(isPortableAssetPath('../../etc/passwd')).toBe(false);
+    expect(isPortableAssetPath('/etc/passwd')).toBe(false);
+    expect(isPortableAssetPath('models/ok.glb')).toBe(true);
+
+    const { plan } = await planFor(foreign('../../../etc/passwd'));
+    expect(plan.files.every((file) => !file.path.includes('..'))).toBe(true);
+  });
+
+  it('does not mutate the manifest it was given', async () => {
+    // `buildExport` is called with the editor's live manifest. Rewriting entries in place would
+    // change the library as a side effect of pressing Export.
+    const manifest = foreign('blob:http://localhost/abc-123');
+    await planFor(manifest);
+    expect(manifest.assets[0]?.glbPath).toBe('blob:http://localhost/abc-123');
   });
 });

@@ -310,6 +310,49 @@ function escapeHtml(text: string): string {
     .replace(/"/g, '&quot;');
 }
 
+/**
+ * Whether a manifest path can be used as-is inside the export folder.
+ *
+ * The library's own assets are relative — `models/tree.glb` — and go out unchanged. Anything else
+ * is a path from somewhere the export cannot reach: an uploaded asset lives at
+ * `https://api.example.com/assets/…`, and an asset imported from a `.hela` file lives at a
+ * `blob:` URL that dies with the browser tab.
+ *
+ * Both used to be copied into the zip verbatim, producing a file called
+ * `assets/blob:http://localhost/abc-123` and a shipped manifest still pointing at the blob. The
+ * export "succeeded" with no warnings and every custom model was a grey box — which is the failure
+ * mode this whole pipeline exists to make impossible.
+ */
+export function isPortableAssetPath(path: string): boolean {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(path)) return false;
+  if (path.startsWith('/') || path.startsWith('\\')) return false;
+  // `..` would write outside the folder somebody extracted the zip into.
+  return !path.split(/[\\/]/).some((segment) => segment === '..');
+}
+
+/**
+ * Where an asset's file is written inside the export, given where it came from.
+ *
+ * Portable paths keep their shape, so an export from the shipped library is byte-identical to what
+ * it always was. Anything else is renamed after the asset's own id, which is unique by definition
+ * and safe by construction.
+ */
+export function exportAssetPath(
+  assetId: string,
+  path: string,
+  kind: 'glb' | 'audio' | 'thumbnail',
+): string {
+  if (isPortableAssetPath(path)) return path;
+
+  const folder = kind === 'glb' ? 'models' : kind === 'audio' ? 'audio' : 'thumbnails';
+  const fallback = kind === 'glb' ? 'glb' : kind === 'audio' ? 'mp3' : 'png';
+  // Taken from the source path when it has one that looks like an extension, so an uploaded `.ogg`
+  // does not arrive claiming to be an `.mp3`. A query string is stripped first: an asset served
+  // with a cache-busting `?v=3` would otherwise get an extension of `glb?v=3`.
+  const extension = /\.([a-z0-9]{1,5})$/i.exec(path.split(/[?#]/)[0] ?? '')?.[1] ?? fallback;
+  return `${folder}/${slugify(assetId)}.${extension.toLowerCase()}`;
+}
+
 export interface BuildExportInput {
   scene: Scene;
   manifest: AssetManifest;
@@ -342,6 +385,23 @@ export async function buildExport(input: BuildExportInput): Promise<ExportPlan> 
     );
   }
 
+  /**
+   * The assets as the export will describe them, with any unreachable path rewritten.
+   *
+   * The manifest that ships has to agree with the files that ship, and the entries in `used` are
+   * the library's own objects — so they are copied rather than mutated. Mutating them would edit
+   * the editor's live manifest as a side effect of pressing Export.
+   */
+  const shipped: AssetManifestEntry[] = used.map((asset) => {
+    const copy = { ...asset };
+    if (asset.glbPath) copy.glbPath = exportAssetPath(asset.id, asset.glbPath, 'glb');
+    if (asset.audioPath) copy.audioPath = exportAssetPath(asset.id, asset.audioPath, 'audio');
+    if (asset.thumbnailPath) {
+      copy.thumbnailPath = exportAssetPath(asset.id, asset.thumbnailPath, 'thumbnail');
+    }
+    return copy;
+  });
+
   const files: ExportFile[] = [
     { path: 'index.html', text: indexHtml(scene, options) },
     {
@@ -360,7 +420,7 @@ export async function buildExport(input: BuildExportInput): Promise<ExportPlan> 
       path: 'assets/manifest.json',
       // A manifest listing only what shipped. One that still advertised the whole library would
       // send the loader looking for files that are not there.
-      text: JSON.stringify({ version: 1, assets: used }, null, 2),
+      text: JSON.stringify({ version: 1, assets: shipped }, null, 2),
     },
   ];
 
@@ -368,15 +428,25 @@ export async function buildExport(input: BuildExportInput): Promise<ExportPlan> 
     files.push({ path: 'scene.source.json', text: JSON.stringify(scene, null, 2) });
   }
 
-  for (const asset of used) {
-    for (const path of [asset.glbPath, asset.audioPath, asset.thumbnailPath]) {
-      if (!path) continue;
+  for (const [index, asset] of used.entries()) {
+    const destination = shipped[index] as AssetManifestEntry;
+    const moves: [string | undefined, string | undefined][] = [
+      [asset.glbPath, destination.glbPath],
+      [asset.audioPath, destination.audioPath],
+      [asset.thumbnailPath, destination.thumbnailPath],
+    ];
+
+    for (const [source, target] of moves) {
+      if (!source || !target) continue;
       try {
-        files.push({ path: `assets/${path}`, bytes: await readAsset(path) });
+        // Read from where the file actually is, written to where the shipped manifest says it is.
+        // For a library asset those are the same string; for an uploaded or imported one they are
+        // not, and conflating them is what produced `assets/blob:http://…` inside the zip.
+        files.push({ path: `assets/${target}`, bytes: await readAsset(source) });
       } catch {
         // One unreadable file should not cost somebody their whole export; the manifest still
         // names it and the loader falls back to a placeholder.
-        warnings.push(`could not read "${path}" for asset "${asset.id}"`);
+        warnings.push(`could not read "${source}" for asset "${asset.id}"`);
       }
     }
   }

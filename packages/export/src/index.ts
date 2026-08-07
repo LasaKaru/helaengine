@@ -11,6 +11,8 @@
 export {
   buildExport,
   collectUsedAssets,
+  exportAssetPath,
+  isPortableAssetPath,
   slugify,
   formatBytes,
   DEFAULT_EXPORT_OPTIONS,
