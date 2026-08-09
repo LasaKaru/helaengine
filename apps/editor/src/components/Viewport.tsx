@@ -13,6 +13,7 @@ import { PlacementController } from './PlacementController';
 import { PlacementToolbar } from './PlacementToolbar';
 import { BehaviorPreview, WaypointEditor } from './BehaviorPreview';
 import { WorldTick } from './WorldTick';
+import { PlayFromHere, PlayFromHereMenu } from './PlayFromHere';
 import { PhysicsPreview } from './PhysicsPreview';
 import { SculptController } from './SculptController';
 import { SelectionController } from './SelectionController';
@@ -100,6 +101,7 @@ export function Viewport({ loader, resolver }: ViewportProps): React.JSX.Element
   const tool = useEditorStore((state) => state.tool);
   const playing = useEditorStore((state) => state.playing);
   const walking = useEditorStore((state) => state.walking);
+  const possessed = useEditorStore((state) => state.possessed);
   // Set by the export QA suite before it screenshots, so the comparison is scene against scene.
   const furnitureHidden = useEditorStore((state) => state.furnitureHidden);
   const editingWaypoints = useEditorStore((state) => state.editingWaypoints);
@@ -128,6 +130,7 @@ export function Viewport({ loader, resolver }: ViewportProps): React.JSX.Element
         <ThumbnailReporter />
         <EngineBridge loader={loader} onLoaded={handleLoaded} />
         <WorldTick loaded={loadedScene} />
+        <PlayFromHere loadedScene={loadedScene} />
         <PlacementController loader={loader} loadedScene={loadedScene} />
         {/* Behaviours-only play. Walk mode runs them through the game runtime instead, so this
             stays out of the way rather than driving the same objects twice. */}
@@ -171,17 +174,21 @@ export function Viewport({ loader, resolver }: ViewportProps): React.JSX.Element
           maxPolarAngle={Math.PI / 2.05}
           // Orbiting mid-drop would fight the ghost for the same pointer.
           // Orbiting during a sculpt stroke would drag the camera instead of the ground.
-          enabled={!dragging && !gizmoActive && !walking && tool === 'select'}
+          // Orbit is available while ejected: that is the whole point of ejecting.
+          enabled={!dragging && !gizmoActive && (!walking || !possessed) && tool === 'select'}
         />
       </Canvas>
 
       <MarqueeOverlay />
+      <PlayFromHereMenu />
 
       {walking && (
         <div className="walk-hint" role="status" aria-label="Walk mode">
-          <strong>Walking</strong>
+          <strong>{possessed ? 'Walking' : 'Ejected'}</strong>
           <span>
-            WASD move · Shift sprint · C crouch · Space jump · V camera · Escape to return
+            {possessed
+              ? 'WASD move · Shift sprint · C crouch · Space jump · V camera · F8 eject · Escape to return'
+              : 'Ejected — drag to look, the world keeps running · F8 to take control · Escape to return'}
           </span>
           {cameraMode && <span className="walk-mode">{cameraMode}</span>}
           {uiScreen && uiScreen !== 'playing' && <span className="walk-mode">{uiScreen}</span>}

@@ -159,9 +159,38 @@ has to change, because everything refers to them by asset id.
 
 ---
 
+## Testing a level: Play From Here
+
+The loop this removes is the whole point. Testing the far corner of a level otherwise means walking
+there from the spawn point, every single time you change something.
+
+**Right-click the ground → Play from here.** Play Preview starts with the player standing where you
+clicked.
+
+It **does not move the spawn point**. Somebody testing the boss room twenty times has not decided
+the game should start there, so the override is editor state and is cleared the moment you leave the
+preview — the next plain Walk begins where the level says.
+
+### Ejecting
+
+**F8** while playing detaches the camera. The world keeps running: physics steps, enemies think,
+triggers fire, and only the camera stops following. Drag to look around, then press **F8** again to
+take control back.
+
+Pausing to look at a patrol is precisely what makes a patrol unobservable, which is why ejecting is
+not a pause. While ejected the player takes no input at all — no movement, no firing — because an
+ejected pawn is nobody's, and one left driveable gets walked blindly into a wall while you are
+looking somewhere else.
+
+Leaving the preview always returns control, so the next run never starts ejected with the keys
+mysteriously dead.
+
+---
+
 ## Reference
 
 - Wind: `packages/schema/src/wind.ts`, `packages/engine/src/render/wind.ts`
 - Ground cover: `packages/schema/src/scatter.ts`, `packages/engine/src/scatter/ScatterField.ts`
 - Looks: `packages/schema/src/looks.ts`
 - Ambience: `packages/schema/src/audio.ts`, `packages/engine/src/audio/AmbiencePlayer.ts`
+- Play From Here: `apps/editor/src/components/PlayFromHere.tsx`

@@ -48,6 +48,17 @@ export interface DevApi {
    * answer there is "no wind" — a test reading `environment.wind.strength` would call that a bug.
    */
   windActive(): boolean;
+  /**
+   * Starts Play Preview at a world point, the way right-clicking the ground does.
+   *
+   * Exposed because the menu is a context menu over a WebGL canvas: driving it from a test means
+   * synthesising a right-click at exactly the pixel a raycast happens to hit terrain, which tests
+   * the browser's hit-testing rather than the feature.
+   */
+  playFrom(point: [number, number, number]): void;
+  /** True while the camera is following the player; false when ejected. */
+  possessed(): boolean;
+  setPossessed(possessed: boolean): void;
   /** Scattered instances the loader actually grew, across every layer. */
   scatterCount(): number;
   viewportObjectIds(): string[];
@@ -457,6 +468,15 @@ export function exposeDevApi(library: AssetLibrary): void {
     },
 
     postProcessingActive: () => postProcessingActive,
+
+    playFrom: (point) => {
+      useEditorStore.getState().setPlayFrom(point);
+      useEditorStore.getState().setWalking(true);
+    },
+
+    possessed: () => useEditorStore.getState().possessed,
+
+    setPossessed: (possessed) => useEditorStore.getState().setPossessed(possessed),
 
     windActive: () => windActive,
 

@@ -2411,3 +2411,47 @@ body,
   color: #f0a3a2;
   font-size: 11px;
 }
+
+/* ---- Play from here ---- */
+
+.play-here-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 14;
+}
+
+.play-here-menu {
+  position: fixed;
+  z-index: 15;
+  min-width: 190px;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
+}
+
+.play-here-menu button {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.play-here-menu button:hover {
+  background: var(--panel-raised);
+}
+
+.play-here-hint {
+  margin: 2px 0 0;
+  padding: 0 10px 4px;
+  color: var(--text-dim);
+  font-size: 11px;
+}

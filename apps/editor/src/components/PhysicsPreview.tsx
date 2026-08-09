@@ -118,7 +118,15 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
 
         // Spawn on the ground rather than at the document's y, which is usually zero and would put
         // the player's feet inside a hill. Half a metre of clearance lets the controller settle.
-        const [spawnX, spawnY, spawnZ] = scene.player.spawn;
+        /**
+         * Where the player starts.
+         *
+         * `playFrom` is Play From Here: an editor-only override, so testing the far corner of a
+         * level does not move the spawn point somebody has already placed. Read from the store at
+         * start rather than passed as a prop, because it is set by the click that begins the run.
+         */
+        const from = useEditorStore.getState().playFrom;
+        const [spawnX, spawnY, spawnZ] = from ?? scene.player.spawn;
         const ground = loadedScene.terrainField?.sampleHeight(spawnX, spawnZ) ?? 0;
         const spawnPoint = new THREE.Vector3(spawnX, Math.max(spawnY, ground + 0.5), spawnZ);
         controller.current = physics.createPlayer(scene.player, spawnPoint);
@@ -420,6 +428,17 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
       return;
     }
 
+    /**
+     * Ejected means the pawn is nobody's.
+     *
+     * Decided once, here, because it gates three separate things further down: the camera stops
+     * following, the player stops taking input, and the pointer is released so the mouse can drive
+     * the editor's orbit controls. Zeroing only the camera would leave a player walking blind into
+     * a wall while you looked somewhere else.
+     */
+    const possessed = useEditorStore.getState().possessed;
+    if (!possessed && manager.pointerLocked) manager.releasePointerLock();
+
     manager.lookSensitivity = config.lookSensitivity;
     manager.update(delta);
 
@@ -436,13 +455,13 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
       setCameraMode(mode);
     }
 
-    const move = manager.move;
+    const move = possessed ? manager.move : { x: 0, y: 0 };
     const moveInput = {
       forward: move.y,
       right: move.x,
-      jump: manager.isDown('jump'),
-      sprint: manager.isDown('sprint'),
-      crouch: manager.isDown('crouch'),
+      jump: possessed && manager.isDown('jump'),
+      sprint: possessed && manager.isDown('sprint'),
+      crouch: possessed && manager.isDown('crouch'),
       yaw: look.current.yaw,
     };
 
@@ -464,10 +483,10 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
     runtime.current?.update(
       delta,
       {
-        fire: manager.isDown('fire'),
-        firePressed: manager.wasPressed('fire'),
-        reload: manager.wasPressed('reload'),
-        nextWeapon: manager.wasPressed('nextWeapon'),
+        fire: possessed && manager.isDown('fire'),
+        firePressed: possessed && manager.wasPressed('fire'),
+        reload: possessed && manager.wasPressed('reload'),
+        nextWeapon: possessed && manager.wasPressed('nextWeapon'),
         origin: shotOrigin,
         direction: shotDirection,
       },
@@ -510,6 +529,18 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
     if (avatar.current) {
       avatar.current.update(player.position, look.current.yaw, player.crouched);
       avatar.current.node.visible = rig.current?.mode !== 'fps';
+    }
+
+    /**
+     * Ejected: the simulation keeps running and the camera is the user's.
+     *
+     * Everything above this line still happens — physics steps, enemies think, triggers fire — and
+     * only the last step, moving the camera, is skipped. That ordering is the feature: pausing to
+     * look at a patrol is exactly what makes a patrol unobservable.
+     */
+    if (!possessed) {
+      manager.endFrame();
+      return;
     }
 
     rig.current?.update(

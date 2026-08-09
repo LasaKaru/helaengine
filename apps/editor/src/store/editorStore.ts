@@ -5,6 +5,7 @@ import type { SculptMode } from '@helaengine/engine';
 import type { UiScreen } from '@helaengine/engine';
 import type { CameraMode } from '@helaengine/schema';
 import type { GizmoMode } from '../transform';
+import type { Vec3 } from '@helaengine/schema';
 
 /** Where the asynchronous Rapier bootstrap has got to. */
 export type PhysicsStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -68,6 +69,25 @@ export interface EditorState {
   playing: boolean;
   /** True while the viewport is in Play Preview: physics on, camera driven by the player. */
   walking: boolean;
+  /**
+   * Where the next Play Preview drops the player, or null for the level's own spawn point.
+   *
+   * Unreal calls this Play From Here, and the reason it exists is the loop it removes: testing the
+   * far corner of a level otherwise means walking there from the start, every single time you
+   * change something. It is editor state rather than document state on purpose — trying a spot must
+   * not move the spawn point somebody has already placed.
+   */
+  playFrom: Vec3 | null;
+  /** The open right-click menu in the viewport, or null. Editor chrome; never saved. */
+  playFromMenu: { point: Vec3; clientX: number; clientY: number } | null;
+  /**
+   * True while the camera is following the player.
+   *
+   * False means ejected: the simulation keeps running and the camera is yours to fly. Watching an
+   * enemy patrol from outside is the only way to see what it is actually doing, and stopping the
+   * game to look is exactly what makes it unobservable.
+   */
+  possessed: boolean;
   /** Rapier is WASM and loads asynchronously; the Walk button reflects this. */
   physicsStatus: PhysicsStatus;
   /**
@@ -104,6 +124,10 @@ export interface EditorState {
   setGraphOpen(open: boolean): void;
   setPlaying(playing: boolean): void;
   setWalking(walking: boolean): void;
+  /** Starts Play Preview at a point, or clears the override when passed null. */
+  setPlayFrom(point: Vec3 | null): void;
+  setPlayFromMenu(menu: { point: Vec3; clientX: number; clientY: number } | null): void;
+  setPossessed(possessed: boolean): void;
   setPhysicsStatus(status: PhysicsStatus): void;
   setFurnitureHidden(hidden: boolean): void;
   setPlayerHealth(health: number | null): void;
@@ -128,6 +152,9 @@ export const useEditorStore = create<EditorState>()(
       graphOpen: false,
       playing: false,
       walking: false,
+      playFrom: null,
+      playFromMenu: null,
+      possessed: true,
       physicsStatus: 'idle',
       furnitureHidden: false,
       playerHealth: null,
@@ -167,6 +194,10 @@ export const useEditorStore = create<EditorState>()(
       setPlaying: (playing) =>
         // Leaving waypoint editing on during play would keep clicks adding points to a moving path.
         set({ playing, ...(playing ? { editingWaypoints: null } : {}) }, false, 'play/set'),
+      setPlayFrom: (playFrom) => set({ playFrom }, false, 'play/from'),
+      setPlayFromMenu: (playFromMenu) => set({ playFromMenu }, false, 'play/fromMenu'),
+      setPossessed: (possessed) => set({ possessed }, false, 'play/possessed'),
+
       setWalking: (walking) =>
         // Walking is Play plus a body: the simulation has to be running for there to be anything
         // to walk around in, so the two are set together rather than left for the user to pair up.
@@ -179,6 +210,11 @@ export const useEditorStore = create<EditorState>()(
                 playerHealth: null,
                 cameraMode: null,
                 uiScreen: null,
+                // Cleared on the way out. A `playFrom` left behind would make the next plain Walk
+                // start somewhere the user did not ask for, with nothing on screen explaining why.
+                playFrom: null,
+                playFromMenu: null,
+                possessed: true,
               },
           false,
           'walk/set',

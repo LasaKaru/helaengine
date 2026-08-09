@@ -18,6 +18,8 @@ export const SHORTCUTS: Array<{ keys: string; description: string }> = [
   { keys: 'Shift', description: 'Sprint while walking' },
   { keys: 'C', description: 'Crouch while walking' },
   { keys: 'V', description: 'Switch camera while walking' },
+  { keys: 'F8', description: 'Eject / take control while walking' },
+  { keys: 'Right-click the ground', description: 'Play from here' },
   { keys: '1 / 2 / 3', description: 'Select, Sculpt, Paint tool' },
   { keys: 'W', description: 'Move tool' },
   { keys: 'E', description: 'Rotate tool' },
@@ -124,6 +126,19 @@ export function useShortcuts(options: ShortcutOptions = {}): void {
       // Walk mode owns the keyboard: WASD is movement, not tool switching. Escape is the way out
       // and is handled below, so nothing else here should fire while the player is walking.
       if (editor.walking) {
+        /**
+         * Eject and possess, on the key Unreal uses.
+         *
+         * Handled here rather than in the input manager because it is an *editor* action: an
+         * exported game has no such thing, and putting it in the shared input layer would mean
+         * every shipped build carried a key that detaches its camera.
+         */
+        if (event.key === 'F8') {
+          event.preventDefault();
+          editor.setPossessed(!editor.possessed);
+          return;
+        }
+
         // Escape belongs to the game shell while walking: it pauses and resumes, which is what
         // every player expects it to do. Leaving the preview is the pause menu's Quit button, or
         // the toolbar, or Shift+P — all of which are still one gesture away.
