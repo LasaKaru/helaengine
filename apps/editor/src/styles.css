@@ -2455,3 +2455,94 @@ body,
   color: var(--text-dim);
   font-size: 11px;
 }
+
+/* ---- Levels ---- */
+
+.level-list {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.level-row {
+  margin-bottom: 8px;
+  padding: 8px;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-left: 3px solid transparent;
+  border-radius: 6px;
+}
+
+.level-row.active {
+  border-left-color: var(--accent);
+}
+
+.level-open {
+  display: block;
+  width: 100%;
+  padding: 0 0 6px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.level-open:disabled {
+  cursor: default;
+}
+
+.level-name {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.level-meta {
+  display: block;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.level-actions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.level-actions button {
+  flex: 1;
+  padding: 4px 6px;
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.level-actions button:disabled {
+  color: var(--text-dim);
+  cursor: default;
+}
+
+.level-actions button.danger:hover:not(:disabled) {
+  color: #ffb4b4;
+  border-color: #7d3b3b;
+}
+
+.level-problems {
+  margin-top: 8px;
+  padding: 8px;
+  color: #f0a3a2;
+  font-size: 11px;
+  background: var(--panel-raised);
+  border: 1px solid #7d3b3b;
+  border-radius: 5px;
+}
+
+.level-problems p {
+  margin: 0 0 4px;
+}

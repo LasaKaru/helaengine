@@ -11,6 +11,7 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { InspectorPanel } from './Panels';
 import { FirstRunTour } from './FirstRunTour';
 import { ShortcutsModal } from './ShortcutsModal';
+import { useLevelsStore } from '../store/levelsStore';
 import { GraphEditor } from './GraphEditor';
 import { useUploadedAssets } from '../storage/useUploadedAssets';
 import { useImportedAssets } from '../storage/useImportedAssets';
@@ -40,6 +41,22 @@ type LoadState =
 
 export function EditorWorkspace(): React.JSX.Element {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
+
+  /**
+   * The levels a `Load level` node may point at: every one except the one being edited.
+   *
+   * A door back to the level you are standing in is never what was meant, and offering it makes the
+   * commonest mistake the easiest click.
+   */
+  const levels = useLevelsStore((current) => current.levels);
+  const activeLevelId = useLevelsStore((current) => current.activeLevelId);
+  const otherLevels = useMemo(
+    () =>
+      levels
+        .filter((level) => level.sceneId !== activeLevelId)
+        .map((level) => ({ id: level.sceneId, name: level.name })),
+    [levels, activeLevelId],
+  );
 
   const library = state.status === 'ready' ? state.library : null;
   const uploads = useUploadedAssets(library);
@@ -174,7 +191,7 @@ export function EditorWorkspace(): React.JSX.Element {
       <DragChip />
       <ShortcutsModal />
       <ErrorBoundary where="the node graph">
-        <GraphEditor manifest={manifest ?? state.library.manifest} />
+        <GraphEditor manifest={manifest ?? state.library.manifest} levels={otherLevels} />
       </ErrorBoundary>
       {/*
         Mounted last, and inside the editor rather than the shell: every element it points at lives
