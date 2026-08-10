@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { SceneObjectSchema, type Scene } from '@helaengine/schema';
+import { SceneObjectSchema, SceneSchema, projectFromScene, type Scene } from '@helaengine/schema';
 import { createEmptyScene } from '../store/sceneStore';
 import { templateById } from '@helaengine/templates';
 import { db } from './db';
@@ -185,5 +185,77 @@ describe('templates', () => {
     const first = templateById('blank')!.build();
     const second = templateById('blank')!.build();
     expect(second.sceneId).not.toBe(first.sceneId);
+  });
+});
+
+/**
+ * Levels through local storage.
+ *
+ * The same two-way compatibility claim the `.hela` container makes: a row written before levels
+ * existed must open, and a row with levels must still hold a playable start level in the field an
+ * older build reads.
+ */
+describe('levels', () => {
+  const level = (sceneId: string, name: string) =>
+    SceneSchema.parse({ sceneId, version: 1, name, objects: [] });
+
+  it('stores no project payload for a single-level game', async () => {
+    const scene = level('only', 'Only');
+    await saveProject({ id: 'p1', scene, project: projectFromScene(scene) });
+
+    // The common row stays exactly what it was.
+    const row = await db.projects.get('p1');
+    expect(row?.projectJson).toBeUndefined();
+
+    const loaded = await loadProject('p1');
+    expect(loaded.project.levels).toHaveLength(1);
+  });
+
+  it('keeps every level, and keeps the start level readable by an older build', async () => {
+    const project = {
+      version: 1 as const,
+      name: 'Game',
+      startLevelId: 'caves',
+      levels: [level('forest', 'Forest'), level('caves', 'Caves')],
+    };
+    await saveProject({ id: 'p2', scene: project.levels[1]!, project });
+
+    const row = await db.projects.get('p2');
+    expect(row?.projectJson).toBeTruthy();
+    // A build that knows nothing about levels reads this field and finds a playable game.
+    expect(JSON.parse(row!.sceneJson).sceneId).toBe('caves');
+
+    const loaded = await loadProject('p2');
+    expect(loaded.project.levels.map((one) => one.sceneId)).toEqual(['forest', 'caves']);
+    expect(loaded.scene.sceneId).toBe('caves');
+  });
+
+  it('opens a row written before levels existed', async () => {
+    await db.projects.put({
+      id: 'p3',
+      name: 'Legacy',
+      sceneJson: JSON.stringify(level('legacy', 'Legacy')),
+      createdAt: 1,
+      updatedAt: 1,
+    });
+
+    const loaded = await loadProject('p3');
+    expect(loaded.project.levels).toHaveLength(1);
+    expect(loaded.scene.sceneId).toBe('legacy');
+  });
+
+  it('keeps both payloads out of the projects list', async () => {
+    const project = {
+      version: 1 as const,
+      name: 'Game',
+      startLevelId: 'forest',
+      levels: [level('forest', 'Forest'), level('caves', 'Caves')],
+    };
+    await saveProject({ id: 'p4', scene: project.levels[0]!, project });
+
+    // Carrying every level's geometry into a grid of cards would load the whole library to draw it.
+    const [summary] = await listProjects();
+    expect(summary).not.toHaveProperty('sceneJson');
+    expect(summary).not.toHaveProperty('projectJson');
   });
 });

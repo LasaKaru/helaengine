@@ -1,4 +1,4 @@
-import type { Scene } from '@helaengine/schema';
+import { projectFromScene, type GameProject, type Scene } from '@helaengine/schema';
 import * as local from './projects';
 import type { ProjectSummary } from './projects';
 import type { StoredProject } from './db';
@@ -104,6 +104,14 @@ export async function listProjects(): Promise<ProjectSummary[]> {
 export async function saveProject(project: {
   id: string;
   scene: Scene;
+  /**
+   * Every level, when there is more than one.
+   *
+   * Carried by the local backend. The cloud API stores a scene per project and validates it as one
+   * server-side, so a cloud project keeps only its start level until that endpoint learns about
+   * level sets — see `docs/LEVELS.md`.
+   */
+  project?: GameProject | undefined;
   thumbnail?: string | undefined;
 }): Promise<void> {
   if (!cloud) {
@@ -120,7 +128,9 @@ export async function saveProject(project: {
   if (project.thumbnail) await cloud.setThumbnail(project.id, project.thumbnail);
 }
 
-export async function loadProject(id: string): Promise<{ record: StoredProject; scene: Scene }> {
+export async function loadProject(
+  id: string,
+): Promise<{ record: StoredProject; scene: Scene; project: GameProject }> {
   if (!cloud) return local.loadProject(id);
 
   const { project, scene } = await cloud.load(id);
@@ -137,6 +147,8 @@ export async function loadProject(id: string): Promise<{ record: StoredProject; 
       sceneJson: JSON.stringify(scene),
     },
     scene,
+    // One level, because that is all a cloud project holds today.
+    project: projectFromScene(scene),
   };
 }
 

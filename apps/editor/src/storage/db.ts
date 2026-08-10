@@ -13,7 +13,22 @@ export interface StoredProject {
   name: string;
   /** Data URL of a viewport screenshot taken at save time. Absent until the first save. */
   thumbnail?: string;
+  /**
+   * The start level, as JSON.
+   *
+   * Kept as the start level rather than promoted to hold the whole project, so a build without
+   * multi-level support still opens a multi-level project and finds a playable game in it. For a
+   * one-level project — which is almost all of them — this is the entire document and nothing has
+   * changed.
+   */
   sceneJson: string;
+  /**
+   * Every level, as a `GameProject`, written only when there is more than one.
+   *
+   * Absent for a single-level project so the common case stores exactly what it always did, and so
+   * "does this row have levels" is answerable without parsing anything.
+   */
+  projectJson?: string;
   createdAt: number;
   updatedAt: number;
 }

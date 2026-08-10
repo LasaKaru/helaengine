@@ -8,7 +8,7 @@ import {
   type AssetPayload,
   type UiAssetPayload,
 } from '@helaengine/hela-file';
-import type { Scene } from '@helaengine/schema';
+import type { GameProject, Scene } from '@helaengine/schema';
 import { db, type StoredUiAsset } from './db';
 import { cloudAssets } from './backend';
 import { releaseUiAssetUrl } from './uiAssets';
@@ -124,6 +124,8 @@ async function collectUiAssets(scene: Scene): Promise<UiAssetPayload[]> {
 
 export interface ExportInput {
   scene: Scene;
+  /** Every level, when there is more than one. Omitted for a single-level game. */
+  project?: GameProject | undefined;
   /** Data URL of the projects-list thumbnail, if there is one. */
   thumbnail?: string | undefined;
 }
@@ -137,6 +139,7 @@ export async function buildHelaFile(input: ExportInput): Promise<Uint8Array> {
 
   return packHelaFile({
     scene: input.scene,
+    ...(input.project ? { project: input.project } : {}),
     engineVersion: ENGINE_VERSION,
     assets,
     uiAssets,
@@ -146,6 +149,8 @@ export async function buildHelaFile(input: ExportInput): Promise<Uint8Array> {
 
 export interface ImportedProject {
   scene: Scene;
+  /** Every level. A single-level file yields a one-level project rather than null. */
+  project: GameProject;
   name: string;
   /** Data URL, so it can go straight into the stored project record. */
   thumbnail: string | undefined;
@@ -200,6 +205,7 @@ export async function importHelaFile(bytes: Uint8Array): Promise<ImportedProject
 
   return {
     scene: read.scene,
+    project: read.project,
     name: read.manifest.name,
     thumbnail: read.thumbnail ? bytesToDataUrl(read.thumbnail, 'image/png') : undefined,
     restoredAssets: read.assets,

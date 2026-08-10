@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
-import { CURRENT_SCENE_VERSION, SceneSchema, type Scene } from '@helaengine/schema';
+import {
+  CURRENT_SCENE_VERSION,
+  SceneSchema,
+  parseScene,
+  projectFromScene,
+  type Scene,
+} from '@helaengine/schema';
 import { looksLikeHelaFile, packHelaFile, unpackHelaFile } from './container.js';
 import {
   canonicalJson,
@@ -319,5 +325,79 @@ describe('refusing a file it did not write', () => {
     // the directory it was extracted to.
     expect(read.manifest.assets[0]!.path).toBe('assets/______escape.glb');
     expect(read.manifest.assets[0]!.path).not.toContain('..');
+  });
+});
+
+/**
+ * Levels through the container.
+ *
+ * The compatibility claim is the interesting one, and it runs both ways: an older build must open a
+ * multi-level file and find a playable game, and this build must open a file that has never heard
+ * of levels.
+ */
+describe('levels', () => {
+  const level = (sceneId: string, name: string): Scene =>
+    parseScene({ sceneId, version: 1, name, objects: [] });
+
+  it('writes no project file for a single-level game', async () => {
+    const scene = level('only', 'Only');
+    const bytes = await packHelaFile({
+      scene,
+      project: projectFromScene(scene),
+      engineVersion: '0.0.0',
+    });
+
+    // The common file stays exactly what it was, and "does this have levels" is answerable from
+    // the entry list rather than by parsing.
+    const zip = await new JSZip().loadAsync(bytes);
+    expect(zip.file('project.json')).toBeNull();
+
+    const read = await unpackHelaFile(bytes);
+    // Still a project, so no caller has to decide what a missing one means.
+    expect(read.project.levels).toHaveLength(1);
+    expect(read.project.startLevelId).toBe('only');
+  });
+
+  it('carries every level, and opens on the start one', async () => {
+    const project = {
+      version: 1 as const,
+      name: 'Game',
+      startLevelId: 'caves',
+      levels: [level('forest', 'Forest'), level('caves', 'Caves')],
+    };
+
+    const bytes = await packHelaFile({
+      // `scene.json` is the start level, so an older build opens this file and gets a playable game
+      // rather than an error.
+      scene: project.levels[1]!,
+      project,
+      engineVersion: '0.0.0',
+    });
+
+    const read = await unpackHelaFile(bytes);
+    expect(read.project.levels.map((one) => one.sceneId)).toEqual(['forest', 'caves']);
+    expect(read.project.startLevelId).toBe('caves');
+    expect(read.scene.sceneId).toBe('caves');
+  });
+
+  it('opens a file written before levels existed', async () => {
+    // No `project` passed at all: exactly what every file on disk today looks like.
+    const bytes = await packHelaFile({ scene: level('legacy', 'Old'), engineVersion: '0.0.0' });
+    const read = await unpackHelaFile(bytes);
+
+    expect(read.project.levels).toHaveLength(1);
+    expect(read.project.levels[0]?.sceneId).toBe('legacy');
+  });
+
+  it('refuses a project file that is not a project', async () => {
+    const scene = level('only', 'Only');
+    const bytes = await packHelaFile({ scene, engineVersion: '0.0.0' });
+    const zip = await new JSZip().loadAsync(bytes);
+    zip.file('project.json', '{"levels":"not an array"}');
+    const tampered = await zip.generateAsync({ type: 'uint8array' });
+
+    // A file is untrusted input however it arrived, so a corrupt level set is a named error rather
+    // than an object the editor tries to draw.
+    await expect(unpackHelaFile(tampered)).rejects.toThrow(/levels could not be read/);
   });
 });

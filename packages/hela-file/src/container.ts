@@ -1,5 +1,11 @@
 import JSZip from 'jszip';
-import { migrateScene, type Scene } from '@helaengine/schema';
+import {
+  asProject,
+  migrateScene,
+  projectFromScene,
+  type GameProject,
+  type Scene,
+} from '@helaengine/schema';
 import {
   ASSET_DIR,
   canonicalJson,
@@ -14,6 +20,7 @@ import {
   type EmbeddedAsset,
   type EmbeddedUiAsset,
   type HelaManifest,
+  PROJECT_PATH,
 } from './format.js';
 
 /**
@@ -47,6 +54,8 @@ export interface UiAssetPayload extends Omit<EmbeddedUiAsset, 'path'> {
 
 export interface PackInput {
   scene: Scene;
+  /** Every level, when there is more than one. Omitted for a single-level game. */
+  project?: GameProject;
   engineVersion: string;
   /** Custom `.glb` files the scene places. Curated assets are never embedded. */
   assets?: AssetPayload[];
@@ -60,6 +69,8 @@ export interface PackInput {
 export interface UnpackResult {
   manifest: HelaManifest;
   scene: Scene;
+  /** Every level. A single-level file yields a one-level project rather than null. */
+  project: GameProject;
   assets: AssetPayload[];
   uiAssets: UiAssetPayload[];
   thumbnail: Uint8Array | null;
@@ -96,6 +107,11 @@ export async function packHelaFile(input: PackInput): Promise<Uint8Array> {
   const zip = new JSZip();
   zip.file(MANIFEST_PATH, canonicalJson(manifest), { date: STABLE_DATE, ...STORED });
   zip.file(SCENE_PATH, canonicalJson(input.scene), { date: STABLE_DATE, ...STORED });
+
+  // Only when it says something `scene.json` does not — see `PROJECT_PATH`.
+  if (input.project && input.project.levels.length > 1) {
+    zip.file(PROJECT_PATH, canonicalJson(input.project), { date: STABLE_DATE, ...STORED });
+  }
 
   if (manifest.hasThumbnail) {
     zip.file(THUMBNAIL_PATH, input.thumbnail!, { date: STABLE_DATE, ...STORED, binary: true });
@@ -179,6 +195,24 @@ export async function unpackHelaFile(bytes: Uint8Array): Promise<UnpackResult> {
     throw new HelaFileError('That project file’s scene could not be read.', { cause: error });
   }
 
+  /**
+   * The level set, when the file carries one.
+   *
+   * A file without `project.json` is a one-level game, and `projectFromScene` says so rather than
+   * this returning null and every caller having to decide what null means. Each level is migrated
+   * on the way in for the same reason the scene is: a file is untrusted input however it arrived.
+   */
+  let project: GameProject = projectFromScene(scene);
+  const projectEntry = zip.file(PROJECT_PATH);
+  if (projectEntry) {
+    try {
+      const parsed = asProject(JSON.parse(await projectEntry.async('string')));
+      project = { ...parsed, levels: parsed.levels.map((level) => migrateScene(level)) };
+    } catch (error) {
+      throw new HelaFileError('That project file’s levels could not be read.', { cause: error });
+    }
+  }
+
   const assets: AssetPayload[] = [];
   for (const entry of manifest.assets) {
     const file = zip.file(entry.path);
@@ -210,7 +244,17 @@ export async function unpackHelaFile(bytes: Uint8Array): Promise<UnpackResult> {
   const thumbnailEntry = manifest.hasThumbnail ? zip.file(THUMBNAIL_PATH) : null;
   const thumbnail = thumbnailEntry ? await thumbnailEntry.async('uint8array') : null;
 
-  return { manifest, scene, assets, uiAssets, thumbnail };
+  /**
+   * The start level, taken *from* the project.
+   *
+   * `scene.json` and `project.json` both parse to equal documents, and returning the former would
+   * hand back two objects the editor then holds as one. It compares the opened document by
+   * reference to tell a load from an edit, so two copies means the first edit after opening a
+   * multi-level file is treated as the load and quietly never saved.
+   */
+  const start = project.levels.find((level) => level.sceneId === project.startLevelId);
+
+  return { manifest, scene: start ?? scene, project, assets, uiAssets, thumbnail };
 }
 
 /**

@@ -157,3 +157,60 @@ test.describe('levels', () => {
     expect(project).toBeTruthy();
   });
 });
+
+/**
+ * Levels through persistence.
+ *
+ * The store and container tests prove the shapes round-trip. This proves the editor actually uses
+ * them: that closing a project and reopening it brings every level back, which is the failure a
+ * user would describe as "my second level is gone".
+ */
+test.describe('levels survive a reopen', () => {
+  test.setTimeout(120_000);
+
+  test('a second level is still there after going home and back', async ({ page }) => {
+    await openEditor(page);
+
+    await page.getByRole('button', { name: 'Add level' }).click();
+    await page.getByRole('button', { name: 'Edit Level 2' }).click();
+    await page.waitForTimeout(600);
+
+    await page.evaluate(() => {
+      window.helaengine!.store.getState().addObject({
+        id: 'marker',
+        assetId: 'prop_crate_01',
+        parentId: null,
+        transform: { position: [3, 0, 3], rotation: [0, 0, 0], scale: [1, 1, 1] },
+        behaviors: [],
+        physics: { body: 'static', collider: 'auto' },
+        animation: null,
+        material: null,
+        trigger: null,
+        sway: 'auto',
+        metadata: {},
+      } as never);
+    });
+
+    // Autosave runs on a debounce; going home saves as well, but waiting makes the intent explicit.
+    await page.waitForTimeout(2500);
+    await page.getByRole('button', { name: 'Projects' }).click();
+    await page.waitForTimeout(1200);
+
+    // Back into the same project from the projects list.
+    await page.locator('.project-open').first().click();
+    await page.waitForTimeout(2000);
+
+    const rows = await page
+      .getByRole('region', { name: 'Levels' })
+      .getByRole('button', { name: /^Edit / })
+      .allTextContents();
+    expect(rows.length).toBe(2);
+
+    await page.getByRole('button', { name: 'Edit Level 2' }).click();
+    await page.waitForTimeout(800);
+    const ids = await page.evaluate(() =>
+      window.helaengine!.store.getState().scene.objects.map((object) => object.id),
+    );
+    expect(ids).toEqual(['marker']);
+  });
+});

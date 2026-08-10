@@ -91,6 +91,15 @@ export type HelaManifest = z.infer<typeof HelaManifestSchema>;
 
 export const MANIFEST_PATH = 'hela.json';
 export const SCENE_PATH = 'scene.json';
+/**
+ * Every level, when there is more than one.
+ *
+ * Written *alongside* `scene.json` rather than instead of it, so a build without multi-level
+ * support opens the file and finds a playable game — its start level — rather than an error. A
+ * single-level project omits this entirely, which keeps the common file byte-identical to what it
+ * was and makes "does this have levels" answerable from the entry list.
+ */
+export const PROJECT_PATH = 'project.json';
 export const THUMBNAIL_PATH = 'thumbnail.png';
 export const ASSET_DIR = 'assets/';
 export const UI_DIR = 'ui/';

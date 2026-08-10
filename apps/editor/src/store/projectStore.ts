@@ -21,7 +21,9 @@ import {
 } from '../storage/backend';
 import { templateById } from '@helaengine/templates';
 import { trackFirst } from '../telemetry/funnel';
+import { projectFromScene } from '@helaengine/schema';
 import { useSceneStore } from './sceneStore';
+import { useLevelsStore } from './levelsStore';
 
 export type Screen = 'projects' | 'editor';
 
@@ -120,7 +122,11 @@ async function writeProjectFile(
   set({ saveState: { status: 'saving' } }, false, 'file/saving');
 
   try {
-    const bytes = await buildHelaFile({ scene, thumbnail: captureThumbnail?.() ?? undefined });
+    const bytes = await buildHelaFile({
+      scene,
+      project: useLevelsStore.getState().project(),
+      thumbnail: captureThumbnail?.() ?? undefined,
+    });
 
     if (!options.ask && fileHandle) {
       await writeTo(fileHandle, bytes);
@@ -215,7 +221,15 @@ export const useProjectStore = create<ProjectState>()(
         // never touches the save button. The backend mints the id — locally that is a generated
         // string, in the cloud it is whatever the server assigned.
         const id = await createProject(scene.name, scene);
-        useSceneStore.getState().setScene(scene);
+        /**
+         * Wrapped, not re-parsed.
+         *
+         * `adoptDocument` validates and therefore *rebuilds* the scene, and `adoptedScene` is held
+         * by reference: `useAutosave` compares identity to tell "this change is the project
+         * opening" from "an edit that arrived in the same pass". A rebuilt object breaks that and
+         * the first edit to a new project silently stays unsaved.
+         */
+        useLevelsStore.getState().adoptProject(projectFromScene(scene));
 
         set(
           {
@@ -237,8 +251,9 @@ export const useProjectStore = create<ProjectState>()(
 
       open: async (id) => {
         try {
-          const { scene } = await loadProject(id);
-          useSceneStore.getState().setScene(scene);
+          const { scene, project } = await loadProject(id);
+          // Adopting the project sets the scene too, on its start level.
+          useLevelsStore.getState().adoptProject(project);
           set(
             {
               projectId: id,
@@ -269,7 +284,14 @@ export const useProjectStore = create<ProjectState>()(
         set({ saveState: { status: 'saving' } }, false, 'project/saving');
         try {
           const scene: Scene = useSceneStore.getState().scene;
-          await saveProject({ id: projectId, scene, thumbnail: captureThumbnail?.() ?? undefined });
+          await saveProject({
+            id: projectId,
+            scene,
+            // Reads the live document out of `sceneStore` on the way past, so the level being
+            // edited is saved as it is now rather than as it was at the last switch.
+            project: useLevelsStore.getState().project(),
+            thumbnail: captureThumbnail?.() ?? undefined,
+          });
           set(
             { saveState: { status: 'saved', at: Date.now() }, dirty: false },
             false,
@@ -353,7 +375,7 @@ export const useProjectStore = create<ProjectState>()(
           // arriving, and dropping it over whatever was on screen would be an edit nobody asked
           // for. It gets its own entry in the list and its own id.
           const id = await createProject(imported.name, imported.scene);
-          useSceneStore.getState().setScene(imported.scene);
+          useLevelsStore.getState().adoptProject(imported.project);
 
           if (imported.thumbnail) {
             await saveProject({ id, scene: imported.scene, thumbnail: imported.thumbnail });
