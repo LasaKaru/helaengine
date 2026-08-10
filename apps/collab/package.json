@@ -15,17 +15,17 @@
     "@helaengine/schema": "workspace:*",
     "lib0": "^0.2.99",
     "pg": "^8.13.1",
-    "ws": "^8.18.0",
+    "ws": "^8.21.2",
     "y-protocols": "^1.0.6",
     "yjs": "^13.6.20"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
-    "@types/pg": "^8.11.10",
+    "@types/pg": "^8.20.4",
     "@types/ws": "^8.5.13",
-    "tsx": "^4.23.1",
+    "tsx": "^4.23.9",
     "typescript": "^5.9.3",
     "vitest": "^2.1.9",
-    "y-websocket": "^3.0.0"
+    "y-websocket": "^3.1.0"
   }
 }
