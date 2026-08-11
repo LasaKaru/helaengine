@@ -12,6 +12,8 @@
   rule, world size, look presets and ambient sound.
 - [**The node graph**](GRAPH.md) — wiring up what happens in a level without writing code, and the
   checks a canvas can make that a script file cannot.
+- [**Skill packs**](PACKS.md) — recipes as markdown files: what a pack may change, why it can never
+  bring code with it, and how to write one.
 - [**Behaviour reference**](BEHAVIOURS.md) — every behaviour and its parameters. Generated from the
   engine's own schemas, so it cannot disagree with the code that enforces them.
 - [**Exporting and hosting**](EXPORTING.md) — what comes out of Export, how to run it, where to put

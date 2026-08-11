@@ -2546,3 +2546,83 @@ body,
 .level-problems p {
   margin: 0 0 4px;
 }
+
+.pack-preview {
+  margin-top: 8px;
+  padding: 8px;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+
+.pack-preview h3 {
+  margin: 0;
+  font-size: 12px;
+}
+
+.pack-preview h4 {
+  margin: 8px 0 4px;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.pack-description {
+  margin: 4px 0 0;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.pack-steps {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 11px;
+}
+
+.pack-steps li {
+  margin-bottom: 2px;
+}
+
+.pack-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.pack-actions button {
+  flex: 1;
+  padding: 4px 6px;
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.pack-actions button:disabled {
+  color: var(--text-dim);
+  cursor: default;
+}
+
+.pack-applied {
+  margin: 8px 0 0;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.pack-error,
+.pack-problems {
+  margin-top: 8px;
+  padding: 8px;
+  color: #f0a3a2;
+  font-size: 11px;
+  background: var(--panel-raised);
+  border: 1px solid #7d3b3b;
+  border-radius: 5px;
+}
+
+.pack-problems p {
+  margin: 0 0 4px;
+}

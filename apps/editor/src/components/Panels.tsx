@@ -21,6 +21,7 @@ import { NumberField } from './NumberField';
 import { TerrainPanel } from './TerrainPanel';
 import { ScatterPanel } from './ScatterPanel';
 import { LevelsPanel } from './LevelsPanel';
+import { PacksPanel } from './PacksPanel';
 import { AudioPanel } from './AudioPanel';
 import { SecretsPanel } from './SecretsPanel';
 import { WeaponsPanel } from './WeaponsPanel';
@@ -531,6 +532,7 @@ export function InspectorPanel({ manifest }: { manifest: AssetManifest }): React
       <AudioPanel manifest={manifest} />
 
       <GameUiPanel />
+      <PacksPanel manifest={manifest} />
       <PlayerPanel />
       <ProgressPanel />
     </aside>
