@@ -5,6 +5,7 @@ import {
   CURRENT_SCENE_VERSION,
   SceneSchema,
   ScatterLayerSchema,
+  JointSchema,
   UnlockableSchema,
   WeaponSchema,
   type Environment,
@@ -30,6 +31,8 @@ import {
   type GraphVariable,
   type SwayOverride,
   type ScatterLayer,
+  type Joint,
+  type JointType,
 } from '@helaengine/schema';
 import { isBuiltinTriggerAsset, triggerDefaults } from '../triggers';
 import {
@@ -132,6 +135,11 @@ export interface SceneState {
   addScatterLayer(assetId: string): string;
   updateScatterLayer(layerId: string, patch: Partial<ScatterLayer>): void;
   removeScatterLayer(layerId: string): void;
+
+  /** Constraints between two objects. */
+  addJoint(type: JointType, objectA: string, objectB: string): string;
+  updateJoint(jointId: string, patch: Partial<Joint>): void;
+  removeJoint(jointId: string): void;
 
   /**
    * Graph edits.
@@ -271,6 +279,12 @@ export const useSceneStore = create<SceneState>()(
           const doomed = collectDescendants(get().scene, objectIds);
           commit('object/remove', (draft) => {
             draft.objects = draft.objects.filter((item) => !doomed.has(item.id));
+            // A joint outlives neither end. Left behind it is a constraint the runtime skips and
+            // the panel warns about forever, and one undo away from being reattached to an object
+            // that no longer exists — so it goes in the same history entry as the deletion.
+            draft.joints = draft.joints.filter(
+              (joint) => !doomed.has(joint.objectA) && !doomed.has(joint.objectB),
+            );
           });
           set(
             (state) => ({ selectedIds: state.selectedIds.filter((id) => !doomed.has(id)) }),
@@ -697,6 +711,32 @@ export const useSceneStore = create<SceneState>()(
         removeScatterLayer: (layerId) =>
           commit('scatter/remove', (draft) => {
             draft.scatter = draft.scatter.filter((layer) => layer.id !== layerId);
+          }),
+
+        addJoint: (type, objectA, objectB) => {
+          const id = `joint_${Math.random().toString(36).slice(2, 8)}`;
+          commit('joint/add', (draft) => {
+            // Parsed rather than assembled by hand, so a new field with a default arrives filled in
+            // rather than as an `undefined` the runtime has to guess about.
+            draft.joints.push(JointSchema.parse({ id, type, objectA, objectB }));
+          });
+          return id;
+        },
+
+        updateJoint: (jointId, patch) =>
+          commit('joint/update', (draft) => {
+            const index = draft.joints.findIndex((joint) => joint.id === jointId);
+            if (index < 0) return;
+            // Re-parsed as a whole rather than assigned into. Changing `type` moves the document to
+            // a different arm of the union, and merging a hinge's `axis` onto a rope would leave a
+            // field the schema does not have on that variant — which parses today and fails to
+            // round-trip the moment somebody saves.
+            draft.joints[index] = JointSchema.parse({ ...draft.joints[index], ...patch });
+          }),
+
+        removeJoint: (jointId) =>
+          commit('joint/remove', (draft) => {
+            draft.joints = draft.joints.filter((joint) => joint.id !== jointId);
           }),
 
         setName: (name) =>

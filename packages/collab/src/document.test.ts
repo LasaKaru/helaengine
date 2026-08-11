@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
-import { SceneSchema, CURRENT_SCENE_VERSION, type Scene } from '@helaengine/schema';
+import { JointSchema, SceneSchema, CURRENT_SCENE_VERSION, type Scene } from '@helaengine/schema';
 import { applyScene, isEmpty, objectsMap, readScene, seedScene } from './document.js';
 
 /**
@@ -387,6 +387,75 @@ describe('reconnecting', () => {
       expect(objectById(doc, 'obj_0002')!['metadata']).toMatchObject({
         label: 'Edited while offline',
       });
+    }
+  });
+});
+
+describe('every part of a scene, not only the parts somebody remembered', () => {
+  /**
+   * The regression this exists for.
+   *
+   * `graph` and `scatter` were added to `SceneSchema` and never added to `SYNCED_SECTIONS`, and
+   * because `readScene` rebuilds the scene by *parsing* what it finds, an absent section came back
+   * as its default rather than as an error. So joining a room replaced a level's whole visual
+   * script with an empty graph, and its ground cover with nothing — silently, and only when a
+   * second person was present. The compile-time guard in `collab.ts` is what stops it recurring;
+   * this is the runtime half, written against the sections rather than against the list.
+   */
+  const populated = (): Scene =>
+    SceneSchema.parse({
+      sceneId: 'scene_collab',
+      version: CURRENT_SCENE_VERSION,
+      name: 'Shared Level',
+      objects: [
+        { id: 'obj_0001', assetId: 'tree_pine_01' },
+        { id: 'obj_0002', assetId: 'rock_boulder_01' },
+      ],
+      graph: {
+        nodes: [{ id: 'n_start', type: 'onStart' }],
+        variables: [{ name: 'score', type: 'number', initial: 0 }],
+        layout: { n_start: [10, 20] },
+      },
+      scatter: [{ id: 'cover', assetId: 'grass_large', density: 30 }],
+      joints: [{ id: 'hinge', type: 'hinge', objectA: 'obj_0001', objectB: 'obj_0002' }],
+    });
+
+  it('carries the graph, the ground cover and the joints into a room', () => {
+    const start = populated();
+    const doc = new Y.Doc();
+    seedScene(doc, start);
+
+    const back = readScene(doc);
+    expect(back.graph.nodes.map((node) => node.id)).toEqual(['n_start']);
+    expect(back.graph.variables).toHaveLength(1);
+    expect(back.scatter.map((layer) => layer.id)).toEqual(['cover']);
+    expect(back.joints.map((joint) => joint.id)).toEqual(['hinge']);
+  });
+
+  it('merges a joint added by one client with a graph node added by the other', () => {
+    const start = populated();
+    const { a, b, sync } = pair(start);
+
+    const mine: Scene = {
+      ...start,
+      joints: [
+        ...start.joints,
+        JointSchema.parse({ id: 'rope', type: 'rope', objectA: 'obj_0001', objectB: 'obj_0002' }),
+      ],
+    };
+    applyScene(a, mine, start);
+
+    const theirs = structuredClone(start);
+    theirs.graph = { ...theirs.graph, layout: { ...theirs.graph.layout, n_start: [99, 99] } };
+    applyScene(b, theirs, start);
+
+    sync();
+
+    // Different sections, so neither edit costs the other one. Section-level last-write-wins only
+    // bites two people inside the *same* section, which is the trade `SYNCED_SECTIONS` documents.
+    for (const doc of [a, b]) {
+      expect(readScene(doc).joints).toHaveLength(2);
+      expect(readScene(doc).graph.layout['n_start']).toEqual([99, 99]);
     }
   });
 });

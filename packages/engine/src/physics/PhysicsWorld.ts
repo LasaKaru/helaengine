@@ -1,13 +1,23 @@
 import * as THREE from 'three';
-import type { BodyType, ColliderType, Player } from '@helaengine/schema';
+import type { BodyType, ColliderType, Joint, Player } from '@helaengine/schema';
 import type { TerrainField } from '../TerrainField.js';
 import { colliderDescFor } from './colliders.js';
+import { jointDataFor, jointIsDriveable } from './joints.js';
 import { PlayerController } from './PlayerController.js';
 import { initPhysics, type RapierModule } from './rapier.js';
 
 /** Rapier's own types are only reachable through the module namespace; these keep call sites readable. */
 type RapierWorld = InstanceType<RapierModule['World']>;
 type RapierRigidBody = ReturnType<RapierWorld['createRigidBody']>;
+type RapierImpulseJoint = ReturnType<RapierWorld['createImpulseJoint']>;
+/**
+ * The joints that have an axis to limit and a motor to drive — hinges and sliders.
+ *
+ * Rapier puts `setLimits` and `configureMotor*` on this subclass rather than on `ImpulseJoint`,
+ * which is a useful thing to be forced to acknowledge: asking a rope for its motor is a category
+ * error, not a call that should quietly do nothing.
+ */
+type RapierUnitJoint = InstanceType<RapierModule['UnitImpulseJoint']>;
 
 export interface PhysicsWorldOptions {
   /** Downward acceleration in metres per second squared. Default 9.81. */
@@ -65,6 +75,9 @@ export class PhysicsWorld {
   readonly #fixedTimestep: number;
   readonly #maxSubsteps: number;
   readonly #players: PlayerController[] = [];
+  readonly #joints = new Map<string, RapierImpulseJoint>();
+  /** Joint ids by the object at each end, so removing a body can drop the joints it took with it. */
+  readonly #jointsByObject = new Map<string, Set<string>>();
   #terrain: RapierRigidBody | null = null;
   #accumulator = 0;
   #disposed = false;
@@ -205,11 +218,100 @@ export class PhysicsWorld {
     const record = this.#bodies.get(objectId);
     if (!record) return;
 
+    // Before the body goes, not after. Rapier frees a removed body's joints for us, which would
+    // leave this map holding handles into freed memory — and the next `removeJoint` for one of them
+    // would hand a dangling handle back to the solver.
+    const attached = this.#jointsByObject.get(objectId);
+    if (attached) {
+      for (const jointId of [...attached]) this.removeJoint(jointId);
+      this.#jointsByObject.delete(objectId);
+    }
+
     this.world.removeRigidBody(record.body);
     this.#objectByBody.delete(record.body.handle);
     this.#bodies.delete(objectId);
     const at = this.#dynamic.indexOf(record);
     if (at >= 0) this.#dynamic.splice(at, 1);
+  }
+
+  get jointCount(): number {
+    return this.#joints.size;
+  }
+
+  /**
+   * Constrains two objects to each other.
+   *
+   * Returns false when either end has no body — which is not an error worth throwing over: an
+   * object with a `none` collider legitimately has no body, and a level in mid-edit can name one it
+   * has just deleted. The caller reports the skip, so "this hinge does nothing" is always something
+   * the user was told about rather than something they discover by pushing a door.
+   *
+   * Waking both bodies is deliberate. Rapier lets a body fall asleep when it has been still, and a
+   * sleeping body ignores a constraint that appears next to it — so a hinge added to a settled
+   * assembly would do nothing until something else happened to disturb it.
+   */
+  addJoint(joint: Joint): boolean {
+    this.removeJoint(joint.id);
+
+    const a = this.#bodies.get(joint.objectA);
+    const b = this.#bodies.get(joint.objectB);
+    if (!a || !b || a === b) return false;
+
+    const data = jointDataFor(this.rapier, joint);
+    const created = this.world.createImpulseJoint(data, a.body, b.body, true);
+
+    // `instanceof` rather than trusting the document's own type tag. The two agree today, but the
+    // one that decides whether `setLimits` exists is the object Rapier handed back.
+    if (jointIsDriveable(joint) && created instanceof this.rapier.UnitImpulseJoint) {
+      if (joint.limit) created.setLimits(joint.limit.min, joint.limit.max);
+
+      const motor = joint.motor;
+      if (motor.mode === 'velocity') {
+        created.configureMotorVelocity(motor.velocity, motor.damping);
+      } else if (motor.mode === 'position') {
+        created.configureMotorPosition(motor.target, motor.stiffness, motor.damping);
+      }
+    }
+
+    created.setContactsEnabled(joint.collide);
+    a.body.wakeUp();
+    b.body.wakeUp();
+
+    this.#joints.set(joint.id, created);
+    for (const objectId of [joint.objectA, joint.objectB]) {
+      let set = this.#jointsByObject.get(objectId);
+      if (!set) this.#jointsByObject.set(objectId, (set = new Set()));
+      set.add(joint.id);
+    }
+    return true;
+  }
+
+  removeJoint(jointId: string): void {
+    const existing = this.#joints.get(jointId);
+    if (!existing) return;
+    this.world.removeImpulseJoint(existing, true);
+    this.#joints.delete(jointId);
+    for (const set of this.#jointsByObject.values()) set.delete(jointId);
+  }
+
+  /**
+   * Retargets a joint's motor while the game is running.
+   *
+   * This is what a graph node or a behaviour drives a powered door with — the alternative would be
+   * rebuilding the joint every time the target changed, which drops the accumulated impulse and
+   * makes the door snap rather than swing.
+   */
+  driveJoint(jointId: string, target: number, stiffness: number, damping: number): boolean {
+    const joint = this.#unitJoint(jointId);
+    if (!joint) return false;
+    joint.configureMotorPosition(target, stiffness, damping);
+    return true;
+  }
+
+  /** A joint that has a motor, or null — a rope has no target to be driven to. */
+  #unitJoint(jointId: string): RapierUnitJoint | null {
+    const joint = this.#joints.get(jointId);
+    return joint instanceof this.rapier.UnitImpulseJoint ? joint : null;
   }
 
   /**
@@ -359,6 +461,8 @@ export class PhysicsWorld {
     this.#objectByBody.clear();
     this.#dynamic.length = 0;
     this.#players.length = 0;
+    this.#joints.clear();
+    this.#jointsByObject.clear();
     this.#terrain = null;
     // Frees the WASM allocation behind the world; without it a scene reload leaks a whole solver.
     this.world.free();

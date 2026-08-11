@@ -22,6 +22,10 @@ export interface ScenePhysicsReport {
   /** Objects that ended up with no collider, and why. */
   skipped: ScenePhysicsSkip[];
   terrain: boolean;
+  /** Constraints actually created. */
+  joints: number;
+  /** Joints that could not be built, and why. Same list the editor's panel warns about. */
+  skippedJoints: ScenePhysicsSkip[];
 }
 
 const worldScale = new THREE.Vector3();
@@ -84,5 +88,20 @@ export function buildScenePhysics(options: ScenePhysicsOptions): ScenePhysicsRep
     else skipped.push({ objectId: object.id, reason: `${shape} collider produced no shape` });
   }
 
-  return { bodies, skipped, terrain: field !== null };
+  // Joints last, and only after every body exists. A joint names two objects and there is no order
+  // that puts both of them before it — building them in the object loop would make a hinge work or
+  // not depending on which end the author happened to place first.
+  const skippedJoints: ScenePhysicsSkip[] = [];
+  let joints = 0;
+  for (const joint of scene.joints) {
+    if (world.addJoint(joint)) joints += 1;
+    else {
+      skippedJoints.push({
+        objectId: joint.id,
+        reason: 'one end has no physics body — check for a "none" collider or a deleted object',
+      });
+    }
+  }
+
+  return { bodies, skipped, terrain: field !== null, joints, skippedJoints };
 }

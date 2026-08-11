@@ -11,6 +11,7 @@ import { TerrainSchema } from './terrain.js';
 import { UnlockablesSchema } from './unlockable.js';
 import { SceneGraphSchema } from './graph.js';
 import { ScatterSchema } from './scatter.js';
+import { JointsSchema } from './joint.js';
 
 /**
  * Current scene document version. Bump this whenever a change to `SceneSchema` cannot read an
@@ -43,6 +44,14 @@ export const SceneSchema = z
      * nothing — an empty list is a list of no rules, which expands to no instances.
      */
     scatter: ScatterSchema,
+    /**
+     * Constraints between objects: hinges, sliders, ropes.
+     *
+     * Empty by default, so every scene written before joints existed parses unchanged and builds
+     * the same world — an empty list is a list of no constraints, which is what an unjointed pile
+     * of bodies already was.
+     */
+    joints: JointsSchema,
     audioConfig: AudioConfigSchema,
     gameConfig: GameConfigSchema,
     uiConfig: UiConfigSchema,
@@ -58,6 +67,22 @@ export const SceneSchema = z
         });
       }
       seen.add(object.id);
+    }
+
+    // Duplicate joint ids are rejected where a joint naming a missing object is not. The two are
+    // different kinds of wrong: an id collision means two joints cannot both be addressed, which no
+    // amount of later editing fixes, while a dangling reference is what a level looks like between
+    // deleting an object and tidying up after it. `jointProblems` reports the latter to a panel.
+    const seenJoints = new Set<string>();
+    for (const [index, joint] of scene.joints.entries()) {
+      if (seenJoints.has(joint.id)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['joints', index, 'id'],
+          message: `duplicate joint id "${joint.id}"`,
+        });
+      }
+      seenJoints.add(joint.id);
     }
 
     const parentById = new Map(scene.objects.map((object) => [object.id, object.parentId]));

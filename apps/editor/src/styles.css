@@ -2626,3 +2626,29 @@ body,
 .pack-problems p {
   margin: 0 0 4px;
 }
+
+.joint-card {
+  margin-bottom: 8px;
+  padding: 8px;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+
+.joint-problems {
+  margin-top: 8px;
+  padding: 8px;
+  color: #f0a3a2;
+  font-size: 11px;
+  background: var(--panel);
+  border: 1px solid #7d3b3b;
+  border-radius: 5px;
+}
+
+.joint-problems p {
+  margin: 0 0 4px;
+}
+
+.joint-problems p:last-child {
+  margin-bottom: 0;
+}

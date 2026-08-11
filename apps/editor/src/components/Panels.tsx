@@ -22,6 +22,7 @@ import { TerrainPanel } from './TerrainPanel';
 import { ScatterPanel } from './ScatterPanel';
 import { LevelsPanel } from './LevelsPanel';
 import { PacksPanel } from './PacksPanel';
+import { JointsPanel } from './JointsPanel';
 import { AudioPanel } from './AudioPanel';
 import { SecretsPanel } from './SecretsPanel';
 import { WeaponsPanel } from './WeaponsPanel';
@@ -525,6 +526,7 @@ export function InspectorPanel({ manifest }: { manifest: AssetManifest }): React
       <LevelsPanel />
       <TerrainPanel />
       <ScatterPanel manifest={manifest} />
+      <JointsPanel />
       <RenderingPanel />
       <GamePanel />
       <WeaponsPanel />

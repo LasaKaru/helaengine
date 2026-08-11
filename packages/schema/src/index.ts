@@ -16,6 +16,7 @@ export * from './graph.js';
 export * from './object.js';
 export * from './wind.js';
 export * from './scatter.js';
+export * from './joint.js';
 export * from './looks.js';
 export * from './pack.js';
 export * from './packFile.js';

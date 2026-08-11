@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Scene } from './scene.js';
 
 /**
  * The shape of a collaborative editing session.
@@ -94,6 +95,13 @@ export function presenceColor(userId: string): string {
  *
  * Listed as a closed vocabulary so that adding a section to `SceneSchema` without deciding how it
  * syncs is a type error rather than a field that silently stops replicating.
+ *
+ * That last sentence was aspirational for two sprints and cost real work. `graph` and `scatter`
+ * were added to the scene and never added here, and because `readScene` rebuilds the document by
+ * parsing what it finds, an absent section came back as its *default* — so joining a room silently
+ * replaced a level's entire visual script with an empty graph, and its ground cover with nothing.
+ * Nothing failed; the level just quietly emptied. `everySectionSyncs` below now makes the claim
+ * true rather than merely written down.
  */
 export const SYNCED_SECTIONS = [
   'name',
@@ -102,8 +110,31 @@ export const SYNCED_SECTIONS = [
   'player',
   'inventory',
   'unlockables',
+  'graph',
+  'scatter',
+  'joints',
   'audioConfig',
   'gameConfig',
   'uiConfig',
 ] as const;
 export type SyncedSection = (typeof SYNCED_SECTIONS)[number];
+
+/**
+ * The three keys that are not sections.
+ *
+ * `objects` merges per object rather than per section; `sceneId` and `version` identify the
+ * document rather than describing it, and are written once when the room is seeded.
+ */
+type NotASection = 'sceneId' | 'version' | 'objects';
+
+/**
+ * Compile-time proof that every field of a scene has been given a sync story.
+ *
+ * Resolves to `never` — and so fails to accept `true` — the moment `SceneSchema` grows a field that
+ * is neither in `SYNCED_SECTIONS` nor deliberately excluded above. This is the type error the
+ * comment has been promising: the fix is one line in either list, and the point is that it has to
+ * be a decision somebody makes rather than one that makes itself.
+ */
+type UnsyncedSceneKey = Exclude<keyof Scene, NotASection | SyncedSection>;
+const everySectionSyncs: [UnsyncedSceneKey] extends [never] ? true : never = true;
+void everySectionSyncs;
