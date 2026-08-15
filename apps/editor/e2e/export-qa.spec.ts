@@ -201,6 +201,7 @@ test.describe('export edge cases', () => {
             animation: null,
             material: null,
             trigger: null,
+            destructible: null,
             sway: 'auto' as const,
             metadata: {},
           },

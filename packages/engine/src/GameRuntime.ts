@@ -11,6 +11,7 @@ import {
 import type { AssetResolver } from './assets.js';
 import { BehaviorRuntime } from './BehaviorRuntime.js';
 import { buildScenePhysics, resolveColliderType } from './physics/buildScenePhysics.js';
+import { DestructibleSystem, type FragmentRequest } from './combat/DestructibleSystem.js';
 import type { PhysicsWorld } from './physics/PhysicsWorld.js';
 import type { PlayerController } from './physics/PlayerController.js';
 import type { LoadedScene, SceneLoader } from './SceneLoader.js';
@@ -44,6 +45,7 @@ export interface GameRuntimeOptions {
 
 const nextPosition = new THREE.Vector3();
 const shotOrigin = new THREE.Vector3();
+const breakPoint = new THREE.Vector3();
 
 /**
  * Everything that has to be true for a scene to be *running* rather than merely loaded.
@@ -62,6 +64,7 @@ export class GameRuntime implements WorldHandle {
   readonly triggers: TriggerRuntime;
   readonly inventory: Inventory;
   readonly weapons: WeaponSystem;
+  readonly destructibles: DestructibleSystem;
   readonly unlocks: UnlockRuntime;
   /** The scene's visual script, or null when it has none. */
   readonly graph: GraphRuntime | null;
@@ -148,6 +151,32 @@ export class GameRuntime implements WorldHandle {
       emit: (event, payload) => this.emit(event, payload),
     });
 
+    this.destructibles = new DestructibleSystem({
+      positionOf: (objectId) => {
+        const node = this.#loaded.objects.get(objectId);
+        if (!node) return null;
+        node.getWorldPosition(breakPoint);
+        return [breakPoint.x, breakPoint.y, breakPoint.z];
+      },
+      destroy: (objectId) => this.destroy(objectId),
+      spawnDebris: (request) => this.#spawnDebris(request),
+      emit: (event, payload) => this.emit(event, payload),
+    });
+
+    for (const object of options.scene.objects) {
+      if (object.destructible) this.destructibles.register(object.id, object.destructible);
+    }
+
+    // Breaking listens for the same `damage` message an enemy answers to, rather than weapons
+    // learning what a crate is. That is why shooting a destructible needed no change to
+    // `WeaponSystem` at all — and why a trigger, a graph node or a script can break something by
+    // raising the event everything else already raises.
+    this.behaviors.on('damage', (payload) => {
+      const hit = payload as { targetId?: unknown; amount?: unknown } | undefined;
+      if (typeof hit?.targetId !== 'string' || typeof hit.amount !== 'number') return;
+      this.destructibles.damage(hit.targetId, hit.amount);
+    });
+
     // Null when the scene has no events to run, which is every scene saved before graphs existed.
     // Constructing one anyway would validate an empty document and subscribe to nothing, sixty
     // times a second, for no reason.
@@ -221,6 +250,9 @@ export class GameRuntime implements WorldHandle {
     // Weapons last: a shot should see the world as it is at the end of the frame the player fired
     // in, not as it was before the enemies moved.
     if (weapons && this.playerAlive) this.weapons.update(deltaSeconds, weapons);
+    // After weapons, so debris created by this frame's shot starts its life with a full lifetime
+    // rather than one already a frame short.
+    this.destructibles.update(deltaSeconds);
   }
 
   /**
@@ -655,6 +687,42 @@ export class GameRuntime implements WorldHandle {
 
   emit(event: string, payload?: unknown): void {
     this.behaviors.emit(event, payload);
+  }
+
+  /**
+   * Places one piece of debris and throws it.
+   *
+   * Debris is spawned dynamic regardless of what the manifest says the asset usually is: the whole
+   * point of a fragment is that it falls. A `spawn` that inherited `static` from a crate's own
+   * entry would leave the pieces hanging in the air exactly where the crate used to be, which reads
+   * as the break having failed rather than as a setting.
+   */
+  #spawnDebris(request: FragmentRequest): string | null {
+    const id = this.spawn({
+      assetId: request.assetId,
+      position: request.position,
+      physics: { body: 'dynamic', collider: 'auto' },
+    });
+    if (id === null) return null;
+
+    const node = this.#loaded.objects.get(id);
+    if (node && request.scale !== 1) {
+      node.scale.multiplyScalar(request.scale);
+      node.updateMatrixWorld(true);
+    }
+
+    const record = this.#physics?.bodyFor(id);
+    if (record && record.type === 'dynamic') {
+      // A velocity rather than an impulse: an impulse is scaled by mass, and mass here is usually
+      // derived from the collider's volume — so identical fragments of two different debris models
+      // would fly apart at visibly different speeds for a reason nobody authored.
+      record.body.setLinvel(
+        { x: request.velocity[0], y: request.velocity[1], z: request.velocity[2] },
+        true,
+      );
+    }
+
+    return id;
   }
 }
 

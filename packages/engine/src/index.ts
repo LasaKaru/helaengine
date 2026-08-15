@@ -94,6 +94,8 @@ export type { MoveInput } from './physics/PlayerController.js';
 export { initPhysics, isPhysicsReady, physicsModule } from './physics/rapier.js';
 export type { RapierModule } from './physics/rapier.js';
 export { colliderDescFor, collectTrimesh } from './physics/colliders.js';
+export { DestructibleSystem } from './combat/DestructibleSystem.js';
+export type { DestructibleHooks, FragmentRequest } from './combat/DestructibleSystem.js';
 export { jointDataFor, jointIsDriveable } from './physics/joints.js';
 export type { ColliderShapeInput, TrimeshData } from './physics/colliders.js';
 export { buildScenePhysics, resolveColliderType } from './physics/buildScenePhysics.js';

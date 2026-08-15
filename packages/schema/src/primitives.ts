@@ -27,3 +27,15 @@ export const IdSchema = z
   .max(128)
   .regex(/^[A-Za-z0-9_.:-]+$/, 'ids may only contain letters, numbers and _ . : -');
 export type Id = z.infer<typeof IdSchema>;
+
+/**
+ * An id, or the empty string meaning "not chosen yet".
+ *
+ * Authoring is a sequence of half-built states — a Destroy node exists for a moment before it is
+ * told what to destroy, and on a fresh project there is nothing to point it at. Refusing the empty
+ * string at the parse boundary would mean the editor could not save a scene mid-thought, so the
+ * gap is legal to *store* and reported by `validateGraph` as an error that stops the graph running.
+ * That is the same trade the rest of the document format makes: parse what the author can express,
+ * refuse to run what cannot work.
+ */
+export const UnsetIdSchema = z.union([z.literal(''), IdSchema]);

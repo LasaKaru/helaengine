@@ -17,6 +17,7 @@ export * from './object.js';
 export * from './wind.js';
 export * from './scatter.js';
 export * from './joint.js';
+export * from './destructible.js';
 export * from './looks.js';
 export * from './pack.js';
 export * from './packFile.js';

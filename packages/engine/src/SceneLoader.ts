@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {
+  destructibleAssets,
   SHADOW_MAP_SIZE,
   type AssetManifestEntry,
   type Environment,
@@ -624,6 +625,13 @@ export class SceneLoader {
     // would ask the cache for a model no pass ever fetched, and simply never grow — silently, since
     // an empty field renders perfectly well.
     for (const layer of scene.scatter) if (layer.enabled) want(layer.assetId);
+    // Debris is the same trap one step later: a crate's fragments are named nowhere else, so
+    // without this the first break asks the cache for a model no pass fetched. The crate would
+    // disappear and leave nothing behind — which looks exactly like an effect that does not work.
+    for (const object of scene.objects) {
+      if (object.destructible)
+        for (const assetId of destructibleAssets(object.destructible)) want(assetId);
+    }
 
     const total = wanted.size;
     let completed = 0;

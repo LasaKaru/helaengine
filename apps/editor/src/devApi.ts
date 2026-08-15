@@ -144,6 +144,15 @@ export interface DevApi {
   cameraMode(): string | null;
   /** Which shell screen is showing, or null when the game shell is not mounted. */
   uiScreen(): string | null;
+  /**
+   * Starts collecting every payload raised under an event name.
+   *
+   * A recorder rather than a callback, because a Playwright `page.evaluate` cannot pass a function
+   * across the boundary. Returns false when nothing is running to listen to.
+   */
+  recordEvents(event: string): boolean;
+  /** What has arrived since `recordEvents`, or null if it was never asked for. */
+  recordedEvents(event: string): unknown[] | null;
   /** Whether the player is crouched, and how fast they are moving. */
   playerMotion(): { speed: number; crouched: boolean; grounded: boolean } | null;
   /**
@@ -284,6 +293,15 @@ export function setPlayer(player: PlayerController | null): void {
 }
 
 let currentGame: GameRuntime | null = null;
+
+/**
+ * Events a test asked to be recorded, and what arrived on each.
+ *
+ * A recorder rather than a callback the test supplies: a Playwright `page.evaluate` cannot hand a
+ * function across the boundary, so the alternative is the test stashing a closure on `window` and
+ * hoping nothing reloads. This keeps the collection on the side that owns the bus.
+ */
+const recorded = new Map<string, unknown[]>();
 
 /** Records the running game runtime, so tests can read AI state and raise events. */
 export function setGameRuntime(runtime: GameRuntime | null): void {
@@ -706,6 +724,16 @@ export function exposeDevApi(library: AssetLibrary): void {
       currentGame.emit(event, payload);
       return true;
     },
+
+    recordEvents: (event) => {
+      if (!currentGame) return false;
+      const seen: unknown[] = [];
+      recorded.set(event, seen);
+      currentGame.behaviors.on(event, (payload) => seen.push(payload ?? null));
+      return true;
+    },
+
+    recordedEvents: (event) => recorded.get(event) ?? null,
 
     graphVariable: (name) => currentGame?.graph?.variable(name) ?? null,
 

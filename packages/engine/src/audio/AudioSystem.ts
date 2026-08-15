@@ -245,12 +245,39 @@ export class AudioSystem {
 
       const voice = this.#createSfx(url, binding);
       if (binding.positional) {
-        const objectId = (payload as { objectId?: unknown } | undefined)?.objectId;
-        const at = typeof objectId === 'string' ? this.#locate(objectId) : null;
+        const at = this.#where(payload);
         if (at) voice.pos?.(at.x, at.y, at.z);
       }
       voice.play();
     }
+  }
+
+  /**
+   * Where a positional sound should come from.
+   *
+   * An object id first, since that is what almost every event carries. An explicit `position` is
+   * the fallback, and it exists for the events raised *about something that has just stopped
+   * existing* — a destructible's break is emitted after the crate has been removed, so looking its
+   * id up finds nothing and the sound would collapse to the centre of the listener's head.
+   */
+  #where(payload: unknown): { x: number; y: number; z: number } | null {
+    const data = payload as { objectId?: unknown; position?: unknown } | undefined;
+
+    if (typeof data?.objectId === 'string') {
+      const found = this.#locate(data.objectId);
+      if (found) return found;
+    }
+
+    const position = data?.position;
+    if (
+      Array.isArray(position) &&
+      position.length >= 3 &&
+      position.every((value) => typeof value === 'number' && Number.isFinite(value))
+    ) {
+      return { x: position[0] as number, y: position[1] as number, z: position[2] as number };
+    }
+
+    return null;
   }
 
   /**

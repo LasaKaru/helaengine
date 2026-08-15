@@ -4,6 +4,7 @@ import { devtools } from 'zustand/middleware';
 import {
   CURRENT_SCENE_VERSION,
   SceneSchema,
+  SceneObjectSchema,
   ScatterLayerSchema,
   JointSchema,
   UnlockableSchema,
@@ -31,6 +32,7 @@ import {
   type GraphVariable,
   type SwayOverride,
   type ScatterLayer,
+  type Destructible,
   type Joint,
   type JointType,
 } from '@helaengine/schema';
@@ -110,6 +112,8 @@ export interface SceneState {
   setMaterial(objectId: string, material: MaterialOverride | null): void;
   /** Whether the wind moves this object, and as what. */
   setSway(objectId: string, sway: SwayOverride): void;
+  /** What happens when this object takes enough damage, or null for something that does not break. */
+  setDestructible(objectId: string, destructible: Destructible | null): void;
   setPlayer(player: Partial<Player>): void;
   setInventory(inventory: Partial<Inventory>): void;
   addWeapon(): string;
@@ -265,7 +269,12 @@ export const useSceneStore = create<SceneState>()(
 
         addObject: (object) => {
           commit('object/add', (draft) => {
-            draft.objects.push(object);
+            // Parsed rather than pushed as given, like every other action that adds to the
+            // document. The type says the caller supplied every field; the type is a claim about
+            // the caller, and a half-built object reaching the panels crashes them on a field the
+            // schema would have defaulted. Parsing is idempotent for a caller who was telling the
+            // truth, so it costs the common path nothing.
+            draft.objects.push(SceneObjectSchema.parse(object));
           });
           // The first moment the product has done something for them, and the step the plan most
           // wants a number for. `trackFirst`, because a per-drop event would make placement look
@@ -336,6 +345,9 @@ export const useSceneStore = create<SceneState>()(
                 // Copied as a value rather than shared: recolouring one copy must not recolour
                 // the object it was copied from.
                 material: source.material ? { ...source.material } : null,
+                // A copy breaks like the original — and as a value rather than shared, so
+                // retuning one crate's hit points does not retune the crate it came from.
+                destructible: source.destructible ? { ...source.destructible } : null,
                 // A duplicated trigger keeps its wiring: copying a spawn point should give you a
                 // second spawn point, not an inert box.
                 trigger: source.trigger
@@ -470,6 +482,12 @@ export const useSceneStore = create<SceneState>()(
           commit('object/setSway', (draft) => {
             const object = draft.objects.find((current) => current.id === objectId);
             if (object) object.sway = sway;
+          }),
+
+        setDestructible: (objectId, destructible) =>
+          commit('object/setDestructible', (draft) => {
+            const object = draft.objects.find((current) => current.id === objectId);
+            if (object) object.destructible = destructible;
           }),
 
         setGameConfig: (config) =>

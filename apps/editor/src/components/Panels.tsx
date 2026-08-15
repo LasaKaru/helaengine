@@ -23,6 +23,7 @@ import { ScatterPanel } from './ScatterPanel';
 import { LevelsPanel } from './LevelsPanel';
 import { PacksPanel } from './PacksPanel';
 import { JointsPanel } from './JointsPanel';
+import { DestructiblePanel } from './DestructiblePanel';
 import { AudioPanel } from './AudioPanel';
 import { SecretsPanel } from './SecretsPanel';
 import { WeaponsPanel } from './WeaponsPanel';
@@ -522,6 +523,7 @@ export function InspectorPanel({ manifest }: { manifest: AssetManifest }): React
       {single && !single.trigger && <BehaviorPanel object={single} />}
       {single && !single.trigger && <AnimationPanel object={single} manifest={manifest} />}
       {single && !single.trigger && <MaterialPanel object={single} />}
+      {single && !single.trigger && <DestructiblePanel object={single} manifest={manifest} />}
 
       <LevelsPanel />
       <TerrainPanel />
