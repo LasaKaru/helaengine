@@ -10,6 +10,8 @@
   character, and why a scene names states rather than clips.
 - [**Making a world feel alive**](WORLD.md) — wind and swaying vegetation, ground cover placed by
   rule, world size, look presets and ambient sound.
+- [**Physics**](PHYSICS.md) — how things collide, how the character moves, and joints, breakables,
+  ragdolls and vehicles — with what the engine does not do stated plainly.
 - [**The node graph**](GRAPH.md) — wiring up what happens in a level without writing code, and the
   checks a canvas can make that a script file cannot.
 - [**Skill packs**](PACKS.md) — recipes as markdown files: what a pack may change, why it can never
