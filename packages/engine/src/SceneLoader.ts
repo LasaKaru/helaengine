@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {
   destructibleAssets,
+  vehicleAssets,
   SHADOW_MAP_SIZE,
   type AssetManifestEntry,
   type Environment,
@@ -629,8 +630,12 @@ export class SceneLoader {
     // without this the first break asks the cache for a model no pass fetched. The crate would
     // disappear and leave nothing behind — which looks exactly like an effect that does not work.
     for (const object of scene.objects) {
-      if (object.destructible)
+      if (object.destructible) {
         for (const assetId of destructibleAssets(object.destructible)) want(assetId);
+      }
+      // Wheels are the same trap once more: named only inside a vehicle, so without this a car
+      // arrives rolling on nothing and it reads as the wheel setting having been ignored.
+      if (object.vehicle) for (const assetId of vehicleAssets(object.vehicle)) want(assetId);
     }
 
     const total = wanted.size;

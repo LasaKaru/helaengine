@@ -465,11 +465,44 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
       yaw: look.current.yaw,
     };
 
+    /**
+     * Getting in and out of a car, on the same key that opens doors.
+     *
+     * `interact` rather than a key of its own: a player who has learned that E is "do the thing in
+     * front of me" should not have to learn a second key for the thing in front of them that
+     * happens to have wheels.
+     */
+    const game = runtime.current;
+    if (game && possessed && manager.wasPressed('interact')) {
+      if (game.drivingVehicleId !== null) game.exitVehicle();
+      else {
+        const nearby = game.nearestVehicle(player.position);
+        if (nearby !== null) game.enterVehicle(nearby);
+      }
+    }
+
+    const driving = game?.drivingVehicleId != null;
+    const driveInput = {
+      throttle: driving ? move.y : 0,
+      steer: driving ? move.x : 0,
+      brake: driving && manager.isDown('jump'),
+    };
+
     // Timed separately because they answer different questions: the solver's cost scales with
     // bodies and contacts, gameplay's with how many things are thinking. Conflating them would
     // hide which one a future regression came from.
     const beforePhysics = performance.now();
-    physics.step(delta, (step) => player.move(moveInput, step));
+    physics.step(delta, (step) => {
+      // A driver's legs do not also walk. Feeding movement to both would have the character
+      // controller trying to stride out of the car it is strapped into, and the two would fight
+      // over the same position every step.
+      if (!driving) player.move(moveInput, step);
+      // Every frame regardless, because a parked car's suspension only runs while it is stepped.
+      game?.driveVehicle(driveInput, step);
+    });
+    // After the step, so the seat is read from where the car actually ended up rather than from
+    // where it was before the frame.
+    if (driving) game?.syncDriver();
     const afterPhysics = performance.now();
 
     // The camera is where the player is looking, so it is where the shot comes from. Third person

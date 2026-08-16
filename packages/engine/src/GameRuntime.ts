@@ -11,6 +11,8 @@ import {
 import type { AssetResolver } from './assets.js';
 import { BehaviorRuntime } from './BehaviorRuntime.js';
 import { buildScenePhysics, resolveColliderType } from './physics/buildScenePhysics.js';
+import type { BuiltVehicle } from './physics/buildScenePhysics.js';
+import type { DriveInput, VehicleController } from './physics/VehicleController.js';
 import { DestructibleSystem, type FragmentRequest } from './combat/DestructibleSystem.js';
 import type { PhysicsWorld } from './physics/PhysicsWorld.js';
 import type { PlayerController } from './physics/PlayerController.js';
@@ -46,6 +48,8 @@ export interface GameRuntimeOptions {
 const nextPosition = new THREE.Vector3();
 const shotOrigin = new THREE.Vector3();
 const breakPoint = new THREE.Vector3();
+/** What an unattended vehicle is told each step: hold yourself up, and do nothing else. */
+const IDLE_DRIVE: DriveInput = { throttle: 0, steer: 0, brake: false };
 
 /**
  * Everything that has to be true for a scene to be *running* rather than merely loaded.
@@ -65,6 +69,9 @@ export class GameRuntime implements WorldHandle {
   readonly inventory: Inventory;
   readonly weapons: WeaponSystem;
   readonly destructibles: DestructibleSystem;
+  readonly #vehicles = new Map<string, VehicleController>();
+  /** Object id of the vehicle the player is in, or null when on foot. */
+  #driving: string | null = null;
   readonly unlocks: UnlockRuntime;
   /** The scene's visual script, or null when it has none. */
   readonly graph: GraphRuntime | null;
@@ -685,6 +692,139 @@ export class GameRuntime implements WorldHandle {
     this.behaviors.emit('objectDestroyed', { objectId });
   }
 
+  /** Vehicles built for this scene, by the object that is their chassis. */
+  get vehicles(): ReadonlyMap<string, VehicleController> {
+    return this.#vehicles;
+  }
+
+  /** The vehicle the player is currently driving, or null when they are on foot. */
+  get drivingVehicleId(): string | null {
+    return this.#driving;
+  }
+
+  /** Adopts the vehicles `buildScenePhysics` created, and gives each one its wheel models. */
+  adoptVehicles(built: readonly BuiltVehicle[]): void {
+    for (const { objectId, controller } of built) {
+      this.#vehicles.set(objectId, controller);
+
+      const settings = this.#documentObjects.get(objectId)?.vehicle;
+      if (!settings || settings.wheelAssetId === '') continue;
+      if (!this.#resolver.has(settings.wheelAssetId)) {
+        this.#warn(`vehicle "${objectId}" wants unknown wheel asset "${settings.wheelAssetId}"`);
+        continue;
+      }
+
+      const nodes: THREE.Object3D[] = [];
+      for (let index = 0; index < 4; index += 1) {
+        // Spawned with no collider on purpose: the wheel's position is already decided by the
+        // suspension ray, and a collider would fight the ray that decided it.
+        const id = this.spawn({
+          assetId: settings.wheelAssetId,
+          position: [0, 0, 0],
+          physics: { body: 'static', collider: 'none' },
+        });
+        const node = id === null ? null : this.#loaded.objects.get(id);
+        if (node) nodes.push(node);
+      }
+      controller.attachWheels(nodes);
+    }
+  }
+
+  /**
+   * Nearest vehicle the player could get into, or null.
+   *
+   * Distance to the *chassis*, not to the seat: a player standing at the driver's door is closer to
+   * the car than to a seat point somewhere inside it, and measuring to the seat makes the prompt
+   * appear a step later than it looks like it should.
+   */
+  nearestVehicle(from: THREE.Vector3): string | null {
+    let best: string | null = null;
+    let bestDistance = Infinity;
+
+    for (const [objectId] of this.#vehicles) {
+      const node = this.#loaded.objects.get(objectId);
+      const settings = this.#documentObjects.get(objectId)?.vehicle;
+      if (!node || !settings) continue;
+
+      node.getWorldPosition(nextPosition);
+      const distance = nextPosition.distanceTo(from);
+      if (distance <= settings.enterRadius && distance < bestDistance) {
+        best = objectId;
+        bestDistance = distance;
+      }
+    }
+
+    return best;
+  }
+
+  /** Puts the player in a vehicle. Returns false if there is no such vehicle to get into. */
+  enterVehicle(objectId: string): boolean {
+    if (!this.#vehicles.has(objectId)) return false;
+    this.#driving = objectId;
+    // The driver stops colliding with the world while they are inside the car. Without this their
+    // capsule sits permanently inside the chassis collider, and the solver spends the whole journey
+    // pushing the two apart — which pins the car and reads exactly like a throttle that does not
+    // work. It cost an afternoon to find, so it is worth saying plainly.
+    this.#player?.setColliderEnabled(false);
+    this.behaviors.emit('vehicleEntered', { objectId });
+    return true;
+  }
+
+  /**
+   * Puts the player back on their feet beside the car.
+   *
+   * Beside rather than at the seat: stepping out at the seat leaves the character capsule inside
+   * the chassis collider, and the solver ejects them through the roof at speed.
+   */
+  exitVehicle(): boolean {
+    const objectId = this.#driving;
+    const controller = objectId === null ? undefined : this.#vehicles.get(objectId);
+    if (!objectId || !controller) return false;
+
+    this.#driving = null;
+    this.#player?.setColliderEnabled(true);
+
+    const node = this.#loaded.objects.get(objectId);
+    if (node && this.#player) {
+      node.getWorldPosition(nextPosition);
+      // Two metres to the driver's side, and a little up, so the drop settles rather than clips.
+      nextPosition.x += 2;
+      nextPosition.y += 0.5;
+      this.#player.teleport(nextPosition);
+    }
+
+    this.behaviors.emit('vehicleExited', { objectId });
+    return true;
+  }
+
+  /**
+   * One fixed step for *every* vehicle, driven or not.
+   *
+   * Called from the host's `onFixedStep` hook beside the character controller, so throttle is
+   * integrated at the rate the solver resolves at.
+   *
+   * Every vehicle, not just the one being driven — and that is not an optimisation left on the
+   * table, it is the difference between working and not. A ray-cast vehicle's suspension only
+   * pushes when `updateVehicle` runs, so a parked car that is never stepped has nothing holding it
+   * up: it sinks until its chassis box rests on the ground, which puts the wheel hubs *below* the
+   * surface. Their rays then point down into empty space, find no contact, and the car can never be
+   * driven again. Skipping idle cars looks like thrift and produces a level full of vehicles that
+   * are dead by the time the player reaches them.
+   */
+  driveVehicle(input: DriveInput, step: number): void {
+    for (const [objectId, controller] of this.#vehicles) {
+      controller.drive(objectId === this.#driving ? input : IDLE_DRIVE, step);
+    }
+  }
+
+  /** Keeps the player's capsule with the car they are driving. */
+  syncDriver(): void {
+    if (this.#driving === null || !this.#player) return;
+    const controller = this.#vehicles.get(this.#driving);
+    if (!controller) return;
+    this.#player.teleport(controller.seatPosition(nextPosition));
+  }
+
   emit(event: string, payload?: unknown): void {
     this.behaviors.emit(event, payload);
   }
@@ -728,16 +868,18 @@ export class GameRuntime implements WorldHandle {
 
 /** Builds the physics for a scene and a runtime to drive it — the whole "press play" path. */
 export function startScene(options: GameRuntimeOptions): GameRuntime {
-  if (options.physics) {
-    buildScenePhysics({
-      world: options.physics,
-      scene: options.scene,
-      loaded: options.loaded,
-      resolver: options.resolver,
-    });
-  }
+  const report = options.physics
+    ? buildScenePhysics({
+        world: options.physics,
+        scene: options.scene,
+        loaded: options.loaded,
+        resolver: options.resolver,
+      })
+    : null;
 
   const runtime = new GameRuntime(options);
+  // After construction, because building a wheel goes through `spawn` and a spawn needs a runtime.
+  if (report) runtime.adoptVehicles(report.vehicles);
   runtime.start();
   return runtime;
 }

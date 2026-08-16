@@ -3,6 +3,7 @@ import type { ColliderType, Scene, SceneObject } from '@helaengine/schema';
 import type { AssetResolver } from '../assets.js';
 import type { LoadedScene } from '../SceneLoader.js';
 import type { PhysicsWorld } from './PhysicsWorld.js';
+import type { VehicleController } from './VehicleController.js';
 
 export interface ScenePhysicsOptions {
   world: PhysicsWorld;
@@ -16,6 +17,11 @@ export interface ScenePhysicsSkip {
   reason: string;
 }
 
+export interface BuiltVehicle {
+  objectId: string;
+  controller: VehicleController;
+}
+
 export interface ScenePhysicsReport {
   /** Bodies actually added to the world. */
   bodies: number;
@@ -24,6 +30,8 @@ export interface ScenePhysicsReport {
   terrain: boolean;
   /** Constraints actually created. */
   joints: number;
+  /** Vehicles built, with their controllers, so the host can drive one. */
+  vehicles: BuiltVehicle[];
   /** Joints that could not be built, and why. Same list the editor's panel warns about. */
   skippedJoints: ScenePhysicsSkip[];
 }
@@ -103,5 +111,20 @@ export function buildScenePhysics(options: ScenePhysicsOptions): ScenePhysicsRep
     }
   }
 
-  return { bodies, skipped, terrain: field !== null, joints, skippedJoints };
+  // Vehicles after the bodies too: a chassis needs its rigid body before a controller can be hung
+  // off it, and a vehicle whose object had no collider is a car with nothing to push.
+  const vehicles: BuiltVehicle[] = [];
+  for (const object of scene.objects) {
+    if (!object.vehicle) continue;
+    const controller = world.createVehicle(object.id, object.vehicle);
+    if (controller) vehicles.push({ objectId: object.id, controller });
+    else {
+      skipped.push({
+        objectId: object.id,
+        reason: 'a vehicle needs a Dynamic chassis with a collider',
+      });
+    }
+  }
+
+  return { bodies, skipped, terrain: field !== null, joints, skippedJoints, vehicles };
 }

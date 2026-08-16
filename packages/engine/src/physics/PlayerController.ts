@@ -282,6 +282,18 @@ export class PlayerController {
     this.#readBack();
   }
 
+  /**
+   * Turns the character's own capsule on or off.
+   *
+   * For riding in things. A driver sits *inside* the chassis collider, and a kinematic capsule
+   * teleported back into that overlap every frame is a permanent penetration the solver spends the
+   * whole journey trying to resolve — it pushes back hard enough to pin the car in place, which
+   * reads exactly like the throttle not working.
+   */
+  setColliderEnabled(enabled: boolean): void {
+    this.#collider.setEnabled(enabled);
+  }
+
   /** Drops the character somewhere new, cancelling any fall in progress. */
   teleport(to: THREE.Vector3): void {
     const radius = this.#player.radius;

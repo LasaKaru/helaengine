@@ -33,6 +33,7 @@ import {
   type SwayOverride,
   type ScatterLayer,
   type Destructible,
+  type Vehicle as VehicleType,
   type Joint,
   type JointType,
 } from '@helaengine/schema';
@@ -114,6 +115,8 @@ export interface SceneState {
   setSway(objectId: string, sway: SwayOverride): void;
   /** What happens when this object takes enough damage, or null for something that does not break. */
   setDestructible(objectId: string, destructible: Destructible | null): void;
+  /** Turns this object into something the player can drive, or null for everything else. */
+  setVehicle(objectId: string, vehicle: VehicleType | null): void;
   setPlayer(player: Partial<Player>): void;
   setInventory(inventory: Partial<Inventory>): void;
   addWeapon(): string;
@@ -348,6 +351,11 @@ export const useSceneStore = create<SceneState>()(
                 // A copy breaks like the original — and as a value rather than shared, so
                 // retuning one crate's hit points does not retune the crate it came from.
                 destructible: source.destructible ? { ...source.destructible } : null,
+                // Copied as a value, so retuning one car's suspension does not retune the one it
+                // was duplicated from.
+                vehicle: source.vehicle
+                  ? (JSON.parse(JSON.stringify(source.vehicle)) as typeof source.vehicle)
+                  : null,
                 // A duplicated trigger keeps its wiring: copying a spawn point should give you a
                 // second spawn point, not an inert box.
                 trigger: source.trigger
@@ -488,6 +496,12 @@ export const useSceneStore = create<SceneState>()(
           commit('object/setDestructible', (draft) => {
             const object = draft.objects.find((current) => current.id === objectId);
             if (object) object.destructible = destructible;
+          }),
+
+        setVehicle: (objectId, vehicle) =>
+          commit('object/setVehicle', (draft) => {
+            const object = draft.objects.find((current) => current.id === objectId);
+            if (object) object.vehicle = vehicle;
           }),
 
         setGameConfig: (config) =>

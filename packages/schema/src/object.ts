@@ -4,6 +4,7 @@ import { ObjectAnimationSchema } from './animation.js';
 import { MaterialOverrideSchema } from './rendering.js';
 import { ObjectPhysicsSchema } from './physics.js';
 import { OptionalDestructibleSchema } from './destructible.js';
+import { OptionalVehicleSchema } from './vehicle.js';
 import { TriggerSchema } from './trigger.js';
 import { IdSchema, TransformSchema } from './primitives.js';
 import { SwayOverrideSchema } from './wind.js';
@@ -61,6 +62,13 @@ export const SceneObjectSchema = z.object({
    * saved before it existed: no destructible is no listener, no hit points and no debris.
    */
   destructible: OptionalDestructibleSchema,
+  /**
+   * Turns this object into something the player can drive, or null for everything else.
+   *
+   * Null by default, so it is invisible to every scene saved before it existed: no vehicle is no
+   * controller, no wheels and no seat.
+   */
+  vehicle: OptionalVehicleSchema,
   /**
    * Turns this object into a trigger volume: it stops being something you look at and becomes
    * something that notices. Null for the overwhelming majority of objects.

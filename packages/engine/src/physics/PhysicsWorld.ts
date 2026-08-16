@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import type { BodyType, ColliderType, Joint, Player } from '@helaengine/schema';
+import type { BodyType, ColliderType, Joint, Player, Vehicle } from '@helaengine/schema';
 import type { TerrainField } from '../TerrainField.js';
 import { colliderDescFor } from './colliders.js';
 import { jointDataFor, jointIsDriveable } from './joints.js';
 import { PlayerController } from './PlayerController.js';
+import { VehicleController } from './VehicleController.js';
 import { initPhysics, type RapierModule } from './rapier.js';
 
 /** Rapier's own types are only reachable through the module namespace; these keep call sites readable. */
@@ -75,6 +76,7 @@ export class PhysicsWorld {
   readonly #fixedTimestep: number;
   readonly #maxSubsteps: number;
   readonly #players: PlayerController[] = [];
+  readonly #vehicles: VehicleController[] = [];
   readonly #joints = new Map<string, RapierImpulseJoint>();
   /** Joint ids by the object at each end, so removing a body can drop the joints it took with it. */
   readonly #jointsByObject = new Map<string, Set<string>>();
@@ -384,6 +386,36 @@ export class PhysicsWorld {
     };
   }
 
+  /**
+   * Builds a driveable vehicle on an existing object's body.
+   *
+   * Returns null when the object has no body, or has one the solver cannot move. A ray-cast vehicle
+   * pushes its *chassis*, so a static one is a car-shaped wall — reporting that is what lets the
+   * editor say so rather than leaving the author to wonder why the throttle does nothing.
+   */
+  createVehicle(objectId: string, settings: Vehicle): VehicleController | null {
+    const record = this.#bodies.get(objectId);
+    if (!record || record.type !== 'dynamic') return null;
+
+    const controller = new VehicleController(this, objectId, record.body, settings);
+    this.#vehicles.push(controller);
+    return controller;
+  }
+
+  vehicleFor(objectId: string): VehicleController | undefined {
+    return this.#vehicles.find((vehicle) => vehicle.objectId === objectId);
+  }
+
+  get vehicleCount(): number {
+    return this.#vehicles.length;
+  }
+
+  /** Forgets a vehicle so a disposed one is not synced from freed memory. */
+  releaseVehicle(controller: VehicleController): void {
+    const at = this.#vehicles.indexOf(controller);
+    if (at >= 0) this.#vehicles.splice(at, 1);
+  }
+
   /** Builds a character controller for the document's player. Stepped and synced with the world. */
   createPlayer(player: Player, spawn?: THREE.Vector3): PlayerController {
     const controller = new PlayerController(this, player, spawn);
@@ -434,6 +466,9 @@ export class PhysicsWorld {
    */
   syncToScene(): void {
     for (const player of this.#players) player.sync();
+    // Before the dynamic bodies rather than after: a wheel model is positioned from the chassis's
+    // own transform, and reading it a frame late makes the wheels trail the car they belong to.
+    for (const vehicle of this.#vehicles) vehicle.syncWheels();
 
     for (const record of this.#dynamic) {
       const translation = record.body.translation();
@@ -461,6 +496,7 @@ export class PhysicsWorld {
     this.#objectByBody.clear();
     this.#dynamic.length = 0;
     this.#players.length = 0;
+    this.#vehicles.length = 0;
     this.#joints.clear();
     this.#jointsByObject.clear();
     this.#terrain = null;

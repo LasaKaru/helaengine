@@ -153,6 +153,16 @@ export interface DevApi {
   recordEvents(event: string): boolean;
   /** What has arrived since `recordEvents`, or null if it was never asked for. */
   recordedEvents(event: string): unknown[] | null;
+  /** Object id of the vehicle the player is driving, or null when on foot or not playing. */
+  drivingVehicleId(): string | null;
+  /** Speed, steering and wheel contact for a vehicle — what a driving test asserts against. */
+  vehicleState(objectId: string): {
+    speed: number;
+    steer: number;
+    grounded: boolean;
+    engineForce: number;
+    steps: number;
+  } | null;
   /** Whether the player is crouched, and how fast they are moving. */
   playerMotion(): { speed: number; crouched: boolean; grounded: boolean } | null;
   /**
@@ -734,6 +744,20 @@ export function exposeDevApi(library: AssetLibrary): void {
     },
 
     recordedEvents: (event) => recorded.get(event) ?? null,
+
+    drivingVehicleId: () => currentGame?.drivingVehicleId ?? null,
+
+    vehicleState: (objectId) => {
+      const controller = currentGame?.vehicles.get(objectId);
+      if (!controller) return null;
+      return {
+        speed: controller.speed,
+        steer: controller.steerAngle,
+        grounded: controller.grounded,
+        engineForce: controller.engineForceAt(2),
+        steps: controller.stepCount,
+      };
+    },
 
     graphVariable: (name) => currentGame?.graph?.variable(name) ?? null,
 
