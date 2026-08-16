@@ -13,6 +13,7 @@ import { BehaviorRuntime } from './BehaviorRuntime.js';
 import { buildScenePhysics, resolveColliderType } from './physics/buildScenePhysics.js';
 import type { BuiltVehicle } from './physics/buildScenePhysics.js';
 import type { DriveInput, VehicleController } from './physics/VehicleController.js';
+import { RagdollBody } from './physics/Ragdoll.js';
 import { DestructibleSystem, type FragmentRequest } from './combat/DestructibleSystem.js';
 import type { PhysicsWorld } from './physics/PhysicsWorld.js';
 import type { PlayerController } from './physics/PlayerController.js';
@@ -70,6 +71,9 @@ export class GameRuntime implements WorldHandle {
   readonly weapons: WeaponSystem;
   readonly destructibles: DestructibleSystem;
   readonly #vehicles = new Map<string, VehicleController>();
+  readonly #ragdolls = new Map<string, RagdollBody>();
+  /** Corpses counting down to removal, so a level does not accumulate eleven bodies per kill. */
+  readonly #corpses: Array<{ objectId: string; secondsLeft: number }> = [];
   /** Object id of the vehicle the player is in, or null when on foot. */
   #driving: string | null = null;
   readonly unlocks: UnlockRuntime;
@@ -178,6 +182,18 @@ export class GameRuntime implements WorldHandle {
     // learning what a crate is. That is why shooting a destructible needed no change to
     // `WeaponSystem` at all — and why a trigger, a graph node or a script can break something by
     // raising the event everything else already raises.
+    /**
+     * Going limp listens for the death message the AI already sends.
+     *
+     * The same shape as breaking: `ChaseOnSightBehavior` raises `enemyDied` because it is dead, not
+     * because it knows what a ragdoll is. Anything else that kills something — a graph node, a
+     * trigger, a script — gets ragdolls for free by raising the same event.
+     */
+    this.behaviors.on('enemyDied', (payload) => {
+      const died = payload as { objectId?: unknown } | undefined;
+      if (typeof died?.objectId === 'string') this.ragdoll(died.objectId);
+    });
+
     this.behaviors.on('damage', (payload) => {
       const hit = payload as { targetId?: unknown; amount?: unknown } | undefined;
       if (typeof hit?.targetId !== 'string' || typeof hit.amount !== 'number') return;
@@ -260,6 +276,7 @@ export class GameRuntime implements WorldHandle {
     // After weapons, so debris created by this frame's shot starts its life with a full lifetime
     // rather than one already a frame short.
     this.destructibles.update(deltaSeconds);
+    this.#tickCorpses(deltaSeconds);
   }
 
   /**
@@ -823,6 +840,91 @@ export class GameRuntime implements WorldHandle {
     const controller = this.#vehicles.get(this.#driving);
     if (!controller) return;
     this.#player.teleport(controller.seatPosition(nextPosition));
+  }
+
+  /**
+   * Ages corpses out.
+   *
+   * Eleven rigid bodies and ten joints per kill is a real cost, and a level where the player fights
+   * their way through forty enemies would otherwise end up simulating four hundred limbs nobody can
+   * see. Zero keeps them, which is the right default for a set piece and the wrong one for a horde.
+   */
+  #tickCorpses(delta: number): void {
+    for (let index = this.#corpses.length - 1; index >= 0; index -= 1) {
+      const entry = this.#corpses[index]!;
+      entry.secondsLeft -= delta;
+      if (entry.secondsLeft > 0) continue;
+
+      const corpse = this.#ragdolls.get(entry.objectId);
+      if (corpse) {
+        this.#physics?.releaseRagdoll(corpse);
+        corpse.dispose();
+      }
+      this.#ragdolls.delete(entry.objectId);
+      this.destroy(entry.objectId);
+      // Backwards, so a splice cannot skip the next entry.
+      this.#corpses.splice(index, 1);
+    }
+  }
+
+  /** Characters currently being simulated as ragdolls, by object id. */
+  get ragdolls(): ReadonlyMap<string, RagdollBody> {
+    return this.#ragdolls;
+  }
+
+  /**
+   * Hands a rigged character's skeleton over to physics.
+   *
+   * Returns false when the object has no rig, no ragdoll settings, or is already limp. Idempotent
+   * on purpose: death can be reported by more than one system in the same frame — the AI's own
+   * state machine and a `damage` handler both have reason to — and building a second set of bodies
+   * on the same bones produces a corpse being pulled in two directions.
+   */
+  ragdoll(objectId: string, velocity?: THREE.Vector3): boolean {
+    if (this.#ragdolls.has(objectId)) return false;
+
+    const settings = this.#documentObjects.get(objectId)?.ragdoll;
+    const node = this.#loaded.objects.get(objectId);
+    const physics = this.#physics;
+    if (!settings || !node || !physics) return false;
+
+    /**
+     * The animator stops first, and this order is the whole correctness of the feature.
+     *
+     * A mixer still writing a death clip onto the same bones the solver is writing gives a corpse
+     * that flickers between two poses every frame — and it reads as unstable physics rather than as
+     * two systems fighting over one skeleton, which is what makes it hard to find.
+     */
+    this.#loaded.animator(objectId)?.dispose();
+
+    // The character's own collider goes too: a capsule standing where the corpse is lying holds it
+    // up off the floor, and the body appears to hover.
+    physics.setObjectEnabled(objectId, false);
+
+    const body = new RagdollBody(physics, objectId, node, settings, velocity);
+    if (body.limbCount === 0) {
+      // Nothing bound, or nothing matched. Undo rather than leave a character with its animator
+      // destroyed and no bodies driving it, which would freeze it mid-pose for good.
+      body.dispose();
+      physics.setObjectEnabled(objectId, true);
+      this.#warn(`ragdoll for "${objectId}" bound no bones`);
+      return false;
+    }
+
+    this.#ragdolls.set(objectId, body);
+    // Synced by the world alongside every other body, so bones are written from the same settled
+    // step the rest of the scene is read from rather than a frame behind it.
+    physics.adoptRagdoll(body);
+    if (settings.lifetime > 0) {
+      this.#corpses.push({ objectId, secondsLeft: settings.lifetime });
+    }
+    this.behaviors.emit('ragdollStarted', { objectId, limbs: body.limbCount });
+    return true;
+  }
+
+  /** Writes every ragdoll's bodies back onto its bones. Called after the solver has stepped. */
+  syncRagdolls(): void {
+    for (const body of this.#ragdolls.values()) body.sync();
   }
 
   emit(event: string, payload?: unknown): void {

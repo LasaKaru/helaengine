@@ -5,6 +5,7 @@ import { colliderDescFor } from './colliders.js';
 import { jointDataFor, jointIsDriveable } from './joints.js';
 import { PlayerController } from './PlayerController.js';
 import { VehicleController } from './VehicleController.js';
+import type { RagdollBody } from './Ragdoll.js';
 import { initPhysics, type RapierModule } from './rapier.js';
 
 /** Rapier's own types are only reachable through the module namespace; these keep call sites readable. */
@@ -77,6 +78,7 @@ export class PhysicsWorld {
   readonly #maxSubsteps: number;
   readonly #players: PlayerController[] = [];
   readonly #vehicles: VehicleController[] = [];
+  readonly #ragdolls: RagdollBody[] = [];
   readonly #joints = new Map<string, RapierImpulseJoint>();
   /** Joint ids by the object at each end, so removing a body can drop the joints it took with it. */
   readonly #jointsByObject = new Map<string, Set<string>>();
@@ -402,6 +404,16 @@ export class PhysicsWorld {
     return controller;
   }
 
+  /** Registers a ragdoll so its bones are written whenever the world syncs. */
+  adoptRagdoll(body: RagdollBody): void {
+    this.#ragdolls.push(body);
+  }
+
+  releaseRagdoll(body: RagdollBody): void {
+    const at = this.#ragdolls.indexOf(body);
+    if (at >= 0) this.#ragdolls.splice(at, 1);
+  }
+
   vehicleFor(objectId: string): VehicleController | undefined {
     return this.#vehicles.find((vehicle) => vehicle.objectId === objectId);
   }
@@ -469,6 +481,7 @@ export class PhysicsWorld {
     // Before the dynamic bodies rather than after: a wheel model is positioned from the chassis's
     // own transform, and reading it a frame late makes the wheels trail the car they belong to.
     for (const vehicle of this.#vehicles) vehicle.syncWheels();
+    for (const ragdoll of this.#ragdolls) ragdoll.sync();
 
     for (const record of this.#dynamic) {
       const translation = record.body.translation();
@@ -497,6 +510,7 @@ export class PhysicsWorld {
     this.#dynamic.length = 0;
     this.#players.length = 0;
     this.#vehicles.length = 0;
+    this.#ragdolls.length = 0;
     this.#joints.clear();
     this.#jointsByObject.clear();
     this.#terrain = null;

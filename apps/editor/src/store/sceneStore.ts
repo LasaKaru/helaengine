@@ -34,6 +34,7 @@ import {
   type ScatterLayer,
   type Destructible,
   type Vehicle as VehicleType,
+  type Ragdoll as RagdollType,
   type Joint,
   type JointType,
 } from '@helaengine/schema';
@@ -117,6 +118,8 @@ export interface SceneState {
   setDestructible(objectId: string, destructible: Destructible | null): void;
   /** Turns this object into something the player can drive, or null for everything else. */
   setVehicle(objectId: string, vehicle: VehicleType | null): void;
+  /** How this character's skeleton behaves once physics takes it over, or null for anything rigid. */
+  setRagdoll(objectId: string, ragdoll: RagdollType | null): void;
   setPlayer(player: Partial<Player>): void;
   setInventory(inventory: Partial<Inventory>): void;
   addWeapon(): string;
@@ -356,6 +359,11 @@ export const useSceneStore = create<SceneState>()(
                 vehicle: source.vehicle
                   ? (JSON.parse(JSON.stringify(source.vehicle)) as typeof source.vehicle)
                   : null,
+                // Copied as a value: rebinding one guard's bones must not rebind the guard it was
+                // duplicated from.
+                ragdoll: source.ragdoll
+                  ? { ...source.ragdoll, bones: { ...source.ragdoll.bones } }
+                  : null,
                 // A duplicated trigger keeps its wiring: copying a spawn point should give you a
                 // second spawn point, not an inert box.
                 trigger: source.trigger
@@ -502,6 +510,12 @@ export const useSceneStore = create<SceneState>()(
           commit('object/setVehicle', (draft) => {
             const object = draft.objects.find((current) => current.id === objectId);
             if (object) object.vehicle = vehicle;
+          }),
+
+        setRagdoll: (objectId, ragdoll) =>
+          commit('object/setRagdoll', (draft) => {
+            const object = draft.objects.find((current) => current.id === objectId);
+            if (object) object.ragdoll = ragdoll;
           }),
 
         setGameConfig: (config) =>

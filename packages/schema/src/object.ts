@@ -5,6 +5,7 @@ import { MaterialOverrideSchema } from './rendering.js';
 import { ObjectPhysicsSchema } from './physics.js';
 import { OptionalDestructibleSchema } from './destructible.js';
 import { OptionalVehicleSchema } from './vehicle.js';
+import { OptionalRagdollSchema } from './ragdoll.js';
 import { TriggerSchema } from './trigger.js';
 import { IdSchema, TransformSchema } from './primitives.js';
 import { SwayOverrideSchema } from './wind.js';
@@ -69,6 +70,11 @@ export const SceneObjectSchema = z.object({
    * controller, no wheels and no seat.
    */
   vehicle: OptionalVehicleSchema,
+  /**
+   * How this character's skeleton behaves once physics takes it over, or null for anything that
+   * does not go limp — which is everything without a rig, and most things with one.
+   */
+  ragdoll: OptionalRagdollSchema,
   /**
    * Turns this object into a trigger volume: it stops being something you look at and becomes
    * something that notices. Null for the overwhelming majority of objects.

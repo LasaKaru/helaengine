@@ -3106,6 +3106,7 @@ test.describe('release gate', () => {
             trigger: null,
             destructible: null,
             vehicle: null,
+            ragdoll: null,
             sway: 'auto' as const,
             metadata: {},
           });

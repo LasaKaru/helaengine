@@ -8,6 +8,7 @@ import { setCamera, setCameraPoseHandler, setLoadedScene, setRenderer } from '..
 import { PostProcessing } from './PostProcessing';
 import { useProjectStore } from '../store/projectStore';
 import { EngineBridge } from './EngineBridge';
+import { setLiveScene } from '../engine/liveScene';
 import { MarqueeOverlay } from './Marquee';
 import { PlacementController } from './PlacementController';
 import { PlacementToolbar } from './PlacementToolbar';
@@ -114,6 +115,8 @@ export function Viewport({ loader, resolver }: ViewportProps): React.JSX.Element
     setStats({ objects: loaded.objects.size, missing: loaded.missingAssetIds.length });
     setLoadedScene(loaded);
     setLoaded(loaded);
+    // So panels can ask the model questions the document cannot answer — bone names, above all.
+    setLiveScene(loaded);
   }, []);
 
   return (
