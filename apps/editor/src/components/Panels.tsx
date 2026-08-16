@@ -370,6 +370,76 @@ function PlayerPanel(): React.JSX.Element {
         />
       </div>
 
+      <h3>Feel</h3>
+      <p className="panel-hint">
+        All four are off by default, so a level tuned before they existed plays exactly as it did.
+        Each one forgives a mistake the player is usually not making.
+      </p>
+
+      <div className="param-row">
+        <span>Coyote time</span>
+        <NumberField
+          label="Coyote time"
+          scrubLabel=""
+          value={player.coyoteSeconds}
+          step={0.02}
+          suffix="s"
+          onChange={(value) => setPlayer({ coyoteSeconds: Math.min(1, Math.max(0, value)) })}
+        />
+      </div>
+      <p className="panel-hint">
+        How long a jump still works after walking off an edge. A player pressing at the lip is
+        almost always a frame or two late; without this their jump is silently eaten and they
+        conclude the controls are unreliable. Around 0.1s is invisible and forgiving.
+      </p>
+
+      <div className="param-row">
+        <span>Jump buffer</span>
+        <NumberField
+          label="Jump buffer"
+          scrubLabel=""
+          value={player.jumpBufferSeconds}
+          step={0.02}
+          suffix="s"
+          onChange={(value) => setPlayer({ jumpBufferSeconds: Math.min(1, Math.max(0, value)) })}
+        />
+      </div>
+      <p className="panel-hint">
+        The same mistake from the other side: a press made just before landing fires on the frame
+        they touch down, instead of being thrown away.
+      </p>
+
+      <div className="param-row">
+        <span>Air control</span>
+        <NumberField
+          label="Air control"
+          scrubLabel=""
+          value={player.airControl}
+          step={0.05}
+          onChange={(value) => setPlayer({ airControl: Math.min(1, Math.max(0, value)) })}
+        />
+      </div>
+      <p className="panel-hint">
+        How much steering the player keeps in mid-air. 1 is full control and reads as floaty; 0
+        commits them to the direction they jumped in.
+      </p>
+
+      <div className="param-row">
+        <span>Mantle up to</span>
+        <NumberField
+          label="Mantle height"
+          scrubLabel=""
+          value={player.mantleHeight}
+          step={0.1}
+          suffix="m"
+          onChange={(value) => setPlayer({ mantleHeight: Math.min(4, Math.max(0, value)) })}
+        />
+      </div>
+      <p className="panel-hint">
+        Chest-high ledges the player hauls themselves onto when they press jump against one. Below
+        the step height it is a kerb they already walk over; zero turns mantling off.
+      </p>
+
       <button type="button" disabled={selectedIds.length !== 1} onClick={moveToSelection}>
         Spawn at object
       </button>

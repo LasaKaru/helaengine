@@ -66,6 +66,44 @@ export const PlayerSchema = z
     /** Tallest ledge the player steps over without jumping, in metres. */
     stepHeight: z.number().min(0).max(2).default(0.4),
     /**
+     * Seconds after walking off an edge during which a jump still works.
+     *
+     * Named after Wile E. Coyote, and it is the single largest difference between a character that
+     * feels responsive and one that feels like it is arguing with you. A player who presses jump at
+     * the lip of a platform is almost always a frame or two late — the character has already left
+     * the ground — and without this their jump is silently eaten. They do not conclude they mistimed
+     * it; they conclude the controls are unreliable.
+     *
+     * Zero is the old behaviour exactly, which is why it is the default: every scene saved before
+     * this existed keeps the movement it was tuned against.
+     */
+    coyoteSeconds: z.number().min(0).max(1).default(0),
+    /**
+     * Seconds before landing during which a jump press is remembered.
+     *
+     * The same mistake from the other side: a player falling towards the ground presses jump a
+     * fraction early, the press lands while they are still airborne, and nothing happens. Buffering
+     * it means the jump fires on the frame they touch down. Zero is the old behaviour.
+     */
+    jumpBufferSeconds: z.number().min(0).max(1).default(0),
+    /**
+     * How much steering the player has in mid-air, as a fraction of ground control.
+     *
+     * One is full control and the old behaviour — a character who can turn on a sixpence while
+     * falling, which reads as floaty and makes a jump a decision that can be taken twice. Lower
+     * values commit the player to the direction they left the ground in. Zero is a pure ballistic
+     * arc, which is precise and unforgiving.
+     */
+    airControl: z.number().min(0).max(1).default(1),
+    /**
+     * Tallest ledge the player pulls themselves onto, in metres, or 0 for none.
+     *
+     * A step is walked over without noticing; a mantle is a deliberate haul over something at chest
+     * height. The gap between `stepHeight` and here is what separates "the geometry is rough" from
+     * "that is a wall I can climb", and it is worth a great deal in a level built out of crates.
+     */
+    mantleHeight: z.number().min(0).max(4).default(0),
+    /**
      * Seconds face-down before respawning at the spawn point.
      *
      * A stub in the honest sense: Sprint 18 replaces "the spawn point" with "the last checkpoint"

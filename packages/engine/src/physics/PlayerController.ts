@@ -29,6 +29,8 @@ const desired = new THREE.Vector3();
 const heading = new THREE.Vector3();
 const strafe = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
+const DOWN = new THREE.Vector3(0, -1, 0);
+const probe = new THREE.Vector3();
 
 /**
  * A walking character, built on Rapier's kinematic character controller.
@@ -51,6 +53,19 @@ export class PlayerController {
   #disposed = false;
   #crouched = false;
   #speed = 0;
+  /**
+   * Seconds of coyote time left — how long a jump will still be accepted after leaving the ground.
+   *
+   * Counted down rather than a timestamp, so it advances with the fixed step and is unaffected by
+   * how long the frame took. A wall-clock deadline would make the window longer on a slow machine.
+   */
+  #coyoteLeft = 0;
+  /** Seconds left of a remembered jump press, waiting for the ground to arrive. */
+  #bufferLeft = 0;
+  /** Whether the jump button was down last step, so a held button is not a stream of jumps. */
+  #jumpHeld = false;
+  /** Ground direction at the moment of takeoff, for air control below 1. */
+  readonly #takeoff = new THREE.Vector3();
   readonly #standHalfHeight: number;
   readonly #crouchHalfHeight: number;
 
@@ -165,15 +180,83 @@ export class PlayerController {
         : input.sprint === true
           ? this.#player.sprintMultiplier
           : 1);
+
+    /**
+     * Air control: how far the player may steer away from the direction they left the ground in.
+     *
+     * Blended toward the takeoff direction rather than clamped, so the setting is a dial and not a
+     * switch — 0.3 is "you can adjust", 0 is "you are committed", 1 is the old behaviour and stays
+     * the default. Blending also keeps the vector's length right, where scaling only the difference
+     * would quietly make diagonal air movement slower than straight.
+     */
+    if (!this.#grounded && this.#player.airControl < 1) {
+      desired.lerpVectors(this.#takeoff, desired, this.#player.airControl);
+      if (desired.lengthSq() > 1) desired.normalize();
+    }
+
     desired.multiplyScalar(speed * step);
 
-    if (this.#grounded) {
+    // Windows first, so this step's decision uses this step's clock. Counting them down afterwards
+    // would give every window one free frame more than it was set to.
+    this.#coyoteLeft = this.#grounded
+      ? this.#player.coyoteSeconds
+      : Math.max(0, this.#coyoteLeft - step);
+
+    // The buffer is filled on the *edge* of the press. While the button is held `input.jump` is
+    // already saying so, so refilling would change nothing except to make the window outlive the
+    // release by its full length.
+    const pressed = input.jump && !this.#jumpHeld;
+    this.#jumpHeld = input.jump;
+    if (pressed) this.#bufferLeft = this.#player.jumpBufferSeconds;
+    else this.#bufferLeft = Math.max(0, this.#bufferLeft - step);
+
+    /**
+     * Whether this step is a jump.
+     *
+     * `input.jump` rather than `pressed`, deliberately. Holding the button has always made the
+     * character bounce on every landing, and that is the behaviour a level tuned against the old
+     * controller was tuned against — so with both windows at zero this reduces to exactly
+     * `input.jump && this.#grounded`, which is what the line here used to say. Making a jump
+     * edge-triggered would be a better default and is not this change's to make: it would alter
+     * every existing scene, silently, in a way nobody asked for.
+     *
+     * `coyoteLeft > 0` covers the player who pressed a moment after walking off the lip;
+     * `bufferLeft > 0` covers the one who pressed a moment before landing. Both are the same
+     * mistake, and both are almost always the game's fault rather than the player's.
+     */
+    const wantsJump = input.jump || this.#bufferLeft > 0;
+    const mayJump = this.#grounded || this.#coyoteLeft > 0;
+    const jumping = wantsJump && mayJump;
+
+    // A mantle is offered on the same press as a jump, and only when a plain jump would not clear
+    // the ledge anyway — so it never takes a jump the player meant to make.
+    const mantle = wantsJump ? this.#mantleBoost(heading) : 0;
+
+    if (mantle > 0) {
+      this.#verticalVelocity = mantle;
+      this.#coyoteLeft = 0;
+      this.#bufferLeft = 0;
+      this.#takeoff.copy(heading);
+    } else if (jumping) {
+      this.#verticalVelocity = this.#player.jumpSpeed;
+      // Both windows are spent by the jump they caused. Leaving coyote time running would let a
+      // player jump a second time out of the same window, in mid-air.
+      this.#coyoteLeft = 0;
+      this.#bufferLeft = 0;
+      this.#takeoff.copy(desired).setY(0);
+      if (this.#takeoff.lengthSq() > 1e-6) this.#takeoff.normalize();
+    } else if (this.#grounded) {
       // A small downward bias while grounded keeps the character pressed onto slopes instead of
       // skimming off the top of every rise.
-      this.#verticalVelocity = input.jump ? this.#player.jumpSpeed : -this.#player.gravity * step;
+      this.#verticalVelocity = -this.#player.gravity * step;
+      // Standing on the ground, the takeoff direction is wherever they are heading now — so
+      // stepping off an edge during coyote time commits to the direction they were walking.
+      this.#takeoff.copy(desired).setY(0);
+      if (this.#takeoff.lengthSq() > 1e-6) this.#takeoff.normalize();
     } else {
       this.#verticalVelocity -= this.#player.gravity * step;
     }
+
     desired.y = this.#verticalVelocity * step;
 
     this.#controller.computeColliderMovement(this.#collider, desired);
@@ -249,6 +332,54 @@ export class PlayerController {
       true,
     );
     this.#readBack();
+  }
+
+  /**
+   * Launch speed that would carry the player onto a ledge in front of them, or 0 for no mantle.
+   *
+   * A mantle as an *assisted jump* rather than a scripted climb. The scripted version — take control
+   * of the body, drive it along a curve, hand it back — is a second movement system with its own
+   * collision story, and every one of its edge cases (mantling into a low ceiling, onto something
+   * that then moves, while another body pushes you) has to be solved separately. Choosing a launch
+   * speed instead leaves the solver in charge throughout: the player is pressing forward already, so
+   * forward momentum carries them over, and everything that was true of a jump stays true.
+   *
+   * The cost is that it looks like a strong hop rather than a hand-over-hand climb. That is the
+   * honest trade for a low-poly engine, and it is the version that cannot get the player stuck.
+   */
+  #mantleBoost(heading: THREE.Vector3): number {
+    const limit = this.#player.mantleHeight;
+    if (limit <= 0 || heading.lengthSq() < 1e-6) return 0;
+
+    const radius = this.#player.radius;
+    const feetY = this.#position.y;
+    const reach = radius + 0.35;
+
+    // Something solid in front, above what a step would have handled on its own. Without this
+    // check, walking at open ground would mantle on every press.
+    probe.copy(this.#position).setY(feetY + this.#player.stepHeight + 0.05);
+    if (this.#world.castDistance(probe, heading, reach, this.#collider.handle) === null) return 0;
+
+    // Where the top of it is: a ray straight down, started above the highest ledge that counts and
+    // aimed at a point past the face rather than at the face itself.
+    probe.copy(this.#position).addScaledVector(heading, reach);
+    probe.y = feetY + limit + 0.5;
+    const drop = this.#world.castDistance(probe, DOWN, limit + 1, this.#collider.handle);
+    if (drop === null) return 0;
+
+    const ledge = probe.y - drop - feetY;
+    // Below a step it is not a mantle, it is a kerb the controller already walks over. Above the
+    // limit it is a wall, and pretending otherwise is how a player ends up on the skybox.
+    if (ledge <= this.#player.stepHeight || ledge > limit) return 0;
+
+    // Headroom for a standing capsule on top of the ledge. Mantling under a low overhang would
+    // wedge the player into it, which is the one outcome worse than not mantling.
+    probe.y = feetY + ledge + 0.05;
+    const clearance = this.#standHalfHeight * 2 + radius * 2;
+    if (this.#world.castDistance(probe, UP, clearance, this.#collider.handle) !== null) return 0;
+
+    // v = sqrt(2gh), plus a margin for the rise being spent partly on moving forward.
+    return Math.sqrt(2 * this.#player.gravity * (ledge + 0.25));
   }
 
   #readBack(): void {
