@@ -194,3 +194,51 @@ mysteriously dead.
 - Looks: `packages/schema/src/looks.ts`
 - Ambience: `packages/schema/src/audio.ts`, `packages/engine/src/audio/AmbiencePlayer.ts`
 - Play From Here: `apps/editor/src/components/PlayFromHere.tsx`
+
+## Weather and particles
+
+Two systems, because they are two problems.
+
+**Weather** fills the level: rain, snow, dust motes, ash. Set it under **Rendering → Weather**. It is
+a box of particles that follows the camera and wraps around inside it — nothing is ever spawned or
+retired, and every position is computed in the vertex shader from a seed and the clock. That is why
+forty thousand raindrops cost one draw call and no per-frame CPU work at all, and why a finite number
+of drops looks infinite: the player carries their own weather around and cannot reach its edge.
+
+`none` is the absence of the system rather than a storm of zero strength. No geometry is built, no
+shader is compiled, and nothing is drawn.
+
+Intensity is a fraction rather than a count, because "twelve thousand particles" is not a quantity
+anybody has an opinion about while "heavy rain" is. It is squared on the way in, so the slider's
+lower half is where the useful range lives.
+
+Weather is blown by the same wind that moves the vegetation, unless you turn that off. Rain falling
+straight down past a canopy that is visibly leaning is the sort of detail that reads as wrong without
+anybody being able to say why.
+
+**Emitters** come from somewhere: smoke off a chimney, fire in a brazier, sparks off a wire, dust
+where something landed. Tick **Particles** on an object. Six kinds, each of which is a behaviour the
+engine implements rather than a shader you supply — fire rises and shrinks and fades from yellow,
+sparks are thrown up and pulled down hard.
+
+The presets are chosen so that ticking `fire` and changing nothing gives fire. The panel's fields are
+multipliers on top, because a panel of raw numbers asks every author to rediscover what fire looks
+like and most of them stop at "orange dots".
+
+An emitter can be continuous or burst-only. A chimney is continuous; a footstep puff is not, and a
+continuous one would be a permanent cloud round the character's ankles. A burst fires on an event
+name — the same names everything else raises, so binding a dust puff to `destructibleBroken` covers
+every crate in the level with one emitter and no wiring.
+
+Each emitter's pool is fixed when the level loads. Growing a GPU buffer mid-frame is a hitch, so a
+full pool drops the newest particle instead: a puff briefly thinner than it asked for.
+
+### What is not here
+
+- **No textured particles.** Every particle is a soft round dot. A texture is one more file to fetch,
+  and at the sizes these are drawn at the difference is mostly invisible — but it does mean no smoke
+  wisps and no sprite sheets.
+- **No collision.** Particles pass through walls and floors.
+- **No lighting.** Particles are unlit and do not cast or receive shadows.
+- **No GPU simulation for emitters.** Weather is a shader; emitters are simulated on the CPU, because
+  births, deaths and pool reuse are exactly what a GPU is bad at without compute shaders.

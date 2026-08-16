@@ -3,6 +3,11 @@ import {
   TONE_MAPPING,
   type ShadowQuality,
   type ToneMapping,
+  WEATHER_HINTS,
+  WEATHER_KINDS,
+  WEATHER_LABELS,
+  weatherCount,
+  type WeatherKind,
 } from '@helaengine/schema';
 import { useSceneStore } from '../store/sceneStore';
 import { LOOKS, LOOK_DESCRIPTION, LOOK_LABEL, SWAY_GROUPS, applyLook } from '@helaengine/schema';
@@ -327,6 +332,86 @@ export function RenderingPanel(): React.JSX.Element {
               </button>
             ))}
           </div>
+        </>
+      )}
+
+      <h3>Weather</h3>
+
+      <label className="param-row">
+        <span>Kind</span>
+        <select
+          aria-label="Weather"
+          value={environment.weather.kind}
+          title={WEATHER_HINTS[environment.weather.kind]}
+          onChange={(event) =>
+            setEnvironment({
+              weather: { ...environment.weather, kind: event.target.value as WeatherKind },
+            })
+          }
+        >
+          {WEATHER_KINDS.map((kind) => (
+            <option key={kind} value={kind}>
+              {WEATHER_LABELS[kind]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="panel-hint">{WEATHER_HINTS[environment.weather.kind]}</p>
+
+      {environment.weather.kind !== 'none' && (
+        <>
+          <div className="param-row">
+            <span>Intensity</span>
+            <NumberField
+              label="Weather intensity"
+              scrubLabel=""
+              value={environment.weather.intensity}
+              step={0.05}
+              onChange={(intensity) =>
+                setEnvironment({
+                  weather: { ...environment.weather, intensity: clamp(intensity, 0, 1) },
+                })
+              }
+            />
+          </div>
+          <p className="panel-hint">
+            About {weatherCount(environment.weather).toLocaleString()} particles, in one draw call —
+            positions are computed in the shader, so this costs no per-frame work at all.
+          </p>
+
+          <div className="param-row">
+            <span>Reaches</span>
+            <NumberField
+              label="Weather radius"
+              scrubLabel=""
+              value={environment.weather.radius}
+              step={5}
+              suffix="m"
+              onChange={(radius) =>
+                setEnvironment({
+                  weather: { ...environment.weather, radius: clamp(radius, 5, 300) },
+                })
+              }
+            />
+          </div>
+          <p className="panel-hint">
+            The box that follows the camera. Too small and the player sees its edge as they turn;
+            too large and the same particles spread thin enough to look like drizzle.
+          </p>
+
+          <label className="param-check">
+            <input
+              type="checkbox"
+              aria-label="Weather follows wind"
+              checked={environment.weather.followWind}
+              onChange={(event) =>
+                setEnvironment({
+                  weather: { ...environment.weather, followWind: event.target.checked },
+                })
+              }
+            />
+            Blown by the wind
+          </label>
         </>
       )}
 

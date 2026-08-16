@@ -139,6 +139,9 @@ export class Viewport {
       // Wind rides the same delta, for the same reason as animation: a paused level whose grass
       // keeps waving looks like the pause did not take.
       this.#loaded?.updateWind(delta);
+      // Particles on the same delta, and with this viewport's camera: weather is a box that follows
+      // it, so an export that ticked particles without one would leave the rain at the origin.
+      this.#loaded?.updateParticles(delta, this.camera);
       if (!this.#loaded) return;
       // One or the other, never both. The composer's last pass writes to the canvas itself, so a
       // direct render afterwards would overwrite the graded frame with the ungraded one — which

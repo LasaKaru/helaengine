@@ -6,6 +6,7 @@ import { ObjectPhysicsSchema } from './physics.js';
 import { OptionalDestructibleSchema } from './destructible.js';
 import { OptionalVehicleSchema } from './vehicle.js';
 import { OptionalRagdollSchema } from './ragdoll.js';
+import { OptionalEmitterSchema } from './vfx.js';
 import { TriggerSchema } from './trigger.js';
 import { IdSchema, TransformSchema } from './primitives.js';
 import { SwayOverrideSchema } from './wind.js';
@@ -75,6 +76,8 @@ export const SceneObjectSchema = z.object({
    * does not go limp — which is everything without a rig, and most things with one.
    */
   ragdoll: OptionalRagdollSchema,
+  /** Particles thrown out by this object — smoke, fire, sparks — or null for the vast majority. */
+  emitter: OptionalEmitterSchema,
   /**
    * Turns this object into a trigger volume: it stops being something you look at and becomes
    * something that notices. Null for the overwhelming majority of objects.

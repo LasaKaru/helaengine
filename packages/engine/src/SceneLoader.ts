@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {
   destructibleAssets,
+  emitterIsActive,
   vehicleAssets,
   SHADOW_MAP_SIZE,
   type AssetManifestEntry,
@@ -13,6 +14,8 @@ import {
   windIsActive,
   NO_WIND,
   type Wind,
+  type Weather,
+  WeatherSchema,
 } from '@helaengine/schema';
 import { MISSING_ASSET_ENTRY, type AssetResolver } from './assets.js';
 import { applyMaterialOverride, restoreOriginalMaterials } from './materials.js';
@@ -28,8 +31,16 @@ import { modelClips, type ModelSource } from './models.js';
 import { Animator } from './animation/Animator.js';
 import { cloneModel } from './animation/clone.js';
 import { LAYER_COUNT, TerrainField } from './TerrainField.js';
+import { createWeather, type WeatherField } from './render/Weather.js';
+import { ParticleEmitter } from './render/ParticleEmitter.js';
 
 const DEG2RAD = Math.PI / 180;
+
+/** Reused per frame: emitters ask where their object is sixty times a second. */
+const emitPoint = new THREE.Vector3();
+const ORIGIN = new THREE.Vector3();
+/** No weather, parsed once — the baseline a rebuild check compares against. */
+const NO_WEATHER: Weather = WeatherSchema.parse({});
 
 export interface SceneLoaderOptions {
   resolver: AssetResolver;
@@ -211,6 +222,12 @@ export class LoadedScene {
 
   /** Batched static objects, if any. Their nodes live in `objects` but not in the scene graph. */
   readonly instances: InstanceManager | null;
+  /** Weather over the level, or null when it has none. */
+  #weather: WeatherField | null;
+  /** What the weather was last built from, so a rebuild only happens when it has to. */
+  #weatherSettings: Weather;
+  /** Emitters attached to objects, by object id. */
+  readonly #emitters = new Map<string, ParticleEmitter>();
   /** Wind uniforms, or null when nothing in this scene sways. */
   #wind: WindUniforms | null;
   /** The current wind settings, kept in step by `syncEnvironment`. */
@@ -244,6 +261,50 @@ export class LoadedScene {
 
   get windActive(): boolean {
     return this.#wind !== null;
+  }
+
+  /** Whether this scene has weather built. */
+  get weatherActive(): boolean {
+    return this.#weather !== null;
+  }
+
+  /** Live particles across every emitter, and the weather field. What a performance test watches. */
+  get particleCount(): number {
+    let total = this.#weather?.particleCount ?? 0;
+    for (const one of this.#emitters.values()) total += one.liveCount;
+    return total;
+  }
+
+  emitter(objectId: string): ParticleEmitter | undefined {
+    return this.#emitters.get(objectId);
+  }
+
+  /**
+   * Advances weather and every emitter by a frame.
+   *
+   * Takes the camera because weather is a box that follows it — a finite number of drops looks
+   * infinite only because the player carries their own weather around and cannot reach its edge.
+   */
+  updateParticles(deltaSeconds: number, camera: THREE.Camera): void {
+    this.#weather?.update(deltaSeconds, camera, this.#windSettings);
+
+    for (const [objectId, one] of this.#emitters) {
+      const node = this.#objects.get(objectId);
+      // Emitted from where the object is *now*, so a plume trails behind a moving source rather
+      // than teleporting with it.
+      if (node) node.getWorldPosition(emitPoint);
+      one.update(deltaSeconds, node ? emitPoint : ORIGIN);
+    }
+  }
+
+  /** Fires one emitter's burst — what a `burstEvent` on the bus resolves to. */
+  burstEmitter(objectId: string, count: number): boolean {
+    const one = this.#emitters.get(objectId);
+    const node = this.#objects.get(objectId);
+    if (!one) return false;
+    if (node) node.getWorldPosition(emitPoint);
+    one.burst(node ? emitPoint : ORIGIN, count);
+    return true;
   }
 
   /**
@@ -345,6 +406,50 @@ export class LoadedScene {
     build(this.threeScene, environment, disposables, nodes);
     this.#added.push(...nodes);
     this.registerEnvironment(nodes, disposables);
+    this.syncWeather(environment.weather);
+  }
+
+  /**
+   * Rebuilds the weather when its settings change.
+   *
+   * A rebuild rather than a uniform update, unlike wind. Wind is four numbers the shader reads, so
+   * dragging its slider is free — but weather's *particle count* is the buffer's own length, and
+   * changing intensity therefore changes how much geometry exists. There is no uniform for "more
+   * rain".
+   *
+   * Skipped when nothing that matters differs, so dragging an unrelated lighting slider does not
+   * throw away and rebuild forty thousand particles sixty times a second.
+   */
+  syncWeather(weather: Weather): void {
+    const current = this.#weatherSettings;
+    if (
+      current.kind === weather.kind &&
+      current.intensity === weather.intensity &&
+      current.radius === weather.radius &&
+      current.color === weather.color &&
+      current.followWind === weather.followWind
+    ) {
+      return;
+    }
+
+    if (this.#weather) {
+      this.#weather.points.removeFromParent();
+      const at = this.#added.indexOf(this.#weather.points);
+      if (at >= 0) this.#added.splice(at, 1);
+      const owned = this.#disposables.indexOf(this.#weather);
+      if (owned >= 0) this.#disposables.splice(owned, 1);
+      this.#weather.dispose();
+      this.#weather = null;
+    }
+
+    this.#weatherSettings = weather;
+    const built = createWeather(weather);
+    if (built) {
+      this.threeScene.add(built.points);
+      this.#added.push(built.points);
+      this.#disposables.push(built);
+      this.#weather = built;
+    }
   }
 
   constructor(init: {
@@ -356,6 +461,9 @@ export class LoadedScene {
     added: THREE.Object3D[];
     instances?: InstanceManager | null;
     wind?: WindUniforms | null;
+    weather?: WeatherField | null;
+    weatherSettings?: Weather;
+    emitters?: Map<string, ParticleEmitter>;
     windSettings?: Wind;
     scatterCount?: number;
   }) {
@@ -368,6 +476,9 @@ export class LoadedScene {
     this.#added = init.added;
     this.instances = init.instances ?? null;
     this.#wind = init.wind ?? null;
+    this.#weather = init.weather ?? null;
+    this.#weatherSettings = init.weatherSettings ?? NO_WEATHER;
+    if (init.emitters) for (const [id, one] of init.emitters) this.#emitters.set(id, one);
     this.#windSettings = init.windSettings ?? NO_WIND;
     this.#scatterCount = init.scatterCount ?? 0;
 
@@ -793,6 +904,32 @@ export class SceneLoader {
 
     const wind = this.#applyWind(scene, objects, batched, instances, scatter);
 
+    /**
+     * Weather and emitters, built last.
+     *
+     * Emitters are keyed by object id and their nodes are added to the scene root rather than
+     * parented to the object they belong to. Parenting would be the obvious thing and it is wrong:
+     * particle positions are in world space by the time the simulation has moved them, and a parent
+     * transform would apply the object's rotation a second time — smoke from a spinning chimney
+     * would orbit it.
+     */
+    const weather = createWeather(scene.environment.weather);
+    if (weather) {
+      threeScene.add(weather.points);
+      added.push(weather.points);
+      disposables.push(weather);
+    }
+
+    const emitters = new Map<string, ParticleEmitter>();
+    for (const object of scene.objects) {
+      if (!object.emitter || !emitterIsActive(object.emitter)) continue;
+      const built = new ParticleEmitter(object.emitter);
+      emitters.set(object.id, built);
+      threeScene.add(built.points);
+      added.push(built.points);
+      disposables.push(built);
+    }
+
     const loaded = new LoadedScene({
       threeScene,
       objects,
@@ -802,6 +939,9 @@ export class SceneLoader {
       added,
       instances,
       wind,
+      weather,
+      weatherSettings: scene.environment.weather,
+      emitters,
       windSettings: scene.environment.wind,
       scatterCount: [...scatter.values()].reduce(
         // One layer makes one batch per mesh in its model, and every batch holds the same instances

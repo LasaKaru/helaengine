@@ -204,6 +204,7 @@ test.describe('export edge cases', () => {
             destructible: null,
             vehicle: null,
             ragdoll: null,
+            emitter: null,
             sway: 'auto' as const,
             metadata: {},
           },

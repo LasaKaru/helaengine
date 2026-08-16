@@ -35,6 +35,7 @@ import {
   type Destructible,
   type Vehicle as VehicleType,
   type Ragdoll as RagdollType,
+  type Emitter as EmitterType,
   type Joint,
   type JointType,
 } from '@helaengine/schema';
@@ -120,6 +121,8 @@ export interface SceneState {
   setVehicle(objectId: string, vehicle: VehicleType | null): void;
   /** How this character's skeleton behaves once physics takes it over, or null for anything rigid. */
   setRagdoll(objectId: string, ragdoll: RagdollType | null): void;
+  /** Particles thrown out by this object, or null for the vast majority. */
+  setEmitter(objectId: string, emitter: EmitterType | null): void;
   setPlayer(player: Partial<Player>): void;
   setInventory(inventory: Partial<Inventory>): void;
   addWeapon(): string;
@@ -364,6 +367,11 @@ export const useSceneStore = create<SceneState>()(
                 ragdoll: source.ragdoll
                   ? { ...source.ragdoll, bones: { ...source.ragdoll.bones } }
                   : null,
+                // Copied as a value: retuning one chimney's smoke must not retune the one it came
+                // from.
+                emitter: source.emitter
+                  ? { ...source.emitter, offset: [...source.emitter.offset] }
+                  : null,
                 // A duplicated trigger keeps its wiring: copying a spawn point should give you a
                 // second spawn point, not an inert box.
                 trigger: source.trigger
@@ -516,6 +524,12 @@ export const useSceneStore = create<SceneState>()(
           commit('object/setRagdoll', (draft) => {
             const object = draft.objects.find((current) => current.id === objectId);
             if (object) object.ragdoll = ragdoll;
+          }),
+
+        setEmitter: (objectId, emitter) =>
+          commit('object/setEmitter', (draft) => {
+            const object = draft.objects.find((current) => current.id === objectId);
+            if (object) object.emitter = emitter;
           }),
 
         setGameConfig: (config) =>

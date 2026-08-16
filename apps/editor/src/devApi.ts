@@ -59,6 +59,14 @@ export interface DevApi {
   /** True while the camera is following the player; false when ejected. */
   possessed(): boolean;
   setPossessed(possessed: boolean): void;
+  /**
+   * Live particles in the viewport — weather plus every emitter.
+   *
+   * Reported by the loader rather than derived from the document, because the two can legitimately
+   * differ: an emitter whose pool is full is producing fewer than its rate asks for, and that is
+   * the true answer rather than a bug.
+   */
+  particleCount(): number;
   /** Scattered instances the loader actually grew, across every layer. */
   scatterCount(): number;
   viewportObjectIds(): string[];
@@ -357,10 +365,21 @@ let postProcessingActive = false;
 
 let windActive = false;
 let scatterCount = 0;
+let particleCount = 0;
 
 /** Registered by the bridge when a scene is loaded, so a test can see what the loader decided. */
 export function setWindActive(active: boolean): void {
   windActive = active;
+}
+
+/**
+ * Published each frame rather than at load, because it changes each frame.
+ *
+ * Weather is a fixed count, but emitters are births and deaths — an emitter that has just started
+ * has almost none, and a test that read the number once would be reading zero.
+ */
+export function setParticleCount(count: number): void {
+  particleCount = count;
 }
 
 export function setScatterCount(count: number): void {
@@ -509,6 +528,8 @@ export function exposeDevApi(library: AssetLibrary): void {
     windActive: () => windActive,
 
     scatterCount: () => scatterCount,
+
+    particleCount: () => particleCount,
 
     objectMaterialColors(objectId) {
       const node = currentLoadedScene?.objects.get(objectId);

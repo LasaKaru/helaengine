@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { HexColorSchema } from './primitives.js';
 import { PostProcessingSchema, ShadowSchema, ToneMappingSchema } from './rendering.js';
 import { WindSchema } from './wind.js';
+import { WeatherSchema } from './vfx.js';
 
 export const FogSchema = z.object({
   color: HexColorSchema.default('#a0c8ff'),
@@ -66,5 +67,12 @@ export const EnvironmentSchema = z.object({
    * it is the sway system absent. Those scenes render exactly as they did.
    */
   wind: WindSchema.default({}),
+  /**
+   * Weather over the whole level, off by default.
+   *
+   * `kind: 'none'` is the absence of the system rather than a storm of nothing: no geometry, no
+   * shader, no uniform. Every scene saved before this existed renders exactly as it did.
+   */
+  weather: WeatherSchema,
 });
 export type Environment = z.infer<typeof EnvironmentSchema>;

@@ -194,6 +194,31 @@ export class GameRuntime implements WorldHandle {
       if (typeof died?.objectId === 'string') this.ragdoll(died.objectId);
     });
 
+    /**
+     * Emitters that burst on an event.
+     *
+     * Subscribed once per distinct event name rather than once per emitter, so a level with forty
+     * dust puffs all bound to `destructibleBroken` adds one listener rather than forty. The burst
+     * fires at the emitting object, not at the event's — a chimney bound to a distant explosion
+     * still smokes from the chimney.
+     */
+    const bursters = new Map<string, string[]>();
+    for (const object of options.scene.objects) {
+      const event = object.emitter?.burstEvent;
+      if (!event) continue;
+      const existing = bursters.get(event);
+      if (existing) existing.push(object.id);
+      else bursters.set(event, [object.id]);
+    }
+    for (const [event, objectIds] of bursters) {
+      this.behaviors.on(event, () => {
+        for (const objectId of objectIds) {
+          const settings = this.#documentObjects.get(objectId)?.emitter;
+          if (settings) this.#loaded.burstEmitter(objectId, settings.burst);
+        }
+      });
+    }
+
     this.behaviors.on('damage', (payload) => {
       const hit = payload as { targetId?: unknown; amount?: unknown } | undefined;
       if (typeof hit?.targetId !== 'string' || typeof hit.amount !== 'number') return;

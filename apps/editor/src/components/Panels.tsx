@@ -26,6 +26,7 @@ import { JointsPanel } from './JointsPanel';
 import { DestructiblePanel } from './DestructiblePanel';
 import { VehiclePanel } from './VehiclePanel';
 import { RagdollPanel } from './RagdollPanel';
+import { EmitterPanel } from './EmitterPanel';
 import { AudioPanel } from './AudioPanel';
 import { SecretsPanel } from './SecretsPanel';
 import { WeaponsPanel } from './WeaponsPanel';
@@ -598,6 +599,7 @@ export function InspectorPanel({ manifest }: { manifest: AssetManifest }): React
       {single && !single.trigger && <DestructiblePanel object={single} manifest={manifest} />}
       {single && !single.trigger && <VehiclePanel object={single} manifest={manifest} />}
       {single && !single.trigger && <RagdollPanel object={single} />}
+      {single && !single.trigger && <EmitterPanel object={single} />}
 
       <LevelsPanel />
       <TerrainPanel />

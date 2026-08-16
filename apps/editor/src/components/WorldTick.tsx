@@ -1,5 +1,6 @@
 import { useFrame } from '@react-three/fiber';
 import type { LoadedScene } from '@helaengine/engine';
+import { setParticleCount } from '../devApi';
 
 /**
  * Advances the loaded scene's own clocks each frame.
@@ -17,12 +18,16 @@ import type { LoadedScene } from '@helaengine/engine';
  * exactly the reason above.
  */
 export function WorldTick({ loaded }: { loaded: LoadedScene | null }): null {
-  useFrame((_state, delta) => {
+  useFrame((state, delta) => {
     if (!loaded) return;
-    // Both are no-ops when the scene has nothing that needs them, so a level with no rigs and no
-    // wind pays two null checks a frame.
+    // Each is a no-op when the scene has nothing that needs it, so a level with no rigs, no wind
+    // and no particles pays three null checks a frame.
     loaded.updateAnimations(delta);
     loaded.updateWind(delta);
+    // The camera goes in because weather is a box that follows it: a finite number of drops looks
+    // infinite only because the player carries their own weather around.
+    loaded.updateParticles(delta, state.camera);
+    setParticleCount(loaded.particleCount);
   });
 
   return null;

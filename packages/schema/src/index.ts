@@ -20,6 +20,7 @@ export * from './joint.js';
 export * from './destructible.js';
 export * from './vehicle.js';
 export * from './ragdoll.js';
+export * from './vfx.js';
 export * from './looks.js';
 export * from './pack.js';
 export * from './packFile.js';
