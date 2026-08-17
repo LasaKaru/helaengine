@@ -260,3 +260,19 @@ export function desktopWarnings(options: DesktopOptions): string[] {
 
   return warnings;
 }
+
+/**
+ * What a client may ask for when it presses Export.
+ *
+ * Separate from `ExportJobSchema`, which is the *record* — a request has no id, no status and no
+ * artifact, and a schema that served both would have to make every one of those optional and then
+ * trust the server to fill them. Two shapes, one of which is only ever built by the server.
+ *
+ * Every field is optional and an empty body is a web export, which is what the editor's existing
+ * button sends and what every caller written before desktop builds existed meant.
+ */
+export const ExportRequestSchema = z.object({
+  target: ExportTargetSchema.default('web'),
+  desktop: DesktopOptionsSchema.optional(),
+});
+export type ExportRequest = z.infer<typeof ExportRequestSchema>;

@@ -1319,6 +1319,35 @@ describe('export jobs', () => {
     expect(created.body.job.desktop).toBeNull();
   });
 
+  it('records a desktop build with the options it was asked for', async () => {
+    const { token, projectId } = await workspace('free');
+    const created = await call<{ job: { target: string; desktop: { platform: string } } }>(
+      'POST',
+      `/projects/${projectId}/exports`,
+      { token, body: { target: 'desktop', desktop: { platform: 'linux-x64', version: '2.1.0' } } },
+    );
+
+    expect(created.status).toBe(202);
+    expect(created.body.job.target).toBe('desktop');
+    expect(created.body.job.desktop.platform).toBe('linux-x64');
+  });
+
+  it('refuses a platform it cannot build, before spending anything', async () => {
+    /**
+     * A 400 in a millisecond rather than a failure three stages into a five-minute job. macOS is
+     * the one people ask for, and an app that will not open without Apple notarisation is worse
+     * than no app — so it is refused at the door with the reason, not attempted.
+     */
+    const { token, projectId } = await workspace('free');
+    const refused = await call<{ error: string }>('POST', `/projects/${projectId}/exports`, {
+      token,
+      body: { target: 'desktop', desktop: { platform: 'darwin-arm64' } },
+    });
+
+    expect(refused.status).toBe(400);
+    expect(refused.body.error).toMatch(/Apple/);
+  });
+
   it('stops at the plan limit, and says what the limit is', async () => {
     const { token, projectId } = await workspace('free');
 

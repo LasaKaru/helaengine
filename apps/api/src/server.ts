@@ -32,6 +32,7 @@ import {
 import { clientAddress, Throttle } from './throttle.js';
 import { createObserver, type ApiTelemetry } from './observability.js';
 import {
+  ExportRequestSchema,
   AssetCategorySchema,
   entitledTier,
   EXPORTS_PER_PERIOD,
@@ -1178,6 +1179,25 @@ export function createApiServer(options: ApiOptions): Server {
           });
         }
 
+        /**
+         * What kind of build this is, from the request rather than assumed.
+         *
+         * An absent body is a web export, which is what every caller written before this meant and
+         * what the editor's existing button still sends. Parsing rather than trusting: the options
+         * decide what a worker spends minutes and hundreds of megabytes producing, and a platform
+         * nobody can build should be a 400 in a millisecond rather than a failure three stages into
+         * a five-minute job.
+         */
+        const raw = await readBody(request);
+        const requested = ExportRequestSchema.safeParse(raw === '' ? {} : JSON.parse(raw));
+        if (!requested.success) {
+          return send(response, 400, {
+            error:
+              'That is not a build this can make. Windows and Linux only — a macOS app has to be ' +
+              'signed and notarised by Apple to open at all, so one is not offered.',
+          });
+        }
+
         // The row first, then the message. If enqueueing fails the user sees a job that never
         // starts, which is recoverable; if the message went first, a crash between the two would
         // hand the worker a job id that does not exist.
@@ -1194,6 +1214,8 @@ export function createApiServer(options: ApiOptions): Server {
               // Stored on the row so a build somebody complains about can be turned back into the
               // request that made it, months later, without a tracing backend.
               correlationId: currentCorrelationId(),
+              target: requested.data.target,
+              desktop: requested.data.desktop,
             }),
         );
 
