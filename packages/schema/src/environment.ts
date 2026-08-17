@@ -3,6 +3,7 @@ import { HexColorSchema } from './primitives.js';
 import { PostProcessingSchema, ShadowSchema, ToneMappingSchema } from './rendering.js';
 import { WindSchema } from './wind.js';
 import { LodSchema } from './lod.js';
+import { StreamingSchema } from './streaming.js';
 import { WeatherSchema } from './vfx.js';
 
 export const FogSchema = z.object({
@@ -84,5 +85,12 @@ export const EnvironmentSchema = z.object({
    * have been a fourth place for every one of those to forget.
    */
   lod: LodSchema.default({}),
+  /**
+   * World chunks and a draw distance, off by default.
+   *
+   * A draw distance is visible — things beyond it are not there — so a scene saved before this
+   * existed draws everything it always drew, and an author who wants the trade makes it on purpose.
+   */
+  streaming: StreamingSchema.default({}),
 });
 export type Environment = z.infer<typeof EnvironmentSchema>;

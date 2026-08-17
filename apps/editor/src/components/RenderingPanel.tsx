@@ -8,6 +8,7 @@ import {
   WEATHER_LABELS,
   weatherCount,
   LOD_MODES,
+  streamingProblems,
   LOD_MODE_HINTS,
   LOD_MODE_LABELS,
   type LodMode,
@@ -442,6 +443,44 @@ export function RenderingPanel(): React.JSX.Element {
         averaging bone weights across a joint tears an elbow, which is far more noticeable than the
         saving.
       </p>
+
+      <div className="param-row">
+        <span>Draw distance</span>
+        <NumberField
+          label="Draw distance"
+          value={environment.streaming.distance}
+          step={10}
+          suffix="m"
+          onChange={(distance) =>
+            setEnvironment({
+              streaming: {
+                ...environment.streaming,
+                distance: Math.max(0, Math.min(5000, distance)),
+              },
+            })
+          }
+        />
+      </div>
+      <p className="panel-hint">
+        Zero is off, and off is the absence of the system rather than an enormous distance: no grid
+        is built and nothing is tested. Above zero, the level is divided into chunks and the ones
+        further away than this are not drawn at all — one distance test per chunk instead of one
+        frustum test per mesh.
+      </p>
+      {(() => {
+        const problems = streamingProblems(
+          environment.streaming,
+          environment.fog ? environment.fog.far : null,
+        );
+        if (problems.length === 0) return null;
+        return (
+          <div className="joint-problems" role="status" aria-label="Draw distance problems">
+            {problems.map((problem) => (
+              <p key={problem}>{problem}</p>
+            ))}
+          </div>
+        );
+      })()}
 
       <h3>Image</h3>
 

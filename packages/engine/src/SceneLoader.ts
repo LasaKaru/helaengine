@@ -7,6 +7,8 @@ import {
   type AssetManifestEntry,
   type Environment,
   type LodMode,
+  type Streaming,
+  streamingIsActive,
   type MaterialOverride,
   type Scene,
   type SceneObject,
@@ -22,6 +24,7 @@ import { MISSING_ASSET_ENTRY, type AssetResolver } from './assets.js';
 import { applyMaterialOverride, restoreOriginalMaterials } from './materials.js';
 import { SurfaceTextures } from './render/surfaces.js';
 import { LodGeometries, buildLod } from './render/lod.js';
+import { ChunkGrid } from './streaming/ChunkGrid.js';
 import { buildScatter, buildScatterMeshes } from './scatter/ScatterField.js';
 import {
   applyWindToObject,
@@ -41,6 +44,8 @@ const DEG2RAD = Math.PI / 180;
 
 /** Reused per frame: emitters ask where their object is sixty times a second. */
 const emitPoint = new THREE.Vector3();
+/** Scratch for the camera's world position during a streaming update. */
+const streamPoint = new THREE.Vector3();
 const ORIGIN = new THREE.Vector3();
 /** No weather, parsed once — the baseline a rebuild check compares against. */
 const NO_WEATHER: Weather = WeatherSchema.parse({});
@@ -237,6 +242,13 @@ export class LoadedScene {
   readonly #lods: LodGeometries;
   /** The level-of-detail mode this scene was built with, so a spawned object matches it. */
   readonly #lodMode: LodMode;
+  /** The spatial partition, or null for a scene with no draw distance. */
+  #chunks: ChunkGrid | null = null;
+  #streaming: Streaming = { distance: 0, size: 32 };
+  /** Where the camera was when chunk visibility was last decided. */
+  readonly #lastStreamPoint = new THREE.Vector3(Infinity, Infinity, Infinity);
+  /** Chunk keys currently drawn, for the editor's statistics and for the tests. */
+  #liveChunks = 0;
   /** Wind uniforms, or null when nothing in this scene sways. */
   #wind: WindUniforms | null;
   /** The current wind settings, kept in step by `syncEnvironment`. */
@@ -321,6 +333,10 @@ export class LoadedScene {
    * infinite only because the player carries their own weather around and cannot reach its edge.
    */
   updateParticles(deltaSeconds: number, camera: THREE.Camera): void {
+    // Here rather than in its own frame hook, because it needs exactly what this already has — the
+    // camera, once a frame — and a second hook would be a second thing every host has to remember
+    // to call. It is throttled on camera movement, so a still camera costs one distance compare.
+    this.updateStreaming(camera);
     this.#weather?.update(deltaSeconds, camera, this.#windSettings);
 
     for (const [objectId, one] of this.#emitters) {
@@ -330,6 +346,90 @@ export class LoadedScene {
       if (node) node.getWorldPosition(emitPoint);
       one.update(deltaSeconds, node ? emitPoint : ORIGIN);
     }
+  }
+
+  /**
+   * Builds the spatial partition from the objects already placed.
+   *
+   * After the objects rather than alongside them, because a chunk's reach is the largest object
+   * radius in it and that is only known once they exist. Cheap enough to do in one pass — it is a
+   * bounding box and a division per object — and it happens once per load.
+   */
+  buildChunks(streaming: Streaming): void {
+    this.#streaming = streaming;
+    this.#liveChunks = 0;
+    // Off is the absence of the system: no grid built, no distance test, and every object left
+    // visible exactly as it was. Restoring visibility first matters — switching the distance off
+    // must not leave the far half of the level hidden.
+    if (!streamingIsActive(streaming)) {
+      if (this.#chunks) {
+        for (const key of this.#chunks.keys()) this.#setChunkVisible(key, true);
+      }
+      this.#chunks = null;
+      return;
+    }
+
+    const grid = new ChunkGrid(streaming.size);
+    const box = new THREE.Box3();
+    const sphere = new THREE.Sphere();
+    for (const [objectId, node] of this.#objects) {
+      // Batched objects are drawn by the `InstancedMesh`, not by this node, so hiding the node
+      // would change nothing while making the statistics claim otherwise. Excluded explicitly
+      // rather than quietly: see `docs/PERFORMANCE.md` for why per-chunk batches are the fix.
+      if (this.instances?.has(objectId)) continue;
+      box.setFromObject(node);
+      const radius = box.isEmpty() ? 0 : box.getBoundingSphere(sphere).radius;
+      grid.add(objectId, node.getWorldPosition(streamPoint), radius);
+    }
+
+    this.#chunks = grid;
+    // Forces the next update to decide from scratch rather than comparing against wherever the
+    // camera happened to be during the previous setting.
+    this.#lastStreamPoint.set(Infinity, Infinity, Infinity);
+  }
+
+  /**
+   * Shows the chunks near the camera and hides the rest.
+   *
+   * Throttled on camera movement rather than on time: the answer is a function of position alone,
+   * so recomputing it while the camera is still is pure waste, and recomputing it after a small
+   * step cannot change any chunk's verdict. A quarter of a chunk is the largest step that certainly
+   * cannot.
+   */
+  updateStreaming(camera: THREE.Camera): void {
+    const grid = this.#chunks;
+    if (!grid) return;
+
+    camera.getWorldPosition(streamPoint);
+    if (this.#lastStreamPoint.distanceTo(streamPoint) < this.#streaming.size * 0.25) return;
+    this.#lastStreamPoint.copy(streamPoint);
+
+    let live = 0;
+    for (const key of grid.keys()) {
+      const near = grid.isWithin(key, streamPoint, this.#streaming.distance);
+      if (near) live += 1;
+      this.#setChunkVisible(key, near);
+    }
+    this.#liveChunks = live;
+  }
+
+  #setChunkVisible(key: string, visible: boolean): void {
+    const grid = this.#chunks;
+    if (!grid) return;
+    for (const objectId of grid.objectsIn(key)) {
+      const node = this.#objects.get(objectId);
+      if (node) node.visible = visible;
+    }
+  }
+
+  /** What the partition built and how much of it is drawn. Null when there is no draw distance. */
+  get streamingStats(): { chunks: number; liveChunks: number; objects: number } | null {
+    if (!this.#chunks) return null;
+    return {
+      chunks: this.#chunks.chunkCount,
+      liveChunks: this.#liveChunks,
+      objects: this.#chunks.objectCount,
+    };
   }
 
   /** Fires one emitter's burst — what a `burstEvent` on the bus resolves to. */
@@ -444,6 +544,11 @@ export class LoadedScene {
     this.#added.push(...nodes);
     this.registerEnvironment(nodes, disposables);
     this.syncWeather(environment.weather);
+    // Rebuilt rather than adjusted: the grid's cell size is baked into every key it holds, so a
+    // changed size is a different partition. It is one pass over the objects, and it only happens
+    // when the setting moves — which until this line was here it never did, and the draw distance
+    // was a number that saved, exported and changed nothing you could see.
+    this.buildChunks(environment.streaming);
   }
 
   /**
@@ -503,6 +608,7 @@ export class LoadedScene {
     surfaces?: SurfaceTextures;
     lods?: LodGeometries;
     lodMode?: LodMode;
+    streaming?: Streaming;
     emitters?: Map<string, ParticleEmitter>;
     windSettings?: Wind;
     scatterCount?: number;
@@ -525,6 +631,7 @@ export class LoadedScene {
     this.#lods = init.lods ?? new LodGeometries();
     if (!init.lods) this.#disposables.push(this.#lods);
     this.#lodMode = init.lodMode ?? 'off';
+    if (init.streaming) this.buildChunks(init.streaming);
     if (init.emitters) for (const [id, one] of init.emitters) this.#emitters.set(id, one);
     this.#windSettings = init.windSettings ?? NO_WIND;
     this.#scatterCount = init.scatterCount ?? 0;
@@ -1014,6 +1121,7 @@ export class SceneLoader {
       surfaces,
       lods,
       lodMode: scene.environment.lod.mode,
+      streaming: scene.environment.streaming,
       emitters,
       windSettings: scene.environment.wind,
       scatterCount: [...scatter.values()].reduce(

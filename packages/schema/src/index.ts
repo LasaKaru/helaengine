@@ -1,6 +1,7 @@
 export * from './primitives.js';
 export * from './terrain.js';
 export * from './lod.js';
+export * from './streaming.js';
 export * from './surface.js';
 export * from './rendering.js';
 export * from './environment.js';

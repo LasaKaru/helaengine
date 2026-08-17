@@ -269,6 +269,8 @@ export interface DevApi {
     peakMs: number;
     frames: number;
   } | null;
+  /** The chunk grid's size and how much of it is drawn. Null when there is no draw distance. */
+  streamingStats(): { chunks: number; liveChunks: number; objects: number } | null;
   /** What level of detail built, and which level one object is drawing. Null before a scene loads. */
   lodStats(objectId?: string): {
     trianglesSaved: number;
@@ -833,6 +835,9 @@ export function exposeDevApi(library: AssetLibrary): void {
         level: node ? activeLodLevel(node) : -1,
       };
     },
+
+    /** What the chunk grid built and how much of it is drawn. Null when there is no draw distance. */
+    streamingStats: () => currentLoadedScene?.streamingStats ?? null,
 
     viewportObjects: () =>
       [...(currentLoadedScene?.objects.entries() ?? [])].map(([id, node]) => ({

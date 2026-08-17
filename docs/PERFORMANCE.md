@@ -152,12 +152,45 @@ in your face. `aggressive` submits fewer than `balanced` from the same pose. The
 subtracted from both sides, because it is a large mesh drawn identically either way and leaving it in
 would hide a 66% saving on the objects behind a 32% saving overall.
 
-**Instanced objects do not get levels of detail.** An `InstancedMesh` draws one geometry many times,
+**World chunks and a draw distance** (`packages/engine/src/streaming/ChunkGrid.ts`). The level is
+divided into a uniform grid over X and Z, each object filed under the chunk containing its origin,
+and chunks further from the camera than the draw distance are not drawn — one distance test per
+chunk instead of one frustum test per mesh. Off by default: a draw distance is visible, so a scene
+saved before this existed draws everything it always drew.
+
+- **A grid, not an octree or a BVH**, which is what the task asked for. A game level is a shell on a
+  plane: a few hundred metres wide and about twenty tall. An octree spends its first subdivision
+  splitting a volume that is empty above and below, and every level after that rediscovers that the
+  interesting axis is horizontal. A BVH is better for ray queries against irregular geometry and
+  worse for the question actually being asked — "what is near this point" — which a uniform grid
+  answers by arithmetic, with no tree to walk and nothing to rebalance.
+- **Conservative at the boundary.** The distance test is widened by each chunk's half-diagonal plus
+  the largest object radius in it, so nothing is culled while any part of it is still inside. A
+  chunk's centre can be well outside the distance while its near corner is inside; culling on the
+  centre alone is a building that vanishes as you walk towards it.
+- **Measured horizontally.** Including the camera's height would cull the ground beneath a camera
+  looking straight down at it, which is a camera mode this engine ships.
+- **Recomputed on movement, not on time.** The answer is a function of camera position alone, so a
+  still camera costs one distance compare per frame, and a step shorter than a quarter of a chunk
+  cannot change any chunk's verdict.
+
+**What the draw distance does not bound is memory**, and that gap is worth understanding before
+anybody relies on the word "streaming". Placed objects are clones sharing one geometry and one
+material per asset — that sharing is why two hundred trees cost one material — so unloading a
+placement frees almost nothing. A level's memory ceiling is set by how many _distinct assets_ it
+uses, not by how many objects it has. Lowering it means evicting assets, which cannot happen while
+any placement still references them, which needs the placements unloaded first. That chain is real
+work and is not done: the task asked for a budget that keeps a large world inside the tab's memory
+ceiling, and what is delivered is the drawing half plus the statistics to see the other half.
+
+**Instanced objects get neither levels of detail nor chunk culling.** An `InstancedMesh` draws one geometry many times,
 so there is no per-copy level to swap — and the batching threshold is 8, which means the case where
-level of detail would pay best is the case it does not cover. Doing it properly means a mesh per
-level with instances re-partitioned by distance as the camera moves, which is a real technique and a
-separate piece of work rather than an extension of this one. Recorded here rather than left to be
-discovered from a triangle count that did not move.
+level of detail would pay best is the case it does not cover. An `InstancedMesh` draws one geometry many times: there is no per-copy level to swap, and hiding one
+instance by collapsing it to zero scale saves rasterisation but not vertex work, so a chunk of
+hidden instances still submits every triangle. Both want the same fix — **a batch per chunk per
+level**, rather than one batch per asset — which is a different structure and a separate piece of
+work. Since batching starts at 8 copies, this is the case both features would pay best on. Recorded
+here rather than left to be discovered from a triangle count that did not move.
 
 ## Boundary check
 
