@@ -1301,6 +1301,24 @@ describe('export jobs', () => {
     expect(refused.body.error).toMatch(/Save the project/);
   });
 
+  it('records a web export as a web export, without being told', async () => {
+    /**
+     * The default, and the reason it is a default rather than a backfill: there is no such thing as
+     * a desktop build made before the column existed, so `web` is the true answer for every row
+     * already in this table rather than a value standing in for a missing read.
+     */
+    const { token, projectId } = await workspace('free');
+    const created = await call<{ job: { target: string; desktop: unknown } }>(
+      'POST',
+      `/projects/${projectId}/exports`,
+      { token },
+    );
+
+    expect(created.status).toBe(202);
+    expect(created.body.job.target).toBe('web');
+    expect(created.body.job.desktop).toBeNull();
+  });
+
   it('stops at the plan limit, and says what the limit is', async () => {
     const { token, projectId } = await workspace('free');
 

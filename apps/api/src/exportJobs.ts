@@ -1,11 +1,13 @@
 import {
   ARTIFACT_TTL_MS,
+  DesktopOptionsSchema,
   EXPORTS_PER_PERIOD,
   QUOTA_PERIOD_MS,
   quotaMessage,
   type ExportJob,
   type ExportJobStatus,
   type ExportStage,
+  type ExportTarget,
   type PlanTier,
 } from '@helaengine/schema';
 import type { Db } from './db.js';
@@ -30,6 +32,8 @@ interface JobRow {
   organization_id: string;
   scene_version: number;
   status: ExportJobStatus;
+  target: ExportTarget;
+  desktop_options: unknown;
   stage: ExportStage;
   progress: number;
   attempts: number;
@@ -42,9 +46,9 @@ interface JobRow {
   updated_at: Date;
 }
 
-const COLUMNS = `id, project_id, organization_id, scene_version, status, stage, progress,
-                 attempts, error, artifact_path, artifact_bytes, expires_at, correlation_id,
-                 created_at, updated_at`;
+const COLUMNS = `id, project_id, organization_id, scene_version, status, target, desktop_options,
+                 stage, progress, attempts, error, artifact_path, artifact_bytes, expires_at,
+                 correlation_id, created_at, updated_at`;
 
 function toJob(row: JobRow): ExportJob {
   return {
@@ -53,17 +57,17 @@ function toJob(row: JobRow): ExportJob {
     organizationId: row.organization_id,
     sceneVersion: row.scene_version,
     status: row.status,
+    target: row.target,
     /**
-     * Web, and truthfully so rather than as a placeholder: nothing can request a desktop build yet.
+     * Parsed on the way out, not trusted.
      *
-     * The schema carries the field and the queue does not, which is deliberate sequencing — the
-     * vocabulary lands first so the worker and the dialog are written against something fixed. The
-     * columns arrive with the worker that populates them; until then every job in this table is a
-     * web export and reporting it as one is the accurate answer, not a default standing in for a
-     * missing read.
+     * The column is JSON and the database will hold whatever was written to it. Anything that does
+     * not parse reads as null — a desktop job with unreadable options is a job the worker cannot
+     * build, and finding that out here beats finding it out three stages into a five-minute build.
      */
-    target: 'web',
-    desktop: null,
+    desktop: DesktopOptionsSchema.nullable()
+      .catch(null)
+      .parse(row.desktop_options ?? null),
     stage: row.stage,
     progress: row.progress,
     attempts: row.attempts,
@@ -128,6 +132,16 @@ export async function createExportJob(
     userId: string;
     /** The request that asked for this build. Null when the caller carries no telemetry. */
     correlationId?: string | null;
+    /**
+     * Web or desktop. Absent means web, which is what every caller written before this meant.
+     *
+     * A desktop build costs far more CPU, disk and bandwidth than a web export, and it currently
+     * spends the same export credit. That is a deliberate simplification rather than an oversight:
+     * a second meter is billing surface to maintain, and until desktop builds are common enough to
+     * show up in the usage numbers there is nothing to price against. Revisit when they do.
+     */
+    target?: ExportTarget;
+    desktop?: unknown;
   },
 ): Promise<ExportJob> {
   const client = await db.connect();
@@ -176,8 +190,9 @@ export async function createExportJob(
 
     const inserted = await client.query<JobRow>(
       `insert into export_jobs
-         (project_id, organization_id, scene_version, requested_by, correlation_id)
-       values ($1, $2, $3, $4, $5)
+         (project_id, organization_id, scene_version, requested_by, correlation_id,
+          target, desktop_options)
+       values ($1, $2, $3, $4, $5, $6, $7)
        returning ${COLUMNS}`,
       [
         input.projectId,
@@ -185,6 +200,13 @@ export async function createExportJob(
         input.sceneVersion,
         input.userId,
         input.correlationId ?? null,
+        input.target ?? 'web',
+        // Parsed here rather than stored as handed over: this is a trust boundary, and the column
+        // is JSON, which will hold anything at all. A desktop request with a platform nobody can
+        // build is rejected at the door instead of three stages into a five-minute job.
+        input.target === 'desktop'
+          ? JSON.stringify(DesktopOptionsSchema.parse(input.desktop ?? {}))
+          : null,
       ],
     );
 
