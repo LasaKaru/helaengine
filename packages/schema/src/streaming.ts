@@ -52,12 +52,22 @@ export const StreamingSchema = z.object({
    * one chunk and nothing is ever culled. Thirty-two is about a building.
    */
   size: z.number().min(4).max(512).default(32),
+  /**
+   * Whether chunks hidden behind the terrain are skipped.
+   *
+   * Terrain rather than arbitrary occluders, and that is the whole design. WebGL2 has occlusion
+   * queries but Three does not expose them, and a software depth rasteriser is a renderer of its
+   * own. What an outdoor level actually has is one enormous occluder — the ground it is standing on
+   * — and a hill either blocks the line of sight to a chunk or it does not, which is a dozen height
+   * samples to answer. Indoor levels built from walls get nothing from this, and are told so.
+   */
+  occlusion: z.boolean().default(false),
 });
 export type Streaming = z.infer<typeof StreamingSchema>;
 
 /** Whether a document is asking for any of this. Off is the absence of the system. */
 export function streamingIsActive(streaming: Streaming): boolean {
-  return streaming.distance > 0;
+  return streaming.distance > 0 || streaming.occlusion;
 }
 
 /**
@@ -67,22 +77,36 @@ export function streamingIsActive(streaming: Streaming): boolean {
  * objects vanish in clear air — the most recognisable "cheap game" artefact there is, and one an
  * author will read as a bug in the engine rather than as their own number.
  */
-export function streamingProblems(streaming: Streaming, fogFar: number | null): string[] {
+export function streamingProblems(
+  streaming: Streaming,
+  fogFar: number | null,
+  terrainRelief = 1,
+): string[] {
   const problems: string[] = [];
   if (!streamingIsActive(streaming)) return problems;
 
-  if (fogFar !== null && streaming.distance < fogFar) {
+  // A flat level has no hills to hide behind, so the test runs, finds nothing, and costs a dozen
+  // height samples per chunk to say so. Worth saying out loud, because "I switched it on and
+  // nothing happened" is otherwise indistinguishable from a broken feature.
+  if (streaming.occlusion && terrainRelief < 2) {
+    problems.push(
+      'this terrain is almost flat, so there is nothing for the occlusion test to hide anything ' +
+        'behind — sculpt some hills, or leave it off',
+    );
+  }
+
+  if (streaming.distance > 0 && fogFar !== null && streaming.distance < fogFar) {
     problems.push(
       `objects disappear at ${Math.round(streaming.distance)}m but the fog does not close in ` +
         `until ${Math.round(fogFar)}m, so they will vanish in clear air`,
     );
   }
-  if (fogFar === null) {
+  if (streaming.distance > 0 && fogFar === null) {
     problems.push(
       'there is no fog, so objects will vanish at the draw distance rather than fade out of it',
     );
   }
-  if (streaming.distance < streaming.size * 2) {
+  if (streaming.distance > 0 && streaming.distance < streaming.size * 2) {
     problems.push(
       `a ${Math.round(streaming.distance)}m distance is barely wider than one ${Math.round(
         streaming.size,

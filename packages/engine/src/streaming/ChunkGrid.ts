@@ -23,6 +23,8 @@ export class ChunkGrid {
   readonly #centres = new Map<string, THREE.Vector3>();
   /** The largest object radius in each chunk, so the distance test can be widened by it. */
   readonly #reach = new Map<string, number>();
+  /** The highest point of anything in each chunk, in world Y. What an occluder has to clear. */
+  readonly #top = new Map<string, number>();
 
   constructor(size: number) {
     // A zero or negative size divides by zero and puts every object in one chunk named NaN. Guarded
@@ -37,7 +39,7 @@ export class ChunkGrid {
   }
 
   /** Files an object under the chunk containing `position`, and widens that chunk's reach. */
-  add(objectId: string, position: THREE.Vector3, radius: number): void {
+  add(objectId: string, position: THREE.Vector3, radius: number, topY = position.y): void {
     const key = ChunkGrid.keyFor(this.#size, position.x, position.z);
     const existing = this.#objects.get(key);
     if (existing) existing.push(objectId);
@@ -51,6 +53,37 @@ export class ChunkGrid {
       );
     }
     this.#reach.set(key, Math.max(this.#reach.get(key) ?? 0, radius));
+    this.#top.set(key, Math.max(this.#top.get(key) ?? -Infinity, topY));
+  }
+
+  /** How wide a chunk is. The occlusion test needs it to find a chunk's near edge. */
+  get size(): number {
+    return this.#size;
+  }
+
+  /** The highest point of anything in a chunk, in world Y. */
+  topOf(key: string): number {
+    return this.#top.get(key) ?? 0;
+  }
+
+  /**
+   * The point on a chunk's footprint closest to `from`, horizontally.
+   *
+   * The occlusion test aims here rather than at the centre, and it has to: a hill can hide a
+   * chunk's middle while the near edge of it — and the building standing on that edge — is in plain
+   * sight. Testing the nearest point is the conservative choice, and being conservative is the
+   * whole difference between culling and objects disappearing.
+   */
+  nearestPointTo(key: string, from: THREE.Vector3, into: THREE.Vector3): THREE.Vector3 {
+    const [column, row] = key.split(',').map(Number) as [number, number];
+    const minX = column * this.#size;
+    const minZ = row * this.#size;
+    into.set(
+      Math.min(minX + this.#size, Math.max(minX, from.x)),
+      this.#top.get(key) ?? 0,
+      Math.min(minZ + this.#size, Math.max(minZ, from.z)),
+    );
+    return into;
   }
 
   get chunkCount(): number {

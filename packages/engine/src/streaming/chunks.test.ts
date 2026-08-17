@@ -81,7 +81,11 @@ describe('ChunkGrid', () => {
 });
 
 describe('streamingProblems', () => {
-  const streaming = (distance: number, size = 32) => ({ distance, size });
+  const streaming = (distance: number, size = 32, occlusion = false) => ({
+    distance,
+    size,
+    occlusion,
+  });
 
   it('says nothing at all when the distance is off', () => {
     expect(streamingProblems(streaming(0), null)).toEqual([]);
@@ -96,5 +100,19 @@ describe('streamingProblems', () => {
 
   it('catches a distance barely wider than one chunk', () => {
     expect(streamingProblems(streaming(40, 32), 20).join(' ')).toContain('appear and disappear');
+  });
+
+  it('says when occlusion has nothing to hide anything behind', () => {
+    // A flat field runs the whole test, finds nothing, and costs a dozen height samples per chunk
+    // to say so. "I switched it on and nothing happened" is otherwise indistinguishable from a
+    // broken feature.
+    expect(streamingProblems(streaming(0, 32, true), null, 0.4).join(' ')).toContain('almost flat');
+    expect(streamingProblems(streaming(0, 32, true), null, 30)).toEqual([]);
+  });
+
+  it('does not complain about fog when only occlusion is on', () => {
+    // The two settings are independent. A level with occlusion and no draw distance has nothing to
+    // fade out of, so the fog advice would be noise — and noise is how warnings stop being read.
+    expect(streamingProblems(streaming(0, 32, true), null, 30)).toEqual([]);
   });
 });

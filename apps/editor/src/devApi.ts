@@ -269,8 +269,15 @@ export interface DevApi {
     peakMs: number;
     frames: number;
   } | null;
+  /** Raises the live terrain with one brush stroke, as the sculpt tool would. */
+  raiseTerrain(x: number, z: number, radius: number, strength: number): boolean;
   /** The chunk grid's size and how much of it is drawn. Null when there is no draw distance. */
-  streamingStats(): { chunks: number; liveChunks: number; objects: number } | null;
+  streamingStats(): {
+    chunks: number;
+    liveChunks: number;
+    occludedChunks: number;
+    objects: number;
+  } | null;
   /** What level of detail built, and which level one object is drawing. Null before a scene loads. */
   lodStats(objectId?: string): {
     trianglesSaved: number;
@@ -633,6 +640,27 @@ export function exposeDevApi(library: AssetLibrary): void {
     },
 
     terrainHeightAt: (x, z) => currentLoadedScene?.terrainField?.sampleHeight(x, z) ?? null,
+
+    /**
+     * One sculpt-brush stroke on the live terrain, without a mouse.
+     *
+     * The same call the editor's raise brush makes, on the same field. It exists because a test that
+     * needs a hill should not have to simulate a drag across a canvas — a brush stroke is a test of
+     * the brush, and what wants proving is what happens to the render once the ground is in the way.
+     *
+     * Applied to the viewport's field and not written back to the document, exactly like a stroke
+     * in progress: the next full rebuild forgets it.
+     */
+    raiseTerrain: (x, z, radius, strength) => {
+      const loaded = currentLoadedScene;
+      const field = loaded?.terrainField;
+      if (!loaded || !field) return false;
+      const touched = field.sculpt(x, z, 'raise', { radius, strength });
+      loaded.refreshTerrain(
+        useSceneStore.getState().scene.terrain.layers.map((layer) => layer.color),
+      );
+      return touched;
+    },
 
     projectObject: (objectId) => {
       const node = currentLoadedScene?.objects.get(objectId);

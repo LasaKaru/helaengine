@@ -60,9 +60,9 @@ async function placeLine(page: Page): Promise<void> {
 const setDistance = async (page: Page, distance: number, size = 32): Promise<void> => {
   await page.evaluate(
     ([far, chunk]) => {
-      window
-        .helaengine!.store.getState()
-        .setEnvironment({ streaming: { distance: far as number, size: chunk as number } });
+      window.helaengine!.store.getState().setEnvironment({
+        streaming: { distance: far as number, size: chunk as number, occlusion: false },
+      });
     },
     [distance, size] as const,
   );
@@ -135,6 +135,48 @@ test.describe('world chunks', () => {
     const withAll = await triangles(page);
     expect(withNearest).toBeGreaterThan(0);
     expect(withNearest).toBeLessThan(withAll);
+  });
+
+  test('a hill hides what is behind it, and flat ground hides nothing', async ({ page }) => {
+    /**
+     * The control is the whole test. Terrain occlusion on a flat field has to change *nothing* —
+     * identical camera, identical objects, identical setting, byte-for-byte the same triangle
+     * count — because there is nothing to hide behind. Only then does the same setting removing
+     * triangles once a ridge is raised mean the ridge is what did it.
+     */
+    await page.evaluate(() => {
+      window
+        .helaengine!.store.getState()
+        .setEnvironment({ streaming: { distance: 0, size: 32, occlusion: true } });
+    });
+    await page.waitForTimeout(1500);
+
+    const overFlatGround = await triangles(page);
+    const flatStats = await page.evaluate(() => window.helaengine!.streamingStats());
+    expect(flatStats?.occludedChunks).toBe(0);
+
+    /**
+     * A hill between the camera and the far towers.
+     *
+     * Raised with the same sculpt call the editor's brush makes, rather than by dragging across the
+     * canvas: a brush stroke is a test of the brush, and what is under test here is whether the
+     * renderer stops submitting triangles for what the ground is in front of.
+     */
+    await page.evaluate(() => {
+      const api = window.helaengine!;
+      for (const along of [-60, -70, -80]) {
+        for (const across of [-40, -20, 0, 20, 40]) {
+          api.raiseTerrain(across, along, 30, 0.9);
+        }
+      }
+    });
+    await page.waitForTimeout(2500);
+
+    const behindTheHill = await triangles(page);
+    const hillStats = await page.evaluate(() => window.helaengine!.streamingStats());
+
+    expect(hillStats?.occludedChunks).toBeGreaterThan(0);
+    expect(behindTheHill).toBeLessThan(overFlatGround);
   });
 
   test('the panel sets it and warns about vanishing in clear air', async ({ page }) => {

@@ -236,6 +236,34 @@ saved before this existed draws everything it always drew.
   still camera costs one distance compare per frame, and a step shorter than a quarter of a chunk
   cannot change any chunk's verdict.
 
+**Occlusion against the terrain** (`packages/engine/src/streaming/horizon.ts`), off by default and
+riding on the same chunk grid. A chunk behind a hill is not drawn: a dozen height samples along the
+line of sight from the camera to the chunk, against the heightfield the collider already uses.
+
+The general problem — is this hidden behind _anything_ — needs hardware occlusion queries, which
+WebGL2 has and Three does not expose, or a software depth rasteriser, which is a second renderer
+written by hand that has to agree with the first about every transform in the scene or it hides
+something that was visible. An outdoor level does not have that problem. It has one enormous
+occluder, the ground, and a hill either interrupts a sight line or it does not.
+
+The honest limit is the other side of the same coin: a level built from walls and rooms gets nothing
+from this, and a flat level gets nothing either. The panel says so when the terrain has under two
+metres of relief, because "I switched it on and nothing happened" is otherwise indistinguishable
+from a broken feature.
+
+Every choice in the test rounds towards drawing, because culling something visible is not a small
+artefact — it is a building that is not there. The sight line aims at the **nearest** point of the
+chunk rather than its centre, and at the **top** of the tallest thing in it rather than the ground;
+the samples skip both ends of the segment, so neither the ground under the camera nor the hill the
+chunk is standing on can occlude it; and the terrain has to clear the line by half a metre before it
+counts, or the heightfield's own interpolation wobble hides a level built on a plain.
+
+Verified in Chromium with its control: switching occlusion on over flat ground changes nothing at
+all, and raising a hill between the camera and the same objects removes them. Writing that test
+found a real bug — the streaming update is throttled on camera movement, so sculpting a hill in
+front of a chunk did not hide it until you also happened to pan. `refreshTerrain` now invalidates
+the cached decision.
+
 **What the draw distance does not bound is memory**, and that gap is worth understanding before
 anybody relies on the word "streaming". Placed objects are clones sharing one geometry and one
 material per asset — that sharing is why two hundred trees cost one material — so unloading a

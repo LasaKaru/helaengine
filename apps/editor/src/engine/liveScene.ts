@@ -53,3 +53,15 @@ export function objectHasProjectedUvs(objectId: string): boolean {
   if (!node) return false;
   return hasProjectedUvs(node);
 }
+
+/**
+ * How much height this level's terrain has, in metres between its lowest and highest point.
+ *
+ * Another question the document cannot answer cheaply: the heightmap is a base64 blob in the
+ * document and a decoded field in the viewport, and the viewport already has it. It decides whether
+ * the panel says the occlusion test has nothing to hide anything behind — a flat field runs the
+ * whole test, finds nothing, and looks exactly like a broken feature.
+ */
+export function liveTerrainRelief(): number {
+  return current?.terrainRelief ?? 0;
+}

@@ -16,6 +16,7 @@ import {
 } from '@helaengine/schema';
 import { useSceneStore } from '../store/sceneStore';
 import { LOOKS, LOOK_DESCRIPTION, LOOK_LABEL, SWAY_GROUPS, applyLook } from '@helaengine/schema';
+import { liveTerrainRelief } from '../engine/liveScene';
 import { NumberField } from './NumberField';
 
 /**
@@ -50,6 +51,10 @@ export function RenderingPanel(): React.JSX.Element {
   const setEnvironment = useSceneStore((state) => state.setEnvironment);
 
   const { lighting, postProcessing: post, wind } = environment;
+  // Read once per render rather than subscribed to: it changes when the terrain is sculpted, which
+  // already re-renders this panel through the document, and sampling a heightfield on every frame
+  // of a sculpt stroke would be work for a sentence nobody is reading mid-drag.
+  const terrainRelief = liveTerrainRelief();
 
   return (
     <section className="panel" aria-label="Rendering">
@@ -467,10 +472,31 @@ export function RenderingPanel(): React.JSX.Element {
         further away than this are not drawn at all — one distance test per chunk instead of one
         frustum test per mesh.
       </p>
+      <label className="param-check">
+        <input
+          type="checkbox"
+          aria-label="Hide what the terrain blocks"
+          checked={environment.streaming.occlusion}
+          onChange={(event) =>
+            setEnvironment({
+              streaming: { ...environment.streaming, occlusion: event.target.checked },
+            })
+          }
+        />
+        Hide what the terrain blocks
+      </label>
+      <p className="panel-hint">
+        A chunk behind a hill is not drawn. Terrain only — the ground is the one occluder an outdoor
+        level reliably has, and testing it is a dozen height samples per chunk against the
+        heightfield the collider already uses. A level built from walls and rooms gets nothing from
+        this.
+      </p>
+
       {(() => {
         const problems = streamingProblems(
           environment.streaming,
           environment.fog ? environment.fog.far : null,
+          terrainRelief,
         );
         if (problems.length === 0) return null;
         return (

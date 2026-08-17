@@ -25,6 +25,7 @@ import { applyMaterialOverride, restoreOriginalMaterials } from './materials.js'
 import { SurfaceTextures } from './render/surfaces.js';
 import { LodGeometries, buildLod } from './render/lod.js';
 import { ChunkGrid } from './streaming/ChunkGrid.js';
+import { terrainHides, terrainRelief } from './streaming/horizon.js';
 import { buildScatter, buildScatterMeshes } from './scatter/ScatterField.js';
 import {
   applyWindToObject,
@@ -46,6 +47,8 @@ const DEG2RAD = Math.PI / 180;
 const emitPoint = new THREE.Vector3();
 /** Scratch for the camera's world position during a streaming update. */
 const streamPoint = new THREE.Vector3();
+/** Scratch for the point an occlusion test aims at. */
+const occlusionTarget = new THREE.Vector3();
 const ORIGIN = new THREE.Vector3();
 /** No weather, parsed once — the baseline a rebuild check compares against. */
 const NO_WEATHER: Weather = WeatherSchema.parse({});
@@ -244,11 +247,13 @@ export class LoadedScene {
   readonly #lodMode: LodMode;
   /** The spatial partition, or null for a scene with no draw distance. */
   #chunks: ChunkGrid | null = null;
-  #streaming: Streaming = { distance: 0, size: 32 };
+  #streaming: Streaming = { distance: 0, size: 32, occlusion: false };
   /** Where the camera was when chunk visibility was last decided. */
   readonly #lastStreamPoint = new THREE.Vector3(Infinity, Infinity, Infinity);
   /** Chunk keys currently drawn, for the editor's statistics and for the tests. */
   #liveChunks = 0;
+  /** How many chunks the last update hid behind the terrain rather than for being too far. */
+  #occludedChunks = 0;
   /** Wind uniforms, or null when nothing in this scene sways. */
   #wind: WindUniforms | null;
   /** The current wind settings, kept in step by `syncEnvironment`. */
@@ -379,7 +384,10 @@ export class LoadedScene {
       if (this.instances?.has(objectId)) continue;
       box.setFromObject(node);
       const radius = box.isEmpty() ? 0 : box.getBoundingSphere(sphere).radius;
-      grid.add(objectId, node.getWorldPosition(streamPoint), radius);
+      // The top of the object, not its origin: the occlusion test aims at the highest thing in a
+      // chunk, because a hill that hides a hut's floor does not hide its roof.
+      const topY = box.isEmpty() ? node.position.y : box.max.y;
+      grid.add(objectId, node.getWorldPosition(streamPoint), radius, topY);
     }
 
     this.#chunks = grid;
@@ -396,6 +404,18 @@ export class LoadedScene {
    * step cannot change any chunk's verdict. A quarter of a chunk is the largest step that certainly
    * cannot.
    */
+  /**
+   * Forces the next streaming update to decide from scratch.
+   *
+   * The throttle assumes the answer is a function of camera position alone, and that is true right
+   * up until the *terrain* changes: sculpting a hill in front of a chunk should hide it, and until
+   * this existed it did not — the camera had not moved, so the cached verdict stood and the new hill
+   * occluded nothing. The symptom was a feature that worked only if you also happened to pan.
+   */
+  invalidateStreaming(): void {
+    this.#lastStreamPoint.set(Infinity, Infinity, Infinity);
+  }
+
   updateStreaming(camera: THREE.Camera): void {
     const grid = this.#chunks;
     if (!grid) return;
@@ -404,13 +424,36 @@ export class LoadedScene {
     if (this.#lastStreamPoint.distanceTo(streamPoint) < this.#streaming.size * 0.25) return;
     this.#lastStreamPoint.copy(streamPoint);
 
+    const terrain = this.#streaming.occlusion ? this.terrainField : null;
+    // Unlimited when the distance is off but occlusion is on: the two are independent settings, and
+    // a zero distance means "no distance limit" rather than "cull everything".
+    const distance = this.#streaming.distance > 0 ? this.#streaming.distance : Infinity;
+
     let live = 0;
+    let occluded = 0;
     for (const key of grid.keys()) {
-      const near = grid.isWithin(key, streamPoint, this.#streaming.distance);
-      if (near) live += 1;
-      this.#setChunkVisible(key, near);
+      let visible = grid.isWithin(key, streamPoint, distance);
+      if (visible && terrain) {
+        // Aimed at the nearest point of the chunk, raised to the top of the tallest thing in it.
+        // Both choices round towards drawing, because culling something that is actually visible is
+        // not a small artefact — it is a building that is not there.
+        grid.nearestPointTo(key, streamPoint, occlusionTarget);
+        if (terrainHides(terrain, streamPoint, occlusionTarget)) {
+          visible = false;
+          occluded += 1;
+        }
+      }
+      if (visible) live += 1;
+      this.#setChunkVisible(key, visible);
     }
     this.#liveChunks = live;
+    this.#occludedChunks = occluded;
+  }
+
+  /** How much height this scene's terrain has. Zero when it is flat, or when there is none. */
+  get terrainRelief(): number {
+    const field = this.terrainField;
+    return field ? terrainRelief(field) : 0;
   }
 
   #setChunkVisible(key: string, visible: boolean): void {
@@ -423,11 +466,17 @@ export class LoadedScene {
   }
 
   /** What the partition built and how much of it is drawn. Null when there is no draw distance. */
-  get streamingStats(): { chunks: number; liveChunks: number; objects: number } | null {
+  get streamingStats(): {
+    chunks: number;
+    liveChunks: number;
+    occludedChunks: number;
+    objects: number;
+  } | null {
     if (!this.#chunks) return null;
     return {
       chunks: this.#chunks.chunkCount,
       liveChunks: this.#liveChunks,
+      occludedChunks: this.#occludedChunks,
       objects: this.#chunks.objectCount,
     };
   }
@@ -673,6 +722,10 @@ export class LoadedScene {
     const mesh = this.terrain;
     const field = this.terrainField;
     if (mesh && field) field.updateGeometry(mesh.geometry, layerColors);
+    // The ground is what the occlusion test tests against, so a stroke that raises a hill has to
+    // re-decide what is hidden behind it. Cheap: it costs one recomputation on the next frame, and
+    // only for a scene that has a chunk grid at all.
+    this.invalidateStreaming();
   }
 
   /**

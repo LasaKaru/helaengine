@@ -54,6 +54,7 @@ export { applyMaterialOverride, hasProjectedUvs } from './materials.js';
 export { SurfaceTextures, type SurfaceMaps } from './render/surfaces.js';
 export { LodGeometries, buildLod, activeLodLevel } from './render/lod.js';
 export { ChunkGrid } from './streaming/ChunkGrid.js';
+export { terrainHides, terrainRelief } from './streaming/horizon.js';
 export { simplifyGeometry, triangleCount, canSimplify } from './render/simplify.js';
 export { PostStack, applyToneMapping, wantsPostProcessing } from './render/PostStack.js';
 export { Animator } from './animation/Animator.js';
