@@ -116,6 +116,16 @@ export function PhysicsPreview({ loadedScene, resolver, loader }: PhysicsPreview
         }
         built = physics;
 
+        /**
+         * Feet look for ground with a physics raycast while the game is running.
+         *
+         * The scene's own fallback samples the terrain heightfield, which knows nothing about the
+         * crate a character is standing on. Installed here rather than passed per frame so the
+         * editor's idle viewport and a running game answer "what is the ground" in one place — two
+         * answers is the editor/export divergence this codebase is built to avoid.
+         */
+        loadedScene.setGroundProbe((x, y, z, reach) => physics.groundNear(x, y, z, reach));
+
         // Spawn on the ground rather than at the document's y, which is usually zero and would put
         // the player's feet inside a hill. Half a metre of clearance lets the controller settle.
         /**

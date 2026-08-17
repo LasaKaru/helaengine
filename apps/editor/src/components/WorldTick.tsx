@@ -23,6 +23,8 @@ export function WorldTick({ loaded }: { loaded: LoadedScene | null }): null {
     // Each is a no-op when the scene has nothing that needs it, so a level with no rigs, no wind
     // and no particles pays three null checks a frame.
     loaded.updateAnimations(delta);
+    // After the clips, never before: the mixer would overwrite a placed foot on the same frame.
+    loaded.updateFootPlacement(delta);
     loaded.updateWind(delta);
     // The camera goes in because weather is a box that follows it: a finite number of drops looks
     // infinite only because the player carries their own weather around.

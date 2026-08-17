@@ -136,6 +136,8 @@ export class Viewport {
       // in the export as well. Ticking in both places instead would run every clip at double
       // speed in a game export, which is the kind of bug that gets blamed on the model.
       this.#loaded?.updateAnimations(delta);
+      // After the clips, never before: the mixer would overwrite a placed foot on the same frame.
+      this.#loaded?.updateFootPlacement(delta);
       // Wind rides the same delta, for the same reason as animation: a paused level whose grass
       // keeps waving looks like the pause did not take.
       this.#loaded?.updateWind(delta);

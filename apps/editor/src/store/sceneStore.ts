@@ -30,6 +30,7 @@ import {
   type MaterialOverride,
   type GraphNode,
   type GraphVariable,
+  type FootIk,
   type LodOverride,
   type SwayOverride,
   type ScatterLayer,
@@ -117,6 +118,7 @@ export interface SceneState {
   /** Whether the wind moves this object, and as what. */
   setSway(objectId: string, sway: SwayOverride): void;
   setLod(objectId: string, lod: LodOverride): void;
+  setFootIk(objectId: string, footIk: FootIk | null): void;
   /** What happens when this object takes enough damage, or null for something that does not break. */
   setDestructible(objectId: string, destructible: Destructible | null): void;
   /** Turns this object into something the player can drive, or null for everything else. */
@@ -351,6 +353,11 @@ export const useSceneStore = create<SceneState>()(
                 // And a copy of an object kept at full detail is kept at full detail: it was
                 // excluded for a reason about the model, and the copy is the same model.
                 lod: source.lod,
+                // A copy of a character places its feet the same way, and as a value rather than
+                // shared: retuning one guard's hip drop must not retune the one it came from.
+                footIk: source.footIk
+                  ? { ...source.footIk, bones: { ...source.footIk.bones } }
+                  : null,
                 // A duplicated rig animates like the original. Copied as a value rather than
                 // shared, so retargeting one guard's clips does not retarget every copy of it.
                 animation: source.animation
@@ -511,6 +518,14 @@ export const useSceneStore = create<SceneState>()(
           commit('object/setSway', (draft) => {
             const object = draft.objects.find((current) => current.id === objectId);
             if (object) object.sway = sway;
+          }),
+
+        setFootIk: (objectId, footIk) =>
+          commit('object/setFootIk', (draft) => {
+            const object = draft.objects.find((current) => current.id === objectId);
+            // Replaced wholesale, like every other binding: a partial merge cannot express "stop
+            // binding this bone", because `undefined` reads as "leave it alone".
+            if (object) object.footIk = footIk;
           }),
 
         setLod: (objectId, lod) =>

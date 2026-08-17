@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { BehaviorSchema } from './behavior.js';
 import { ObjectAnimationSchema } from './animation.js';
+import { OptionalFootIkSchema } from './footIk.js';
 import { LodOverrideSchema } from './lod.js';
 import { MaterialOverrideSchema } from './rendering.js';
 import { ObjectPhysicsSchema } from './physics.js';
@@ -59,6 +60,14 @@ export const SceneObjectSchema = z.object({
    * is no level of detail at all.
    */
   lod: LodOverrideSchema.default('auto'),
+  /**
+   * Feet placed on the ground beneath them, or null for a character animated exactly as authored.
+   *
+   * Null by default and null in every document written before it existed, so nothing that used to
+   * stand flat starts crouching. Only means anything on a rigged model — the binding names bones,
+   * and a model with none binds nothing.
+   */
+  footIk: OptionalFootIkSchema,
   /**
    * Overrides for this instance's material, or null to use whatever the model shipped with.
    *

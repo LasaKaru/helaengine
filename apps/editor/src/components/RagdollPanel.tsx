@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
   RAGDOLL_LABELS,
   RAGDOLL_PARTS,
@@ -25,9 +25,18 @@ export function RagdollPanel({ object }: { object: SceneObject }): React.JSX.Ele
   const ragdoll = object.ragdoll;
   const [detected, setDetected] = useState<number | null>(null);
 
-  // Read from the model the viewport built, because the document does not know what is inside a
-  // `.glb` and the manifest does not carry bone names.
-  const bones = useMemo(() => boneNamesFor(object.id), [object.id]);
+  /**
+   * The bone names inside this model, read on every render rather than memoised on the object id.
+   *
+   * From the model the viewport built: the document does not know what is inside a `.glb`, and the
+   * manifest does not carry bone names.
+   *
+   * The model arrives asynchronously, and a `useMemo` keyed only on the id caches whatever the
+   * viewport had at the moment the panel first appeared — which for a freshly placed character is an
+   * empty list, leaving the Detect button disabled forever with no explanation. Traversing a
+   * skeleton is a few dozen nodes; the memo was saving nothing and costing that.
+   */
+  const bones = boneNamesFor(object.id);
   const problems = ragdoll ? ragdollProblems(ragdoll) : [];
 
   const update = (patch: Partial<Ragdoll>): void => {

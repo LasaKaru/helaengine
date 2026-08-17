@@ -271,6 +271,11 @@ export interface DevApi {
   } | null;
   /** Raises the live terrain with one brush stroke, as the sculpt tool would. */
   raiseTerrain(x: number, z: number, radius: number, strength: number): boolean;
+  /** Where one character's ankles are, in world space. Null when it has no foot placement. */
+  footPositions(objectId: string): {
+    left: { x: number; y: number; z: number } | null;
+    right: { x: number; y: number; z: number } | null;
+  } | null;
   /** The chunk grid's size and how much of it is drawn. Null when there is no draw distance. */
   streamingStats(): {
     chunks: number;
@@ -862,6 +867,29 @@ export function exposeDevApi(library: AssetLibrary): void {
         levels: (node?.userData['lodLevels'] as number | undefined) ?? 0,
         level: node ? activeLodLevel(node) : -1,
       };
+    },
+
+    /**
+     * Where one character's ankles actually are, in world space.
+     *
+     * Read from the skeleton the renderer is drawing, not from the solver's own numbers: asserting
+     * the solver against itself would pass on a solver whose output nothing consumes.
+     */
+    footPositions: (objectId) => {
+      const node = currentLoadedScene?.objects.get(objectId);
+      const settings = useSceneStore
+        .getState()
+        .scene.objects.find((object) => object.id === objectId)?.footIk;
+      if (!node || !settings) return null;
+
+      const read = (name: string): { x: number; y: number; z: number } | null => {
+        const bone = name === '' ? undefined : node.getObjectByName(name);
+        if (!bone) return null;
+        bone.updateWorldMatrix(true, false);
+        const at = bone.getWorldPosition(new Vector3());
+        return { x: at.x, y: at.y, z: at.z };
+      };
+      return { left: read(settings.bones.footL), right: read(settings.bones.footR) };
     },
 
     /** What the chunk grid built and how much of it is drawn. Null when there is no draw distance. */

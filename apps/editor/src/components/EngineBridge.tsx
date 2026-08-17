@@ -45,7 +45,14 @@ function structureKey(scene: Scene): string {
   const scatterKey = JSON.stringify(scene.scatter);
 
   const objectKey = scene.objects
-    .map((object) => `${object.id}:${object.assetId}:${object.sway}:${object.lod}`)
+    .map(
+      (object) =>
+        // Foot placement is part of the *structure*: the solver binds bones inside one clone's
+        // skeleton and is built with that clone. Keyed on the whole binding rather than on whether
+        // it exists, because rebinding a bone has to rebuild it too — without this, switching
+        // placement on wrote a perfectly good setting into the document and no solver was ever made.
+        `${object.id}:${object.assetId}:${object.sway}:${object.lod}:${JSON.stringify(object.footIk)}`,
+    )
     .join('|');
 
   // Level of detail is geometry: switching it on decimates every mesh and wraps each object in a

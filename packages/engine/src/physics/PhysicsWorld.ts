@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import type { BodyType, ColliderType, Joint, Player, Vehicle } from '@helaengine/schema';
 import type { TerrainField } from '../TerrainField.js';
+
+/** Straight down. Reused rather than allocated: the foot placer asks twice per character per frame. */
+const DOWN = new THREE.Vector3(0, -1, 0);
 import { colliderDescFor } from './colliders.js';
 import { jointDataFor, jointIsDriveable } from './joints.js';
 import { PlayerController } from './PlayerController.js';
@@ -348,6 +351,23 @@ export class PhysicsWorld {
     );
 
     return hit ? hit.timeOfImpact : null;
+  }
+
+  /**
+   * A ground probe for the foot placer: the surface nearest a point, above or below it.
+   *
+   * Both directions, and the upward half is the one that matters. A foot that has sunk into a stair
+   * riser needs the tread *above* it found; a downward-only search reports the floor beneath the
+   * step and pushes the foot further in.
+   *
+   * Returns null for a foot over a void, which the solver treats as "keep the animation's pose" —
+   * the honest answer, and better than snapping the trailing foot of a walking character backwards
+   * onto the step it just left.
+   */
+  groundNear(x: number, y: number, z: number, reach: number): number | null {
+    const from = { x, y: y + reach, z };
+    const distance = this.castDistance(new THREE.Vector3(from.x, from.y, from.z), DOWN, reach * 2);
+    return distance === null ? null : from.y - distance;
   }
 
   /**

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { guessBoneNames } from './bones.js';
 
 /**
  * A character that goes limp.
@@ -133,9 +134,8 @@ export function defaultRagdoll(): Ragdoll {
 /**
  * Common naming patterns for each part, lowercased, in order of preference.
  *
- * Side markers are deliberately matched as separated tokens (`_l`, `.l`, `left`) rather than a bare
- * `l`, because half the bones in a rig contain the letter L — `Shoulder` and `Pelvis` among them —
- * and a naive match binds the left forearm to the pelvis with total confidence.
+ * How they are matched — normalisation, side markers, first-come claiming — lives in `bones.ts`,
+ * shared with the foot placer.
  */
 const PATTERNS: Readonly<Record<RagdollPart, readonly string[]>> = {
   hips: ['hips', 'pelvis', 'root'],
@@ -151,30 +151,6 @@ const PATTERNS: Readonly<Record<RagdollPart, readonly string[]>> = {
   legLowerR: ['rightleg', 'lowerleg_r', 'shin_r', 'calf_r', 'knee_r'],
 };
 
-/** Bone name reduced to something the patterns can be compared against. */
-function normalise(name: string): string {
-  // `mixamorig:LeftUpLeg` and `Bone.Left.Up.Leg` both become `leftupleg`. Separators go because
-  // every exporter picks a different one, and the tokens either side are what carry the meaning.
-  return name
-    .toLowerCase()
-    .replace(/^.*[:|]/, '')
-    .replace(/[\s._-]+/g, '');
-}
-
-/** True when a normalised bone name carries the given side marker. */
-function sided(normalised: string, side: 'l' | 'r'): boolean {
-  const other = side === 'l' ? 'r' : 'l';
-  const word = side === 'l' ? 'left' : 'right';
-  const otherWord = side === 'l' ? 'right' : 'left';
-
-  if (normalised.includes(otherWord)) return false;
-  if (normalised.includes(word)) return true;
-  // A trailing marker, which is what survives normalising `Thigh_L`. Anchored to the end so
-  // `Clavicle` does not read as a left-hand bone.
-  if (normalised.endsWith(other)) return false;
-  return normalised.endsWith(side);
-}
-
 /**
  * Guesses a bone binding from the names a rig actually contains.
  *
@@ -183,34 +159,7 @@ function sided(normalised: string, side: 'l' | 'r'): boolean {
  * folds the wrong way, so the editor shows what was matched rather than applying it silently.
  */
 export function guessRagdollBones(boneNames: readonly string[]): Record<RagdollPart, string> {
-  const bound = Object.fromEntries(RAGDOLL_PARTS.map((part) => [part, ''])) as Record<
-    RagdollPart,
-    string
-  >;
-  const taken = new Set<string>();
-
-  for (const part of RAGDOLL_PARTS) {
-    const wantsSide = part.endsWith('L') ? 'l' : part.endsWith('R') ? 'r' : null;
-
-    for (const pattern of PATTERNS[part]) {
-      const match = boneNames.find((name) => {
-        if (taken.has(name)) return false;
-        const flat = normalise(name);
-        if (!flat.includes(pattern.replace(/[\s._-]+/g, ''))) return false;
-        return wantsSide === null || sided(flat, wantsSide);
-      });
-
-      if (match) {
-        bound[part] = match;
-        // Claimed, so `spine` cannot also match the bone `hips` already took — the patterns overlap
-        // deliberately, and first-come is what keeps the more specific pattern winning.
-        taken.add(match);
-        break;
-      }
-    }
-  }
-
-  return bound;
+  return guessBoneNames(RAGDOLL_PARTS, PATTERNS, boneNames);
 }
 
 /** Parts that have a bone bound, in an order where a parent always precedes its children. */

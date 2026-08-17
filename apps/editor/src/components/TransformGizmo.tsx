@@ -186,6 +186,7 @@ export function TransformGizmo(): React.JSX.Element | null {
       emitter: null,
       sway: 'auto' as const,
       lod: 'auto' as const,
+      footIk: null,
       metadata: {},
     }));
 

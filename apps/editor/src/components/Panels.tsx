@@ -14,6 +14,7 @@ import { useSceneStore } from '../store/sceneStore';
 import { BehaviorPanel } from './BehaviorPanel';
 import { AnimationPanel } from './AnimationPanel';
 import { RenderingPanel } from './RenderingPanel';
+import { FootIkPanel } from './FootIkPanel';
 import { MaterialPanel } from './MaterialPanel';
 import { GameUiPanel } from './GameUiPanel';
 import { TriggerPanel } from './TriggerPanel';
@@ -595,6 +596,7 @@ export function InspectorPanel({ manifest }: { manifest: AssetManifest }): React
       {single && !single.trigger && <PhysicsSection object={single} />}
       {single && !single.trigger && <BehaviorPanel object={single} />}
       {single && !single.trigger && <AnimationPanel object={single} manifest={manifest} />}
+      {single && !single.trigger && <FootIkPanel object={single} />}
       {single && !single.trigger && <MaterialPanel object={single} manifest={manifest} />}
       {single && !single.trigger && <DestructiblePanel object={single} manifest={manifest} />}
       {single && !single.trigger && <VehiclePanel object={single} manifest={manifest} />}

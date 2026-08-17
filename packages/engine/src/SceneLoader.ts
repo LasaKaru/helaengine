@@ -24,6 +24,7 @@ import { MISSING_ASSET_ENTRY, type AssetResolver } from './assets.js';
 import { applyMaterialOverride, restoreOriginalMaterials } from './materials.js';
 import { SurfaceTextures } from './render/surfaces.js';
 import { LodGeometries, buildLod } from './render/lod.js';
+import { FootIk, type GroundProbe } from './animation/FootIk.js';
 import { ChunkGrid } from './streaming/ChunkGrid.js';
 import { terrainHides, terrainRelief } from './streaming/horizon.js';
 import { buildScatter, buildScatterMeshes } from './scatter/ScatterField.js';
@@ -268,6 +269,16 @@ export class LoadedScene {
    * work with an answer that only changes when something spawns or dies.
    */
   readonly #animators = new Map<string, Animator>();
+
+  /**
+   * Foot placers, by object id.
+   *
+   * Kept beside the animators rather than inside them, because the order between the two is the
+   * whole correctness of the feature: the mixer writes the clip's pose, and this overwrites part of
+   * it afterwards. An `Animator` that owned its own solver would have to promise that order, and a
+   * promise in a comment is not the same as a call site you can read.
+   */
+  readonly #footIk = new Map<string, FootIk>();
 
   /**
    * This scene's generated surface maps.
@@ -529,6 +540,55 @@ export class LoadedScene {
   }
 
   /**
+   * Places every rigged character's feet, after the clips have had their say.
+   *
+   * A separate call rather than the tail of `updateAnimations`, because it needs something the
+   * animation system has no business knowing: what the ground is. The caller supplies that — the
+   * game runtime uses a physics raycast, so a foot lands on a crate as readily as on a hill.
+   */
+  updateFootPlacement(deltaSeconds: number): void {
+    if (this.#footIk.size === 0) return;
+    const ground = this.#groundProbe ?? this.#terrainProbe;
+    for (const solver of this.#footIk.values()) solver.solve(deltaSeconds, ground);
+  }
+
+  /**
+   * Where the feet are told to look for ground.
+   *
+   * One probe for the whole scene, set by whoever knows most about the world: play preview and an
+   * exported game install a physics raycast, so a foot lands on a crate as readily as on a hill.
+   * Without one the terrain is sampled directly, which is what the editor's idle viewport has.
+   *
+   * A single settable probe rather than a parameter on the tick, because the tick is called from
+   * two places and a parameter would be two answers to "what is the ground" — the shape of
+   * divergence between the editor and an export that this codebase exists to avoid.
+   */
+  setGroundProbe(probe: GroundProbe | null): void {
+    this.#groundProbe = probe;
+  }
+
+  #groundProbe: GroundProbe | null = null;
+
+  /** The fallback: the terrain heightfield, ignoring everything standing on it. */
+  readonly #terrainProbe: GroundProbe = (x, y, z, reach) => {
+    const height = this.terrainField?.sampleHeight(x, z);
+    if (height === undefined) return null;
+    // Out of reach is a void, not a hit. A foot on a first-floor balcony should not be dragged down
+    // to the hillside twelve metres below it.
+    return Math.abs(height - y) <= reach ? height : null;
+  };
+
+  /** The foot placer for one object, for the editor's statistics and the tests. */
+  footIk(objectId: string): FootIk | undefined {
+    return this.#footIk.get(objectId);
+  }
+
+  /** How many characters in this scene are having their feet placed. */
+  get footIkCount(): number {
+    return this.#footIk.size;
+  }
+
+  /**
    * The lights, fog and background this scene built, so they can be replaced without a full reload.
    *
    * Tracked separately from `#added` because they are the one part of a scene that changes on its
@@ -691,6 +751,8 @@ export class LoadedScene {
     for (const [id, node] of this.#objects) {
       const animator = node.userData['animator'] as Animator | undefined;
       if (animator) this.#animators.set(id, animator);
+      const solver = node.userData['footIk'] as FootIk | undefined;
+      if (solver) this.#footIk.set(id, solver);
     }
   }
 
@@ -1581,6 +1643,25 @@ export class SceneLoader {
       if (clips.length > 0) {
         const animator = new Animator(visual, clips, object.animation);
         node.userData['animator'] = animator;
+
+        /**
+         * The foot placer, built here for the same reason the animator is: it binds bones by name
+         * inside *this* clone's skeleton, and this is the only place that clone exists.
+         *
+         * Bound only alongside an animator, because a foot placer on an unanimated model would be
+         * solving a pose nothing is moving — which is the static-mesh case, and a static mesh should
+         * be placed correctly rather than corrected at runtime.
+         */
+        if (object.footIk) {
+          const solver = new FootIk(visual, object.footIk);
+          if (solver.legCount > 0) node.userData['footIk'] = solver;
+          else {
+            this.#warn(
+              `object "${object.id}" has foot placement switched on but no leg fully bound, so ` +
+                'nothing will be placed',
+            );
+          }
+        }
         owned.push(animator);
         for (const name of animator.missing) {
           this.#warn(
