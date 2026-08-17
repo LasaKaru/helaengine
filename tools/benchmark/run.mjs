@@ -91,6 +91,26 @@ const objectCount = await page.evaluate(
 
 await page.getByRole('button', { name: 'Walk' }).click();
 await page.waitForFunction(() => window.helaengine.playerPosition() !== null, { timeout: 30_000 });
+
+/**
+ * Dismiss the game's own main menu, and the reason is the whole point of this benchmark.
+ *
+ * The Stress Test template ships a UI shell, so entering Walk mode lands on its home screen — and a
+ * menu here is not an overlay, it genuinely stops the world: `PhysicsPreview` returns out of its
+ * frame callback before stepping anything.
+ *
+ * This benchmark was written before the shell existed, and its physics numbers were real when they
+ * were taken. Since the shell arrived, every "playing" figure has been measured against a *paused*
+ * simulation. The giveaway sat in the output the whole time as `simulation: null`, which the
+ * human-readable report skipped over in silence. The render numbers stayed honest — the scene draws
+ * behind the menu — but the one figure that would say whether physics belongs on a worker had been
+ * missing for sprints.
+ */
+await page
+  .getByRole('button', { name: 'Play', exact: true })
+  .click()
+  .catch(() => {});
+await page.waitForFunction(() => window.helaengine.uiScreen() === 'playing', { timeout: 30_000 });
 await page.waitForTimeout(1500);
 
 const playing = {
@@ -125,6 +145,20 @@ const report = {
   errors,
 };
 
+/**
+ * A missing measurement has to look like a failure rather than like a blank.
+ *
+ * This check is here rather than in the human-readable output because `--json` is what the
+ * regression check reads, and the silent version of this is how a paused simulation was benchmarked
+ * for several sprints without anybody noticing.
+ */
+if (!report.playing.simulation) {
+  errors.push(
+    'no simulation timing was recorded — the world was never stepped, so the "playing" numbers ' +
+      'are of a paused scene. Check that the game reached its playing screen.',
+  );
+}
+
 await page.screenshot({ path: new URL('./stress.png', import.meta.url).pathname });
 await browser.close();
 
@@ -146,7 +180,7 @@ if (asJson) {
     console.log(
       `simulation cost per frame: physics ${playing.simulation.physicsMs}ms   ` +
         `gameplay ${playing.simulation.gameplayMs}ms   peak ${playing.simulation.peakMs}ms   ` +
-        `(CPU only, comparable across machines)`,
+        `over ${playing.simulation.frames} frames (CPU only, comparable across machines)`,
     );
   }
   console.log(

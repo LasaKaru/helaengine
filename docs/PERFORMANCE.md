@@ -66,6 +66,37 @@ Simulation cost per frame, in play preview with all twenty enemies active:
 Total **~1.7 ms of CPU per frame**, comfortably inside the 4 ms bar and leaving about 15 ms of a
 60 fps budget for rendering.
 
+### Re-measured, 2026-08-17 — and why there was a gap
+
+| Configuration | physics | gameplay | peak    | frames |
+| ------------- | ------- | -------- | ------- | ------ |
+| Play preview  | 2.44 ms | 0.26 ms  | 35.9 ms | 49     |
+
+**These figures were missing for several sprints, and the benchmark said so in a way nobody read.**
+The numbers above them were real when they were taken, in the sprint that added the benchmark. Two
+sprints later the game shell arrived — and a menu in this engine does not cover the world, it stops
+it: `PhysicsPreview` returns out of its frame callback before stepping anything. From then on the
+benchmark clicked into Walk mode, landed on the Stress Test template's main menu, and sampled a
+_paused_ simulation. It printed `simulation: null`, and the human-readable report skipped the line
+in silence.
+
+Nothing about it looked wrong. The scene drew, the player existed, the frame sampler ran, and the
+render numbers stayed honest, because the world renders behind a menu perfectly well. The only
+symptom was a blank where a line used to be.
+
+Fixed in two places, because one of them is the actual defect and the other is why it survived:
+
+- The benchmark now dismisses the game's menu and waits for the playing screen before sampling.
+- A missing measurement is now an **error** rather than a blank, in `--json` as well as in the
+  printed report. A number that quietly disappears is worse than one that is wrong.
+
+`apps/editor/e2e/simulation-timing.spec.ts` pins both halves in CI: that a shell on its home screen
+records nothing at all, and that dismissing it records a real per-frame cost.
+
+**The rise from 1.56 ms to 2.44 ms is not a regression measurement.** The two runs are on different
+container CPUs, and the engine has since grown joints, breakables, ragdolls and vehicles, all of
+which add per-step work. What the number is good for is the decision it was taken for, below.
+
 The average excludes the first ten frames, and `peakMs` is reported separately so that decision is
 visible rather than hidden. The first step of a simulation is genuinely not representative of the
 ones after it: Rapier builds its broad phase, all twenty enemies happen to run their first
@@ -91,6 +122,37 @@ appears where the triangle count, not the call count, is the constraint.
 **SwiftShader frame times barely moved** between batched and unbatched. That is expected and is not
 evidence against the change: a software rasteriser is fill-rate bound, so it is insensitive to
 exactly the thing being optimised. It is why the bar above is written in draw calls.
+
+## Should physics move to a Web Worker?
+
+The measurement above was taken to answer this, and it does not answer it on its own — so here is
+the trade, written down rather than settled by whoever touches it next.
+
+**For.** Physics is **2.44 ms of a 16.7 ms frame**, about 15%, and it is the largest single block of
+main-thread CPU the engine spends. On a worker that time comes back for rendering, and a garbage
+collection or a React render in the editor cannot stall a step. Every serious engine does this.
+
+**Against, and it is not a small against.**
+
+- **`SharedArrayBuffer` needs cross-origin isolation** — COOP and COEP headers on every response.
+  An export is a folder of static files that people host wherever they like and often open from
+  `file://`, and the portable build is exactly that. Requiring headers means either exports that
+  silently lose physics on ordinary hosting, or a main-thread fallback kept alongside the worker —
+  two physics architectures, drifting apart on the third change.
+- **Rapier's character controller is synchronous by nature.** `computeColliderMovement` is called
+  with the desired motion and its correction is read back in the same frame, before the transform is
+  written. Across a worker that becomes a round trip, so the player moves on last frame's answer.
+  Same for every line-of-sight trace and every weapon raycast.
+- **A one-frame lag changes gameplay everywhere.** Coyote time, jump buffering and mantling were
+  tuned against the current timing, and 580 engine tests plus the smoke gate pin behaviour that
+  would shift.
+
+**What would change the answer:** a scene where `physicsMs` clears about 4 ms — roughly a thousand
+active colliders, or ragdolls in numbers — or a decision that exports may require a host that sets
+COOP/COEP. Until one of those, the honest position is that this is a large architectural change with
+a hosting cost, for 15% of a frame that is not currently the constraint.
+
+Task #87 stays open, with this paragraph as its brief.
 
 ## What is optimised, and what is deliberately not
 
