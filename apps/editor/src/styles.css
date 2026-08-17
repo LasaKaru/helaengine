@@ -2653,3 +2653,94 @@ body,
 .joint-problems p:last-child {
   margin-bottom: 0;
 }
+
+/**
+ * The opening ident.
+ *
+ * Fixed and above everything, over an editor that is already mounting behind it — the cover is the
+ * point, not a loading state. It fades out rather than vanishing, so the transition into the start
+ * screen reads as one movement.
+ */
+.ident {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: var(--bg);
+  animation: ident-out 300ms ease-in 1100ms forwards;
+}
+
+.ident-mark {
+  color: var(--accent);
+  animation: ident-in 520ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+/*
+ * The pulse traced left to right.
+ *
+ * `stroke-dasharray` set to more than the path's length and the offset run down to zero draws the
+ * line rather than fading it in. 260 is comfortably longer than the path at this viewBox — a value
+ * shorter than the path leaves a permanent gap, which looks like a rendering fault rather than an
+ * animation.
+ */
+.ident-mark svg path[stroke] {
+  stroke-dasharray: 260;
+  stroke-dashoffset: 260;
+  animation: ident-trace 700ms ease-out 260ms forwards;
+}
+
+.ident-name {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text);
+  animation: ident-in 520ms ease-out 420ms both;
+}
+
+@keyframes ident-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes ident-trace {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes ident-out {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+/*
+ * Reduced motion gets the finished mark, held.
+ *
+ * Not "no ident": somebody who has asked for less movement has not asked to be told less about what
+ * they are using. What they lose is the tracing and the scale, which are the parts that move.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .ident-mark,
+  .ident-name {
+    animation: none;
+  }
+
+  .ident-mark svg path[stroke] {
+    stroke-dashoffset: 0;
+    animation: none;
+  }
+}

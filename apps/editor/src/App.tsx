@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
+import { OpeningIdent } from './components/OpeningIdent';
 import { ProjectsScreen } from './components/ProjectsScreen';
 import { useShortcuts } from './useShortcuts';
 import { useAutosave } from './useAutosave';
@@ -91,7 +92,13 @@ export function App(): React.JSX.Element {
     };
   }, [onProjects]);
 
-  if (screen === 'projects') return <ProjectsScreen />;
+  if (screen === 'projects')
+    return (
+      <>
+        <OpeningIdent />
+        <ProjectsScreen />
+      </>
+    );
 
   return (
     <Suspense
