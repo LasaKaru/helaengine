@@ -4,6 +4,7 @@ export * from './bones.js';
 export * from './footIk.js';
 export * from './lod.js';
 export * from './streaming.js';
+export * from './water.js';
 export * from './surface.js';
 export * from './rendering.js';
 export * from './environment.js';

@@ -4,6 +4,7 @@ import { PostProcessingSchema, ShadowSchema, ToneMappingSchema } from './renderi
 import { WindSchema } from './wind.js';
 import { LodSchema } from './lod.js';
 import { StreamingSchema } from './streaming.js';
+import { OptionalWaterSchema } from './water.js';
 import { WeatherSchema } from './vfx.js';
 
 export const FogSchema = z.object({
@@ -92,5 +93,13 @@ export const EnvironmentSchema = z.object({
    * existed draws everything it always drew, and an author who wants the trade makes it on purpose.
    */
   streaming: StreamingSchema.default({}),
+  /**
+   * Water over the level, or null for a level with none.
+   *
+   * Null is the absence of the system rather than a surface at the bottom of the world: no plane
+   * built, no shader compiled, no per-frame work. Every scene saved before this existed renders
+   * exactly as it did.
+   */
+  water: OptionalWaterSchema,
 });
 export type Environment = z.infer<typeof EnvironmentSchema>;
