@@ -110,11 +110,54 @@ is decided per `Mesh` rather than per group. `instancing.test.ts` pins both halv
 keeps `frustumCulled` on and has a bounding sphere, and an object behind the camera is confirmed
 outside the frustum.
 
-**LOD is not implemented.** The task said to add distance-based LOD "for high-poly assets if any
-exceed budget". None do: the heaviest asset in the library is 8,000 triangles against an 8,000
-budget, and the whole stress scene is 36k. Adding an LOD system now would mean writing, testing and
-maintaining a mechanism with nothing to apply it to. The budgets in `ASSET-CONVENTIONS.md` are what
-keeps that true; when an asset breaks them, this is the paragraph to come back to.
+**Level of detail** (`packages/engine/src/render/lod.ts`, `render/simplify.ts`). Coarse copies of
+each mesh, generated when the level loads and swapped by distance. Off by default, because every new
+field has to leave old documents rendering exactly as they did; `balanced` is the setting to use on a
+level with real geometry in it.
+
+This paragraph used to say the opposite — that LOD was not implemented and had nothing to apply it
+to, because the heaviest asset was 8,000 triangles against an 8,000 budget. That was a defensible
+reading of a starter library, and it stopped being true the moment somebody imported their own
+models, which is now a supported path with a panel behind it. A budget the engine cannot enforce on
+a file from somebody's hard drive is not a reason to have no mechanism.
+
+- **Generated, not authored.** Vertex clustering: the bounding box is divided into a grid, vertices
+  sharing a cell are averaged into one, and triangles that collapse to a line are dropped. No
+  meshoptimizer, which produces better meshes and is another WebAssembly module in every exported
+  game — a gap that matters least exactly where a coarse mesh is used, forty metres away and thirty
+  pixels tall.
+- **The grid resolution is searched for, not calculated.** The closed form — resolution is the
+  square root of the target vertex count, since a surface mesh is a shell — is wrong by a
+  shape-dependent factor: "decimate to 15%" gave 54% on a sphere. Counting occupied cells at a
+  resolution is one pass over the vertices, and seven probes of that cost less than the clustering
+  they size.
+- **Switching distances are multiples of the object's own radius.** Forty metres is far away for a
+  crate and close for a cathedral, so a number in metres would pop on one and never trigger on the
+  other. With a floor of six metres, because an object that coarsens while you look straight at it
+  is what makes people switch this off and never switch it back on.
+- **One decimation per distinct mesh**, cached for the scene and freed with it. A hundred crates
+  share one geometry and therefore one decimation.
+- **Rigged characters keep every triangle.** Clustering merges vertices that may belong to different
+  bones, and averaging weights across a joint gives an elbow that tears when it bends — far more
+  noticeable at forty metres than the triangles saved. Refused in `canSimplify`, so there is no list
+  of exceptions to keep in step elsewhere.
+- **Per object, `never` is an escape hatch rather than a knob.** The decimator is bad at smooth
+  silhouettes, and the one landmark it makes a mess of should not force the level back to `off`.
+
+Measured in Chromium against `renderer.info.render.triangles` — the renderer's own count of what it
+submitted — with six unbatched 1,598-triangle models in a row. From 220 metres, `balanced` submits
+**less than half** the triangles those objects cost with it off; from 12 metres it submits _exactly_
+the same number, byte for byte, which is the control that says the levels are not coarsening things
+in your face. `aggressive` submits fewer than `balanced` from the same pose. The terrain is
+subtracted from both sides, because it is a large mesh drawn identically either way and leaving it in
+would hide a 66% saving on the objects behind a 32% saving overall.
+
+**Instanced objects do not get levels of detail.** An `InstancedMesh` draws one geometry many times,
+so there is no per-copy level to swap — and the batching threshold is 8, which means the case where
+level of detail would pay best is the case it does not cover. Doing it properly means a mesh per
+level with instances re-partitioned by distance as the camera moves, which is a real technique and a
+separate piece of work rather than an extension of this one. Recorded here rather than left to be
+discovered from a triangle count that did not move.
 
 ## Boundary check
 

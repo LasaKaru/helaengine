@@ -6,6 +6,7 @@ import {
   SHADOW_MAP_SIZE,
   type AssetManifestEntry,
   type Environment,
+  type LodMode,
   type MaterialOverride,
   type Scene,
   type SceneObject,
@@ -20,6 +21,7 @@ import {
 import { MISSING_ASSET_ENTRY, type AssetResolver } from './assets.js';
 import { applyMaterialOverride, restoreOriginalMaterials } from './materials.js';
 import { SurfaceTextures } from './render/surfaces.js';
+import { LodGeometries, buildLod } from './render/lod.js';
 import { buildScatter, buildScatterMeshes } from './scatter/ScatterField.js';
 import {
   applyWindToObject,
@@ -231,6 +233,10 @@ export class LoadedScene {
   readonly #emitters = new Map<string, ParticleEmitter>();
   /** Generated surface maps for this scene. Also needed after load, by `setMaterial`. */
   readonly #surfaces: SurfaceTextures;
+  /** Decimated copies for this scene, shared by every object built into it. */
+  readonly #lods: LodGeometries;
+  /** The level-of-detail mode this scene was built with, so a spawned object matches it. */
+  readonly #lodMode: LodMode;
   /** Wind uniforms, or null when nothing in this scene sways. */
   #wind: WindUniforms | null;
   /** The current wind settings, kept in step by `syncEnvironment`. */
@@ -255,6 +261,21 @@ export class LoadedScene {
    */
   get surfaceTextures(): SurfaceTextures {
     return this.#surfaces;
+  }
+
+  /** This scene's decimated copies, so an object spawned after load shares them. */
+  get lodGeometries(): LodGeometries {
+    return this.#lods;
+  }
+
+  /** The mode this scene was built with. A spawned object has to match, or it pops on arrival. */
+  get lodMode(): LodMode {
+    return this.#lodMode;
+  }
+
+  /** Triangles the coarse copies remove from the finest ones. What a performance test watches. */
+  get lodTrianglesSaved(): number {
+    return this.#lods.trianglesSaved;
   }
 
   /** The animator for one object, for callers that drive a specific character. */
@@ -480,6 +501,8 @@ export class LoadedScene {
     weather?: WeatherField | null;
     weatherSettings?: Weather;
     surfaces?: SurfaceTextures;
+    lods?: LodGeometries;
+    lodMode?: LodMode;
     emitters?: Map<string, ParticleEmitter>;
     windSettings?: Wind;
     scatterCount?: number;
@@ -499,6 +522,9 @@ export class LoadedScene {
     // a null to guard on everywhere. It generates nothing until something asks for a surface.
     this.#surfaces = init.surfaces ?? new SurfaceTextures();
     if (!init.surfaces) this.#disposables.push(this.#surfaces);
+    this.#lods = init.lods ?? new LodGeometries();
+    if (!init.lods) this.#disposables.push(this.#lods);
+    this.#lodMode = init.lodMode ?? 'off';
     if (init.emitters) for (const [id, one] of init.emitters) this.#emitters.set(id, one);
     this.#windSettings = init.windSettings ?? NO_WIND;
     this.#scatterCount = init.scatterCount ?? 0;
@@ -885,12 +911,28 @@ export class SceneLoader {
     const surfaces = new SurfaceTextures();
     disposables.push(surfaces);
 
+    // Decimated copies, one per distinct mesh rather than per placement: a hundred crates share one
+    // geometry and therefore one decimation. Clustering the same mesh a hundred times at load is
+    // where a few milliseconds becomes a visible stall.
+    const lods = new LodGeometries();
+    disposables.push(lods);
+
     for (const object of scene.objects) {
       const entry = this.#resolveEntry(object, missingAssetIds);
       const mine: DisposableResource[] = [];
       objects.set(
         object.id,
-        this.#buildObject(object, entry, geometryCache, materialCache, disposables, mine, surfaces),
+        this.#buildObject(
+          object,
+          entry,
+          geometryCache,
+          materialCache,
+          disposables,
+          mine,
+          surfaces,
+          lods,
+          scene.environment.lod.mode,
+        ),
       );
       if (mine.length > 0) owned.set(object.id, mine);
     }
@@ -970,6 +1012,8 @@ export class SceneLoader {
       weather,
       weatherSettings: scene.environment.weather,
       surfaces,
+      lods,
+      lodMode: scene.environment.lod.mode,
       emitters,
       windSettings: scene.environment.wind,
       scatterCount: [...scatter.values()].reduce(
@@ -1247,6 +1291,8 @@ export class SceneLoader {
       own,
       own,
       loaded.surfaceTextures,
+      loaded.lodGeometries,
+      loaded.lodMode,
     );
     loaded.adopt(object.id, node, own);
     return node;
@@ -1306,6 +1352,8 @@ export class SceneLoader {
     disposables: DisposableResource[],
     owned: DisposableResource[],
     surfaces: SurfaceTextures,
+    lods: LodGeometries,
+    lodMode: LodMode,
   ): THREE.Object3D {
     // A trigger is not a thing you look at, so it gets an outline instead of a model.
     const model = object.trigger ? undefined : this.#models.get(entry.id);
@@ -1326,6 +1374,21 @@ export class SceneLoader {
     visual.scale.set(...entry.defaultScale);
     visual.name = `${object.id}:visual`;
 
+    /**
+     * Coarse copies, swapped by distance.
+     *
+     * Before the material override rather than after, so every level gets the same colour and the
+     * same surface — an object whose distant copy was a different colour would announce the swap
+     * from across the level, which is the one thing level of detail must not do.
+     *
+     * A trigger has no model to decimate, and an object set to `never` has opted out. Everything
+     * else that cannot usefully be decimated — a twelve-triangle box, a rigged character whose
+     * bone weights must not be averaged across a joint — comes back unchanged from `buildLod`
+     * itself, so there is no list of exceptions to keep in step here.
+     */
+    const drawn =
+      object.trigger || object.lod === 'never' ? visual : buildLod(visual, lodMode, lods);
+
     const node = new THREE.Group();
     node.name = object.metadata.label ?? object.id;
     node.userData['objectId'] = object.id;
@@ -1334,16 +1397,19 @@ export class SceneLoader {
     // from a placeholder, and "does it have children" stopped being a reliable signal once every
     // object became a group.
     node.userData['hasModel'] = model !== undefined;
+    // Read by the editor's statistics and by the tests. Explicit rather than inferred from the node
+    // shape: "is the root a LOD" is true for an object whose levels were all rejected, too.
+    node.userData['lodLevels'] = drawn === visual ? 0 : (drawn as THREE.LOD).levels.length;
     // Editor furniture, not scenery: the preview hides these the moment play starts, and an
     // exported project never renders them at all.
     if (object.trigger) node.userData['isTrigger'] = true;
-    node.add(visual);
+    node.add(drawn);
 
     // Materials are cloned per object, so the ones this creates belong to this object alone and
     // land on its own disposal list — freeing them on delete is what keeps a session that
     // recolours fifty objects from holding fifty materials it can never reach again.
     if (object.material && !object.trigger) {
-      node.userData['materialClones'] = applyMaterialOverride(visual, object.material, surfaces);
+      node.userData['materialClones'] = applyMaterialOverride(drawn, object.material, surfaces);
     }
 
     // Built here rather than by the game runtime, because the animator has to be bound to *this*

@@ -3109,6 +3109,7 @@ test.describe('release gate', () => {
             ragdoll: null,
             emitter: null,
             sway: 'auto' as const,
+            lod: 'auto' as const,
             metadata: {},
           });
         }

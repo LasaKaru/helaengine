@@ -30,6 +30,7 @@ import {
   type MaterialOverride,
   type GraphNode,
   type GraphVariable,
+  type LodOverride,
   type SwayOverride,
   type ScatterLayer,
   type Destructible,
@@ -115,6 +116,7 @@ export interface SceneState {
   setMaterial(objectId: string, material: MaterialOverride | null): void;
   /** Whether the wind moves this object, and as what. */
   setSway(objectId: string, sway: SwayOverride): void;
+  setLod(objectId: string, lod: LodOverride): void;
   /** What happens when this object takes enough damage, or null for something that does not break. */
   setDestructible(objectId: string, destructible: Destructible | null): void;
   /** Turns this object into something the player can drive, or null for everything else. */
@@ -346,6 +348,9 @@ export const useSceneStore = create<SceneState>()(
                 // A copy sways like the original: duplicating a hedge you told to stand still
                 // should give you a second still hedge, not one that starts waving.
                 sway: source.sway,
+                // And a copy of an object kept at full detail is kept at full detail: it was
+                // excluded for a reason about the model, and the copy is the same model.
+                lod: source.lod,
                 // A duplicated rig animates like the original. Copied as a value rather than
                 // shared, so retargeting one guard's clips does not retarget every copy of it.
                 animation: source.animation
@@ -506,6 +511,12 @@ export const useSceneStore = create<SceneState>()(
           commit('object/setSway', (draft) => {
             const object = draft.objects.find((current) => current.id === objectId);
             if (object) object.sway = sway;
+          }),
+
+        setLod: (objectId, lod) =>
+          commit('object/setLod', (draft) => {
+            const object = draft.objects.find((current) => current.id === objectId);
+            if (object) object.lod = lod;
           }),
 
         setDestructible: (objectId, destructible) =>

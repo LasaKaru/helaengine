@@ -74,6 +74,7 @@ test.describe('levels', () => {
         material: null,
         trigger: null,
         sway: 'auto',
+        lod: 'auto',
         metadata: {},
       } as never);
     });
@@ -187,6 +188,7 @@ test.describe('levels survive a reopen', () => {
         material: null,
         trigger: null,
         sway: 'auto',
+        lod: 'auto',
         metadata: {},
       } as never);
     });

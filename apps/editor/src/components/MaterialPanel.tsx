@@ -12,6 +12,7 @@ import {
   type SurfaceKind,
   type SurfaceScale,
   type AssetManifest,
+  type LodOverride,
   type SwayOverride,
 } from '@helaengine/schema';
 import { useSceneStore } from '../store/sceneStore';
@@ -52,6 +53,7 @@ export function MaterialPanel({
 }): React.JSX.Element {
   const setMaterial = useSceneStore((state) => state.setMaterial);
   const setSway = useSceneStore((state) => state.setSway);
+  const setLod = useSceneStore((state) => state.setLod);
   const material = object.material;
 
   const patch = (changes: Partial<MaterialOverride>): void => {
@@ -210,6 +212,23 @@ export function MaterialPanel({
       <p className="panel-hint">
         Automatic decides from the model. Override it for a potted plant indoors, or for an imported
         model the rule has not heard of.
+      </p>
+
+      <label className="param-row">
+        <span>Detail</span>
+        <select
+          aria-label="Level of detail for this object"
+          value={object.lod}
+          onChange={(event) => setLod(object.id, event.target.value as LodOverride)}
+        >
+          <option value="auto">Follow the level</option>
+          <option value="never">Always full detail</option>
+        </select>
+      </label>
+      <p className="panel-hint">
+        The escape hatch, not a tuning knob. The decimator is bad at smooth silhouettes, and the one
+        landmark it makes a mess of should not force the whole level back to no detail levels at
+        all.
       </p>
     </section>
   );

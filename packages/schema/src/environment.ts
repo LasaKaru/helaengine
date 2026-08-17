@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { HexColorSchema } from './primitives.js';
 import { PostProcessingSchema, ShadowSchema, ToneMappingSchema } from './rendering.js';
 import { WindSchema } from './wind.js';
+import { LodSchema } from './lod.js';
 import { WeatherSchema } from './vfx.js';
 
 export const FogSchema = z.object({
@@ -74,5 +75,14 @@ export const EnvironmentSchema = z.object({
    * shader, no uniform. Every scene saved before this existed renders exactly as it did.
    */
   weather: WeatherSchema,
+  /**
+   * Level of detail, off by default.
+   *
+   * Here rather than in a new top-level section because it is a rendering decision made per level,
+   * exactly like `postProcessing` — which is also not lighting — and because the environment already
+   * has an incremental sync path, a collaboration mapping and an editor panel. A new section would
+   * have been a fourth place for every one of those to forget.
+   */
+  lod: LodSchema.default({}),
 });
 export type Environment = z.infer<typeof EnvironmentSchema>;

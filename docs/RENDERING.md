@@ -259,3 +259,5 @@ nothing else — and 6 on the lighting the loader builds.
   wrong for organic ones. Seam-minimising unwrapping belongs in the ingest pipeline, not the
   renderer.
 - **Antialiasing as a setting.** On in the editor and in exports, not exposed.
+- **Levels of detail on instanced objects.** Batched copies share one geometry, so there is no
+  per-copy level to swap — see `PERFORMANCE.md`.

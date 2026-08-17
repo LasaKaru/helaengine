@@ -52,6 +52,8 @@ export { GraphRuntime, graphHasContent, STEP_BUDGET } from './graph/GraphRuntime
 export type { GraphRuntimeOptions } from './graph/GraphRuntime.js';
 export { applyMaterialOverride, hasProjectedUvs } from './materials.js';
 export { SurfaceTextures, type SurfaceMaps } from './render/surfaces.js';
+export { LodGeometries, buildLod, activeLodLevel } from './render/lod.js';
+export { simplifyGeometry, triangleCount, canSimplify } from './render/simplify.js';
 export { PostStack, applyToneMapping, wantsPostProcessing } from './render/PostStack.js';
 export { Animator } from './animation/Animator.js';
 export { cloneModel, hasSkeleton } from './animation/clone.js';

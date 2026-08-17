@@ -8,6 +8,7 @@ import type {
   LoadedScene,
   PlayerController,
 } from '@helaengine/engine';
+import { activeLodLevel } from '@helaengine/engine';
 import { SceneObjectSchema, type AssetManifestEntry, type Vec3 } from '@helaengine/schema';
 import type { AssetLibrary } from './engine/assetLibrary';
 import { collabPeers, collabStatus, currentSession } from './collab/current';
@@ -267,6 +268,12 @@ export interface DevApi {
     gameplayMs: number;
     peakMs: number;
     frames: number;
+  } | null;
+  /** What level of detail built, and which level one object is drawing. Null before a scene loads. */
+  lodStats(objectId?: string): {
+    trianglesSaved: number;
+    levels: number;
+    level: number;
   } | null;
   renderStats(): {
     calls: number;
@@ -806,6 +813,24 @@ export function exposeDevApi(library: AssetLibrary): void {
         instancedObjects: currentLoadedScene?.instances?.instancedObjectIds.length ?? 0,
         sceneObjects: currentLoadedScene?.objects.size ?? 0,
         pooledNodes: library.loader.pooledCount(),
+      };
+    },
+
+    /**
+     * What the level-of-detail system built, and which level one object is showing.
+     *
+     * `level` is read from the scene graph rather than recomputed from the camera distance:
+     * recomputing it would be asserting the arithmetic against itself, whereas `visible` is what
+     * Three actually chose during the render that is on the screen.
+     */
+    lodStats: (objectId?: string) => {
+      const loaded = currentLoadedScene;
+      if (!loaded) return null;
+      const node = objectId === undefined ? undefined : loaded.objects.get(objectId);
+      return {
+        trianglesSaved: loaded.lodTrianglesSaved,
+        levels: (node?.userData['lodLevels'] as number | undefined) ?? 0,
+        level: node ? activeLodLevel(node) : -1,
       };
     },
 

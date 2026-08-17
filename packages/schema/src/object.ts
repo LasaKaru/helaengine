@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { BehaviorSchema } from './behavior.js';
 import { ObjectAnimationSchema } from './animation.js';
+import { LodOverrideSchema } from './lod.js';
 import { MaterialOverrideSchema } from './rendering.js';
 import { ObjectPhysicsSchema } from './physics.js';
 import { OptionalDestructibleSchema } from './destructible.js';
@@ -49,6 +50,15 @@ export const SceneObjectSchema = z.object({
    * Every document written before wind existed says `auto`, and `auto` with no wind is no sway.
    */
   sway: SwayOverrideSchema.default('auto'),
+  /**
+   * Whether this object gets generated levels of detail, when the level has them switched on.
+   *
+   * `never` is an escape hatch rather than a tuning knob. Vertex clustering is bad at silhouettes,
+   * and the one smooth landmark it makes a mess of should not force the whole level back to `off`.
+   * Every document written before this existed says `auto`, and `auto` with the level setting off
+   * is no level of detail at all.
+   */
+  lod: LodOverrideSchema.default('auto'),
   /**
    * Overrides for this instance's material, or null to use whatever the model shipped with.
    *

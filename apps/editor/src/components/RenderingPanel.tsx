@@ -7,6 +7,10 @@ import {
   WEATHER_KINDS,
   WEATHER_LABELS,
   weatherCount,
+  LOD_MODES,
+  LOD_MODE_HINTS,
+  LOD_MODE_LABELS,
+  type LodMode,
   type WeatherKind,
 } from '@helaengine/schema';
 import { useSceneStore } from '../store/sceneStore';
@@ -414,6 +418,30 @@ export function RenderingPanel(): React.JSX.Element {
           </label>
         </>
       )}
+
+      <h3>Detail</h3>
+
+      <label className="param-row">
+        <span>Level of detail</span>
+        <select
+          aria-label="Level of detail"
+          value={environment.lod.mode}
+          onChange={(event) => setEnvironment({ lod: { mode: event.target.value as LodMode } })}
+        >
+          {LOD_MODES.map((mode) => (
+            <option key={mode} value={mode}>
+              {LOD_MODE_LABELS[mode]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="panel-hint">{LOD_MODE_HINTS[environment.lod.mode]}</p>
+      <p className="panel-hint">
+        The coarse copies are generated when the level loads, from the models themselves — nothing
+        is downloaded and nothing is added to an export. Rigged characters keep every triangle:
+        averaging bone weights across a joint tears an elbow, which is far more noticeable than the
+        saving.
+      </p>
 
       <h3>Image</h3>
 

@@ -41,6 +41,7 @@ async function place(page: Page, assetId: string): Promise<void> {
       material: null,
       trigger: null,
       sway: 'auto',
+      lod: 'auto',
       metadata: {},
     } as never);
   }, assetId);

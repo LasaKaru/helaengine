@@ -206,6 +206,7 @@ test.describe('export edge cases', () => {
             ragdoll: null,
             emitter: null,
             sway: 'auto' as const,
+            lod: 'auto' as const,
             metadata: {},
           },
         ],

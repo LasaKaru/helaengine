@@ -45,10 +45,15 @@ function structureKey(scene: Scene): string {
   const scatterKey = JSON.stringify(scene.scatter);
 
   const objectKey = scene.objects
-    .map((object) => `${object.id}:${object.assetId}:${object.sway}`)
+    .map((object) => `${object.id}:${object.assetId}:${object.sway}:${object.lod}`)
     .join('|');
 
-  return `${terrainKey}#${windKey}#${scatterKey}#${objectKey}`;
+  // Level of detail is geometry: switching it on decimates every mesh and wraps each object in a
+  // `THREE.LOD`, which is a different scene graph rather than a different value in the one already
+  // built. Everything else about the environment takes the incremental path; this cannot.
+  const lodKey = scene.environment.lod.mode;
+
+  return `${terrainKey}#${windKey}#${scatterKey}#${lodKey}#${objectKey}`;
 }
 
 /** Identifies the terrain's *data* — the part that can change without new geometry being needed. */
