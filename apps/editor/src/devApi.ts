@@ -271,6 +271,12 @@ export interface DevApi {
   } | null;
   /** Raises the live terrain with one brush stroke, as the sculpt tool would. */
   raiseTerrain(x: number, z: number, radius: number, strength: number): boolean;
+  /** Whether the runtime built a foot placer for this object, and what it resolved. */
+  footIkState(objectId: string): {
+    legCount: number;
+    hipOffset: number;
+    resolved: Record<string, boolean>;
+  } | null;
   /** Where one character's ankles are, in world space. Null when it has no foot placement. */
   footPositions(objectId: string): {
     left: { x: number; y: number; z: number } | null;
@@ -890,6 +896,23 @@ export function exposeDevApi(library: AssetLibrary): void {
         return { x: at.x, y: at.y, z: at.z };
       };
       return { left: read(settings.bones.footL), right: read(settings.bones.footR) };
+    },
+
+    /**
+     * The foot placer's own account of itself: did the runtime build one, and for how many legs.
+     *
+     * Null when no solver exists for this object at all, which is a different answer from a solver
+     * that exists and solves nothing — and telling those apart from the outside is impossible,
+     * which is how four separate bugs each looked like the cause of one unchanged number.
+     */
+    footIkState: (objectId) => {
+      const solver = currentLoadedScene?.footIk(objectId);
+      if (!solver) return null;
+      return {
+        legCount: solver.legCount,
+        hipOffset: Number(solver.hipOffset.toFixed(4)),
+        resolved: solver.resolved,
+      };
     },
 
     /** What the chunk grid built and how much of it is drawn. Null when there is no draw distance. */

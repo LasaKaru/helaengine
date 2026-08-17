@@ -51,7 +51,6 @@ const inverseParent = new THREE.Quaternion();
 const localDelta = new THREE.Quaternion();
 const rotation = new THREE.Quaternion();
 const hipShift = new THREE.Vector3();
-const parentBasis = new THREE.Matrix4();
 const fallbackAxis = new THREE.Vector3(1, 0, 0);
 
 export class FootIk {
@@ -85,6 +84,21 @@ export class FootIk {
   /** Legs this rig actually resolved. Zero means the solver is inert, which the editor reports. */
   get legCount(): number {
     return this.#legs.length;
+  }
+
+  /**
+   * Which bones the binding actually resolved to objects in this model.
+   *
+   * Reported rather than inferred, and added because four rounds of inferring from an ankle that
+   * would not move each turned up a real bug and none of them was the one. A solver that says what
+   * it found is a solver you can ask.
+   */
+  get resolved(): Record<string, boolean> {
+    const found: Record<string, boolean> = { hips: this.#hips !== null };
+    for (const [index, leg] of this.#legs.entries()) {
+      found[`leg${index}`] = Boolean(leg.thigh && leg.shin && leg.foot);
+    }
+    return found;
   }
 
   /** How far the hips are currently dropped, in metres. Read by the tests and the statistics. */
@@ -139,15 +153,23 @@ export class FootIk {
        * twenty degrees moved its feet by the cosine of the tilt and landed short. Converted as a
        * direction rather than a point, so the parent's translation is not counted.
        */
-      hipShift.set(0, this.#hipOffset, 0);
       if (this.#hips.parent) {
         this.#hips.parent.updateWorldMatrix(true, false);
-        parentBasis.extractRotation(this.#hips.parent.matrixWorld).invert();
-        hipShift.applyMatrix4(parentBasis);
+        // Rest position out to world, dropped there, and back. Round-tripping through the parent
+        // handles its *scale* as well as its rotation, which rotating a direction does not — and
+        // that was the bug: a model authored in centimetres has an armature scaled by a hundred, so
+        // a six-centimetre drop written in parent space moved the character six ten-thousandths of
+        // a metre. The solver was right, the number it wrote was right, and nothing visibly moved.
+        hipShift.copy(this.#hipRest);
+        this.#hips.parent.localToWorld(hipShift);
+        hipShift.y += this.#hipOffset;
+        this.#hips.parent.worldToLocal(hipShift);
+      } else {
+        hipShift.copy(this.#hipRest).setY(this.#hipRest.y + this.#hipOffset);
       }
       // Written against the clip's own value rather than added to the current one, so the drop does
       // not accumulate a little further every frame until the character is underground.
-      this.#hips.position.copy(this.#hipRest).add(hipShift);
+      this.#hips.position.copy(hipShift);
       this.#hips.updateWorldMatrix(true, true);
     }
 
