@@ -68,19 +68,24 @@ test.describe('foot placement', () => {
   });
 
   /**
-   * NOT PASSING, and marked so rather than deleted or weakened until it does.
+   * STILL NOT PASSING. Marked rather than weakened, and the list below is what has been ruled out.
    *
-   * The solver itself is proved in `packages/engine/src/animation/footIk.test.ts` — thirteen tests
-   * against a synthetic skeleton with known bone lengths, every guard mutation-tested. What this
-   * test covers is the *wiring*: that the runtime builds a solver for a placed character, ticks it
-   * after the mixer, and that the ankles in the drawn skeleton therefore move with the ground.
+   * The solver is proved in `packages/engine/src/animation/footIk.test.ts`. What fails here is the
+   * runtime path: the fox's ankles read 0.159 with placement on and 0.159 with it off, on ground at
+   * zero — so nothing is being solved at all, rather than being solved wrongly.
    *
-   * That is exactly the half no unit test can see, and right now it does not pass against the only
-   * rigged asset the library ships. Three real defects were found and fixed on the way here — the
-   * panel cached an empty bone list from before the model loaded, the scene was never rebuilt when
-   * placement was switched on, and the binder could not name a quadruped's thigh — and the ankles
-   * still do not move. So the runtime path is **unproven**, and saying so is worth more than a test
-   * relaxed until it passes. Task #97 carries it.
+   * Fixed while chasing it, each a real defect in its own right:
+   *  - the bone panel cached an empty bone list from before the model finished loading;
+   *  - `EngineBridge` never rebuilt the scene when placement was switched on;
+   *  - the binder could not name a quadruped's thigh (`b_LeftLeg01` / `b_LeftLeg02`);
+   *  - the solver was only constructed *inside* the animator block, so an object with no animation
+   *    never got one — which is wrong for a character standing still on a slope, and was silent.
+   *
+   * Ruled out: the tick order (animations then placement, in one place), the search range (the foot
+   * is 16cm above ground and the range is 50cm), and the target being out of reach.
+   *
+   * Not yet checked: whether `legCount` is actually non-zero at runtime — there is no dev API for
+   * it, and adding one is the next step rather than another guess.
    */
   test.fixme('the ankles follow the ground, and do not without it', async ({ page }) => {
     /**

@@ -1635,6 +1635,28 @@ export class SceneLoader {
       node.userData['materialClones'] = applyMaterialOverride(drawn, object.material, surfaces);
     }
 
+    /**
+     * The foot placer, built here for the same reason the animator is: it binds bones by name
+     * inside *this* clone's skeleton, and this is the only place that clone exists.
+     *
+     * Outside the animator's block, and that was a real bug rather than a tidy-up. It started
+     * nested inside it, on the reasoning that a foot placer without an animation has no clip to
+     * correct — which is wrong twice over. A character standing still on a slope still wants its
+     * feet on the slope, and, worse, an author who switched placement on without also configuring
+     * an animation got no solver at all, silently. It cost three other fixes and a browser test to
+     * find, because everything downstream of the missing solver behaved perfectly.
+     */
+    if (object.footIk && !object.trigger) {
+      const solver = new FootIk(visual, object.footIk);
+      if (solver.legCount > 0) node.userData['footIk'] = solver;
+      else {
+        this.#warn(
+          `object "${object.id}" has foot placement switched on but no leg fully bound, so ` +
+            'nothing will be placed',
+        );
+      }
+    }
+
     // Built here rather than by the game runtime, because the animator has to be bound to *this*
     // clone's skeleton and this is the only place that clone exists. The runtime finds it through
     // `LoadedScene.animators`.
@@ -1643,25 +1665,6 @@ export class SceneLoader {
       if (clips.length > 0) {
         const animator = new Animator(visual, clips, object.animation);
         node.userData['animator'] = animator;
-
-        /**
-         * The foot placer, built here for the same reason the animator is: it binds bones by name
-         * inside *this* clone's skeleton, and this is the only place that clone exists.
-         *
-         * Bound only alongside an animator, because a foot placer on an unanimated model would be
-         * solving a pose nothing is moving — which is the static-mesh case, and a static mesh should
-         * be placed correctly rather than corrected at runtime.
-         */
-        if (object.footIk) {
-          const solver = new FootIk(visual, object.footIk);
-          if (solver.legCount > 0) node.userData['footIk'] = solver;
-          else {
-            this.#warn(
-              `object "${object.id}" has foot placement switched on but no leg fully bound, so ` +
-                'nothing will be placed',
-            );
-          }
-        }
         owned.push(animator);
         for (const name of animator.missing) {
           this.#warn(
