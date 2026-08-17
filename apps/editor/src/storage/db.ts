@@ -77,6 +77,13 @@ export interface StoredLocalAsset {
   animations: string[];
   skinned: boolean;
   /**
+   * Which PBR maps the model's own materials carry, measured at import.
+   *
+   * Optional because rows written before this existed do not have it, and an absent value means
+   * "never measured" rather than "has none" — re-importing the file is what fills it in.
+   */
+  materialMaps?: string[];
+  /**
    * Attribution, as the author typed it.
    *
    * Optional, because a model somebody made themselves has nobody to credit. Carried into the

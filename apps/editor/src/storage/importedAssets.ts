@@ -69,6 +69,9 @@ export function registerImportedAssets(assets: AssetPayload[]): void {
       // guessed, because an empty list is the truth about what has been measured.
       animations: [],
       skinned: false,
+      // Unmeasured, not absent: reading which PBR maps a GLB carries means decoding it, and this
+      // runs before that. An empty list says nothing has been measured, which is the truth.
+      materialMaps: [],
       // An asset that arrived inside somebody's project file. Whoever built that file is the
       // authority on its terms, and this browser has no way to ask — so it is recorded as a
       // customer asset with nothing claimed about its licence, which is the truth.

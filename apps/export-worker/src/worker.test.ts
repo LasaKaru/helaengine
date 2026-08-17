@@ -89,6 +89,7 @@ const manifest: AssetManifest = {
       origin: 'first-party' as const,
       animations: [],
       skinned: false,
+      materialMaps: [],
       placeholderColor: '#2d5a34',
     },
   ],

@@ -1,6 +1,21 @@
-import type { MaterialOverride, SceneObject } from '@helaengine/schema';
+import {
+  SURFACE_HINTS,
+  SURFACE_KINDS,
+  SURFACE_LABELS,
+  SURFACE_SCALES,
+  SURFACE_SCALE_LABELS,
+  SurfaceSchema,
+  surfaceProblems,
+  type MaterialOverride,
+  type SceneObject,
+  type Surface,
+  type SurfaceKind,
+  type SurfaceScale,
+  type AssetManifest,
+  type SwayOverride,
+} from '@helaengine/schema';
 import { useSceneStore } from '../store/sceneStore';
-import type { SwayOverride } from '@helaengine/schema';
+import { objectHasProjectedUvs } from '../engine/liveScene';
 import { NumberField } from './NumberField';
 
 /**
@@ -28,7 +43,13 @@ const DEFAULTS = {
   opacity: 1,
 } as const;
 
-export function MaterialPanel({ object }: { object: SceneObject }): React.JSX.Element {
+export function MaterialPanel({
+  object,
+  manifest,
+}: {
+  object: SceneObject;
+  manifest: AssetManifest;
+}): React.JSX.Element {
   const setMaterial = useSceneStore((state) => state.setMaterial);
   const setSway = useSceneStore((state) => state.setSway);
   const material = object.material;
@@ -165,6 +186,13 @@ export function MaterialPanel({ object }: { object: SceneObject }): React.JSX.El
         </p>
       )}
 
+      <SurfaceSection
+        object={object}
+        manifest={manifest}
+        surface={material?.surface}
+        patch={patch}
+      />
+
       <label className="param-row">
         <span>Wind</span>
         <select
@@ -184,5 +212,117 @@ export function MaterialPanel({ object }: { object: SceneObject }): React.JSX.El
         model the rule has not heard of.
       </p>
     </section>
+  );
+}
+
+/**
+ * The generated PBR surface for one object.
+ *
+ * Its own component rather than more rows in the panel above, because it is not an override of a
+ * property the model has — it is a set of maps the model never had, and the three controls only
+ * mean anything once a kind is chosen.
+ */
+function SurfaceSection({
+  object,
+  manifest,
+  surface,
+  patch,
+}: {
+  object: SceneObject;
+  manifest: AssetManifest;
+  surface: Surface | undefined;
+  patch: (changes: Partial<MaterialOverride>) => void;
+}): React.JSX.Element {
+  const entry = manifest.assets.find((candidate) => candidate.id === object.assetId);
+  const problems = surface
+    ? surfaceProblems(surface, entry?.materialMaps ?? [], objectHasProjectedUvs(object.id))
+    : [];
+
+  const update = (changes: Partial<Surface>): void => {
+    if (surface) patch({ surface: { ...surface, ...changes } });
+  };
+
+  return (
+    <div className="panel-section" role="group" aria-label="Surface">
+      <label className="param-row">
+        <span>Surface</span>
+        <select
+          aria-label="Surface"
+          value={surface?.kind ?? 'none'}
+          onChange={(event) =>
+            patch({
+              surface:
+                event.target.value === 'none'
+                  ? undefined
+                  : SurfaceSchema.parse({ kind: event.target.value as SurfaceKind }),
+            })
+          }
+        >
+          <option value="none">None</option>
+          {SURFACE_KINDS.map((kind) => (
+            <option key={kind} value={kind}>
+              {SURFACE_LABELS[kind]}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {!surface && (
+        <p className="panel-hint">
+          Bricks in a wall, grain in a plank. The geometry does not change — what changes is how the
+          light comes off it, which is where most of the detail in a modern game lives. The colour
+          still comes from the model, or from the row above.
+        </p>
+      )}
+
+      {surface && (
+        <>
+          <p className="panel-hint">{SURFACE_HINTS[surface.kind]}</p>
+
+          <label className="param-row">
+            <span>Size</span>
+            <select
+              aria-label="Surface size"
+              value={surface.scale}
+              onChange={(event) => update({ scale: event.target.value as SurfaceScale })}
+            >
+              {SURFACE_SCALES.map((scale) => (
+                <option key={scale} value={scale}>
+                  {SURFACE_SCALE_LABELS[scale]}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="param-row">
+            <span>Depth</span>
+            <NumberField
+              label="Surface depth"
+              value={surface.depth}
+              step={0.05}
+              onChange={(depth) => update({ depth: clamp(depth, 0, 2) })}
+            />
+          </div>
+
+          <div className="param-row">
+            <span>Shadowing</span>
+            <NumberField
+              label="Surface shadowing"
+              value={surface.occlusion}
+              step={0.05}
+              onChange={(occlusion) => update({ occlusion: clamp(occlusion, 0, 1) })}
+            />
+          </div>
+
+          {problems.length > 0 && (
+            <div className="joint-problems" role="status" aria-label="Surface problems">
+              {problems.map((problem) => (
+                <p key={problem}>{problem}</p>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }

@@ -595,7 +595,7 @@ export function InspectorPanel({ manifest }: { manifest: AssetManifest }): React
       {single && !single.trigger && <PhysicsSection object={single} />}
       {single && !single.trigger && <BehaviorPanel object={single} />}
       {single && !single.trigger && <AnimationPanel object={single} manifest={manifest} />}
-      {single && !single.trigger && <MaterialPanel object={single} />}
+      {single && !single.trigger && <MaterialPanel object={single} manifest={manifest} />}
       {single && !single.trigger && <DestructiblePanel object={single} manifest={manifest} />}
       {single && !single.trigger && <VehiclePanel object={single} manifest={manifest} />}
       {single && !single.trigger && <RagdollPanel object={single} />}

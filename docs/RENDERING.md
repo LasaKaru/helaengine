@@ -107,6 +107,103 @@ template's colour to all of them, silently, because it still draws.
 
 ---
 
+## Surfaces
+
+A wall in this engine is a box with about twelve triangles. Lighting it well makes it a
+_convincingly lit_ box — the thing that separates a wall from a slab is that a wall has bricks in it,
+and bricks are a surface property rather than a shape.
+
+A **surface** is a set of PBR maps applied to one placed object: a normal map, a roughness and
+metalness map, and an ambient-occlusion map. It sits inside the material override, and the vocabulary
+is closed like every other one here:
+
+| Kind         | What it is                                                               |
+| ------------ | ------------------------------------------------------------------------ |
+| **Brick**    | Running bond with recessed mortar. Walls, chimneys, the base of a house. |
+| **Tile**     | A square grid with grouted joints. Floors, bathrooms, plazas.            |
+| **Planks**   | Long boards with grain and gaps between them. Decking, crates, fences.   |
+| **Stone**    | Irregular blocks with deep joints. Castle walls, cliffs, foundations.    |
+| **Plaster**  | Fine render with a gentle unevenness. Interiors, rendered exteriors.     |
+| **Concrete** | Coarse and pitted. Bunkers, kerbs, industrial floors.                    |
+| **Metal**    | Brushed and reflective. Machinery, containers, anything meant to shine.  |
+
+Three settings: **size** (fine, normal, coarse), **depth** — how deeply the pattern appears cut in,
+and zero is genuinely flat — and **shadowing**, how dark the creases go.
+
+The colour still comes from the model, or from the colour row above. A surface changes how light
+comes off an object, not what colour it is.
+
+### The maps are generated, not shipped
+
+Nothing is downloaded and nothing is added to an export. The maps are a few hundred lines of
+arithmetic run when a level loads, from a hashed noise function with no `Math.random` anywhere — so
+the same kind produces identical bytes on every machine, and an export looks like the editor preview
+it was made in.
+
+Fifty brick walls at the same size are **one pair of textures**, shared and freed with the scene.
+That is why size is three named steps rather than a slider: each distinct value needs its own
+generated pair, and a slider dragged for a minute would leave a hundred of them on the GPU with only
+one still reachable.
+
+The trade is worth stating plainly: these are procedural patterns, not photographs. Brick here is a
+regular running bond, not a scanned Victorian wall. It reads correctly at gameplay distance and it
+will not survive a close-up. An asset that ships its own scanned maps keeps them, and the panel says
+so before a surface replaces one.
+
+### Two things that were silently doing nothing
+
+Both were found by driving a browser, and neither would have failed a single unit test.
+
+**Occlusion needs a second UV set.** Three reads `aoMap` from `uv1`, not `uv` — a glTF convention
+from when lightmaps had their own unwrap. A model out of Blender almost never has one, so the map
+bound successfully, sampled an attribute that did not exist, and contributed nothing. No warning; the
+creases were simply not dark.
+
+**Most of the shipped models have no texture coordinates at all.** Nothing had ever textured them, so
+nothing had needed any. A material with a normal map and no `uv` attribute does not fail either:
+every fragment samples texel zero, and the wall comes out uniformly tinted by one arbitrary pixel of
+a brick. It looked like the feature working — until changing the size from fine to coarse rendered a
+**byte-identical** frame, which is what the browser test measured and what nothing else could have.
+
+The fix is a box projection generated where a model has no UVs of its own: each face projected down
+the axis it most faces, in metres of the model's own space, so a brick is the same size on a small
+crate and a large one. It is not a real unwrap and does not pretend to be — on a sphere it is visibly
+wrong, which is why the panel says when it has been used. What it cannot know about is the
+_placement_ scale: a crate stretched into a six-metre wall stretches its bricks with it, because the
+geometry is shared with every other placement of that asset.
+
+### What the manifest now records
+
+Ingest measures which PBR maps each asset's own materials carry, and imports from disk measure the
+same thing in the browser. The editor uses it for one thing: warning before a generated surface
+replaces a normal map an artist actually authored. An empty list means _unmeasured_, not _has none_ —
+every manifest built before this existed says the same thing, and inventing a measurement for them
+would be worse than admitting the gap.
+
+### What was verified
+
+In a real browser, each claim against its control:
+
+|                              |                                                                                                                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **A surface changes pixels** | Two frames of the same static wall are byte-identical; applying brick changes 99% of them; clearing it returns to the _exact_ first frame, byte for byte.    |
+| **Depth is the normal map**  | Depth 0 and depth 1.5 have every map bound and the same roughness pattern, and differ — which isolates the normal map from everything else the surface does. |
+| **Occlusion reaches it**     | Shadowing 0 against 1 differs. This is the test the `uv1` bug would have failed.                                                                             |
+| **Size reaches it**          | Fine against coarse differs. This is the test the missing-UV bug did fail, before the projection existed.                                                    |
+
+Plus 10 unit tests on the generated maps themselves — asserted byte by byte, which is only possible
+because generation is deterministic: that the pattern tiles without a seam, that a flat texel encodes
+as pointing straight out and a joint as pointing sideways, that occlusion actually varies, that
+concrete is rougher than glazed tile and only metal is metallic, and that every texture is freed. And
+16 on how they are bound to a material.
+
+Every one of those guards was mutation-tested: flattening the normal map, making occlusion uniform,
+dropping the scale from the cache key, applying the surface _after_ the explicit roughness, leaving
+the material scalars where the model had them, and removing the UV projection each break exactly the
+test that claims to cover them.
+
+---
+
 ## A bug this turned up
 
 Adding the panel exposed something that had been true since the beginning: **no environment change
@@ -152,9 +249,13 @@ nothing else — and 6 on the lighting the loader builds.
   a light component, which is a scene-schema feature rather than a rendering one.
 - **Baked lighting.** Lightmaps would transform how a scene looks at no runtime cost, which matters
   more here than anywhere else because the target is a browser. Ranked next on the roadmap.
-- **Ambient occlusion.** The most valuable effect not in the list; it needs a depth pass and is the
-  first candidate for a fourth entry.
+- **Screen-space ambient occlusion.** Surfaces bake occlusion into the _pattern_, which darkens a
+  mortar joint but knows nothing about the corner where two walls meet. Contact shadows between
+  objects need a depth pass, and remain the most valuable effect not in the list.
 - **Authored materials as assets.** An override belongs to one object. A named material reused
   across fifty objects is a different feature, and the one to build before somebody hand-edits
   fifty overrides.
+- **A real UV unwrap.** The box projection is right for the boxy shapes this engine is full of and
+  wrong for organic ones. Seam-minimising unwrapping belongs in the ingest pipeline, not the
+  renderer.
 - **Antialiasing as a setting.** On in the editor and in exports, not exposed.

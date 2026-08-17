@@ -1,4 +1,5 @@
 import { THREE, hasSkeleton } from '@helaengine/engine';
+import type { AssetManifestEntry } from '@helaengine/schema';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { ASSET_BASE_URL } from '../engine/assetLibrary';
@@ -25,6 +26,14 @@ export interface ModelReport {
   baseOffset: number;
   animations: string[];
   skinned: boolean;
+  /**
+   * Which PBR maps the file's own materials carry.
+   *
+   * Measured here for the same reason everything else is: the editor has to warn before a generated
+   * surface replaces a normal map the author made, and decoding every custom model on every page
+   * load to find out is not a trade worth making.
+   */
+  materialMaps: AssetManifestEntry['materialMaps'];
   /**
    * A suggested uniform scale, or null when the model is already in metres.
    *
@@ -85,6 +94,25 @@ export async function inspectModel(bytes: ArrayBuffer, filename: string): Promis
     );
   }
 
+  // Three has already turned the glTF's texture references into material properties by this point,
+  // so this is read from the materials rather than from the file — the same measurement the Node
+  // ingest makes from the document, arrived at from the other end.
+  const found = new Set<AssetManifestEntry['materialMaps'][number]>();
+  model.traverse((object) => {
+    const mesh = object as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      const standard = material as THREE.MeshStandardMaterial;
+      if (standard.map) found.add('baseColor');
+      if (standard.normalMap) found.add('normal');
+      // glTF packs roughness and metalness into one texture, so either property means the file
+      // carried the one map that feeds both.
+      if (standard.roughnessMap ?? standard.metalnessMap) found.add('metallicRoughness');
+      if (standard.aoMap) found.add('occlusion');
+      if (standard.emissiveMap) found.add('emissive');
+    }
+  });
+
   const box = new THREE.Box3().setFromObject(model);
   const size = box.getSize(new THREE.Vector3());
   const bounds: [number, number, number] = [
@@ -102,6 +130,8 @@ export async function inspectModel(bytes: ArrayBuffer, filename: string): Promis
     baseOffset: Number(box.min.y.toFixed(4)),
     animations: gltf.animations.map((clip) => clip.name).filter((name) => name.length > 0),
     skinned: hasSkeleton(model),
+    // Sorted so two imports of the same file produce the same row.
+    materialMaps: [...found].sort(),
     suggestedScale,
   };
 }

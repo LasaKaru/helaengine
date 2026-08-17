@@ -155,6 +155,9 @@ export class CloudAssets {
       // has.
       animations: [],
       skinned: false,
+      // Unmeasured, not absent: reading which PBR maps a GLB carries means decoding it, and this
+      // runs before that. An empty list says nothing has been measured, which is the truth.
+      materialMaps: [],
       placeholderColor: '#7c8fa8',
       // Attribution, carried into the manifest so an export credits an uploaded asset the same way
       // it credits a curated one. Dropping it here would mean the API recorded a licence, the

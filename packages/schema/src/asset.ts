@@ -73,6 +73,23 @@ export const AssetManifestEntrySchema = z.object({
    * to know which it is holding.
    */
   skinned: z.boolean().default(false),
+  /**
+   * Which PBR texture maps the asset's own materials carry, measured at ingest.
+   *
+   * Recorded because the alternative is silence at the moment it matters. A generated surface binds
+   * a normal, roughness and occlusion map onto the object; if the model already shipped a scanned
+   * normal map, the surface quietly replaces it and the only symptom is that the detail got *worse*
+   * — an author would reasonably conclude the surface feature is broken. With this here the panel
+   * can say so before the change is made.
+   *
+   * Defaults to empty, which reads as "nothing is known about this asset's maps" rather than "it has
+   * none": every manifest generated before this field existed says the same thing, and inventing a
+   * measurement for them would be worse than admitting the gap.
+   */
+  materialMaps: z
+    .array(z.enum(['baseColor', 'normal', 'metallicRoughness', 'occlusion', 'emissive']))
+    .default([]),
+
   /** Measured bounding size in metres. Also the placeholder box size before a GLB exists. */
   bounds: Vec3Schema.default([1, 1, 1]),
   /** Placeholder tint, and the fallback material colour when a model fails to load. */

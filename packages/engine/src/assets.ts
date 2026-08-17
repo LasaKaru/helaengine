@@ -68,6 +68,7 @@ export const BUILTIN_ASSET_ENTRIES: AssetManifestEntry[] = [
     origin: 'first-party',
     animations: [],
     skinned: false,
+    materialMaps: [],
   },
   {
     id: 'logic_trigger_sphere',
@@ -81,6 +82,7 @@ export const BUILTIN_ASSET_ENTRIES: AssetManifestEntry[] = [
     origin: 'first-party',
     animations: [],
     skinned: false,
+    materialMaps: [],
   },
 ];
 
@@ -96,6 +98,7 @@ export const MISSING_ASSET_ENTRY: AssetManifestEntry = {
   origin: 'first-party',
   animations: [],
   skinned: false,
+  materialMaps: [],
   category: 'props',
   tags: [],
   defaultScale: [1, 1, 1],

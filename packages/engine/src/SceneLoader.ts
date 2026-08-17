@@ -19,6 +19,7 @@ import {
 } from '@helaengine/schema';
 import { MISSING_ASSET_ENTRY, type AssetResolver } from './assets.js';
 import { applyMaterialOverride, restoreOriginalMaterials } from './materials.js';
+import { SurfaceTextures } from './render/surfaces.js';
 import { buildScatter, buildScatterMeshes } from './scatter/ScatterField.js';
 import {
   applyWindToObject,
@@ -228,6 +229,8 @@ export class LoadedScene {
   #weatherSettings: Weather;
   /** Emitters attached to objects, by object id. */
   readonly #emitters = new Map<string, ParticleEmitter>();
+  /** Generated surface maps for this scene. Also needed after load, by `setMaterial`. */
+  readonly #surfaces: SurfaceTextures;
   /** Wind uniforms, or null when nothing in this scene sways. */
   #wind: WindUniforms | null;
   /** The current wind settings, kept in step by `syncEnvironment`. */
@@ -242,6 +245,17 @@ export class LoadedScene {
    * work with an answer that only changes when something spawns or dies.
    */
   readonly #animators = new Map<string, Animator>();
+
+  /**
+   * This scene's generated surface maps.
+   *
+   * Exposed so an object spawned after load shares them rather than generating its own set — a
+   * wave-spawner placing brick walls would otherwise pay for a fresh pair of textures per wall, and
+   * the ones it made would be freed with each wall rather than with the scene.
+   */
+  get surfaceTextures(): SurfaceTextures {
+    return this.#surfaces;
+  }
 
   /** The animator for one object, for callers that drive a specific character. */
   animator(objectId: string): Animator | undefined {
@@ -379,7 +393,9 @@ export class LoadedScene {
     delete node.userData['materialClones'];
     restoreOriginalMaterials(node);
 
-    if (override) node.userData['materialClones'] = applyMaterialOverride(node, override);
+    if (override) {
+      node.userData['materialClones'] = applyMaterialOverride(node, override, this.#surfaces);
+    }
   }
 
   /**
@@ -463,6 +479,7 @@ export class LoadedScene {
     wind?: WindUniforms | null;
     weather?: WeatherField | null;
     weatherSettings?: Weather;
+    surfaces?: SurfaceTextures;
     emitters?: Map<string, ParticleEmitter>;
     windSettings?: Wind;
     scatterCount?: number;
@@ -478,6 +495,10 @@ export class LoadedScene {
     this.#wind = init.wind ?? null;
     this.#weather = init.weather ?? null;
     this.#weatherSettings = init.weatherSettings ?? NO_WEATHER;
+    // A scene built without one — a test double, a preview — still gets a working cache rather than
+    // a null to guard on everywhere. It generates nothing until something asks for a surface.
+    this.#surfaces = init.surfaces ?? new SurfaceTextures();
+    if (!init.surfaces) this.#disposables.push(this.#surfaces);
     if (init.emitters) for (const [id, one] of init.emitters) this.#emitters.set(id, one);
     this.#windSettings = init.windSettings ?? NO_WIND;
     this.#scatterCount = init.scatterCount ?? 0;
@@ -857,12 +878,19 @@ export class SceneLoader {
 
     const owned = new Map<string, DisposableResource[]>();
 
+    // Generated surface maps, shared by every object in this scene that asks for the same kind and
+    // scale, and freed with it. Scene-wide rather than global because the editor rebuilds a scene
+    // constantly, and textures outliving every object that referenced them are a leak whose only
+    // symptom is a tab that gets slower over an afternoon.
+    const surfaces = new SurfaceTextures();
+    disposables.push(surfaces);
+
     for (const object of scene.objects) {
       const entry = this.#resolveEntry(object, missingAssetIds);
       const mine: DisposableResource[] = [];
       objects.set(
         object.id,
-        this.#buildObject(object, entry, geometryCache, materialCache, disposables, mine),
+        this.#buildObject(object, entry, geometryCache, materialCache, disposables, mine, surfaces),
       );
       if (mine.length > 0) owned.set(object.id, mine);
     }
@@ -941,6 +969,7 @@ export class SceneLoader {
       wind,
       weather,
       weatherSettings: scene.environment.weather,
+      surfaces,
       emitters,
       windSettings: scene.environment.wind,
       scatterCount: [...scatter.values()].reduce(
@@ -1210,7 +1239,15 @@ export class SceneLoader {
     // freed the moment this object is deleted.
     const own: DisposableResource[] = [];
     const entry = this.#resolver.get(object.assetId) ?? MISSING_ASSET_ENTRY;
-    const node = this.#buildObject(object, entry, new Map(), new Map(), own, own);
+    const node = this.#buildObject(
+      object,
+      entry,
+      new Map(),
+      new Map(),
+      own,
+      own,
+      loaded.surfaceTextures,
+    );
     loaded.adopt(object.id, node, own);
     return node;
   }
@@ -1268,6 +1305,7 @@ export class SceneLoader {
     materialCache: Map<string, THREE.Material>,
     disposables: DisposableResource[],
     owned: DisposableResource[],
+    surfaces: SurfaceTextures,
   ): THREE.Object3D {
     // A trigger is not a thing you look at, so it gets an outline instead of a model.
     const model = object.trigger ? undefined : this.#models.get(entry.id);
@@ -1305,7 +1343,7 @@ export class SceneLoader {
     // land on its own disposal list — freeing them on delete is what keeps a session that
     // recolours fifty objects from holding fifty materials it can never reach again.
     if (object.material && !object.trigger) {
-      node.userData['materialClones'] = applyMaterialOverride(visual, object.material);
+      node.userData['materialClones'] = applyMaterialOverride(visual, object.material, surfaces);
     }
 
     // Built here rather than by the game runtime, because the animator has to be bound to *this*

@@ -84,6 +84,28 @@ function measure(document: Document): {
   return { polyCount, bounds: [size(0), size(1), size(2)] };
 }
 
+/**
+ * Which PBR maps the source's own materials carry.
+ *
+ * Read from the document rather than assumed, and recorded on the manifest, because the editor
+ * needs it to warn before a generated surface replaces a map an artist authored. The union of every
+ * material's maps: an asset whose window is emissive and whose wall is normal-mapped carries both,
+ * and the question the editor asks — "will I be overwriting something?" — is answered by the union.
+ */
+function measureMaterialMaps(document: Document): AssetManifestEntry['materialMaps'] {
+  const found = new Set<AssetManifestEntry['materialMaps'][number]>();
+  for (const material of document.getRoot().listMaterials()) {
+    if (material.getBaseColorTexture()) found.add('baseColor');
+    if (material.getNormalTexture()) found.add('normal');
+    if (material.getMetallicRoughnessTexture()) found.add('metallicRoughness');
+    if (material.getOcclusionTexture()) found.add('occlusion');
+    if (material.getEmissiveTexture()) found.add('emissive');
+  }
+  // Sorted, so re-running ingest on unchanged sources produces a byte-identical manifest — a
+  // manifest that reordered itself per run would show up as a diff in every asset commit.
+  return [...found].sort();
+}
+
 /** Flags source files that break the conventions in ways ingest cannot silently fix. */
 function auditConventions(bounds: Vec3, minY: number): string[] {
   const warnings: string[] = [];
@@ -134,6 +156,7 @@ async function ingestOne(
     .map((animation) => animation.getName())
     .filter((name) => name.length > 0);
   const skinned = document.getRoot().listSkins().length > 0;
+  const materialMaps = measureMaterialMaps(document);
   warnings.push(...auditConventions(bounds, lowestPoint(document)));
 
   const budget = checkPolyBudget(metadata.category, polyCount);
@@ -187,6 +210,7 @@ async function ingestOne(
       bounds,
       animations,
       skinned,
+      materialMaps,
       placeholderColor: metadata.placeholderColor,
       // Attribution travels with the entry, because the manifest is what an export reads to write
       // its CREDITS file. Anything dropped here is attribution silently stripped from every game
@@ -288,6 +312,8 @@ async function ingestAudio(
     // and never passes through `parse`.
     animations: [],
     skinned: false,
+    // A sound has no materials at all, so this is empty as a measurement rather than as a default.
+    materialMaps: [],
     placeholderColor: '#7a6fd0',
     ...(metadata.license === undefined ? {} : { license: metadata.license }),
     ...(metadata.author === undefined ? {} : { author: metadata.author }),

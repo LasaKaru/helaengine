@@ -1,4 +1,4 @@
-import type { LoadedScene } from '@helaengine/engine';
+import { hasProjectedUvs, type LoadedScene } from '@helaengine/engine';
 
 /**
  * The scene the viewport has actually built, for panels that need to ask it something.
@@ -35,4 +35,21 @@ export function boneNamesFor(objectId: string): string[] {
     if ((child as { isBone?: boolean }).isBone) names.push(child.name);
   });
   return names;
+}
+
+/**
+ * Whether a placed object's texture coordinates were invented by the engine's box projection.
+ *
+ * The same kind of question as the bone names: it lives in the geometry, and nothing in the document
+ * or the manifest records it. It matters because a projected pattern stretches with a non-uniform
+ * placement scale — an author who stretched a crate into a wall should be told why the bricks came
+ * out oblong, rather than concluding the feature is broken.
+ *
+ * False for an object the viewport has not built, and for one with no surface: the projection only
+ * runs when a surface is applied, so before that there is nothing to report.
+ */
+export function objectHasProjectedUvs(objectId: string): boolean {
+  const node = current?.objects.get(objectId);
+  if (!node) return false;
+  return hasProjectedUvs(node);
 }

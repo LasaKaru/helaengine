@@ -117,6 +117,9 @@ export function toManifestEntry(asset: StoredLocalAsset): AssetManifestEntry {
     bounds: asset.bounds,
     animations: asset.animations,
     skinned: asset.skinned,
+    // Empty for a row imported before the measurement existed, which reads as "unmeasured" — the
+    // same thing it means everywhere else it defaults.
+    materialMaps: (asset.materialMaps ?? []) as AssetManifestEntry['materialMaps'],
     placeholderColor: '#8a7ca8',
     ...(asset.license ? { license: asset.license } : {}),
     ...(asset.author ? { author: asset.author } : {}),
@@ -199,6 +202,7 @@ export async function importLocalAsset(
     bounds: report.bounds,
     animations: report.animations,
     skinned: report.skinned,
+    materialMaps: report.materialMaps,
     ...(options.license ? { license: options.license } : {}),
     ...(options.author ? { author: options.author } : {}),
     ...(options.sourceUrl ? { sourceUrl: options.sourceUrl } : {}),

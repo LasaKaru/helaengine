@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { HexColorSchema } from './primitives.js';
+import { SurfaceSchema } from './surface.js';
 
 /**
  * How a scene is lit and graded, as data.
@@ -136,6 +137,15 @@ export const MaterialOverrideSchema = z.object({
    * a skydome, a cave. Nothing else in the schema addresses it and it is a one-line property.
    */
   doubleSided: z.boolean().optional(),
+  /**
+   * A generated PBR surface — brick, tile, planks — bound as normal, roughness and occlusion maps.
+   *
+   * Lives inside the override rather than beside it because it is the same kind of thing and needs
+   * exactly the same machinery: materials cloned per object so one brick wall is not every wall,
+   * restored when it is cleared, and freed when the object goes. A parallel field would have been a
+   * second copy of all of that, and a second thing for `setMaterial` to forget.
+   */
+  surface: SurfaceSchema.optional(),
 });
 export type MaterialOverride = z.infer<typeof MaterialOverrideSchema>;
 
