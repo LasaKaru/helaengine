@@ -82,10 +82,11 @@ body,
 }
 
 .brand-mark {
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-  background: var(--accent);
+  /* The mark draws itself and takes its colour from here, so one SVG serves the dark editor
+     chrome and the light opener without a second export. */
+  display: block;
+  color: var(--accent);
+  flex: none;
 }
 
 .project-name input {

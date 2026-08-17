@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { BrandMark } from './BrandMark';
 import type { AssetManifest } from '@helaengine/schema';
 import { ExportWizard } from './ExportWizard';
 import { VersionHistory } from './VersionHistory';
@@ -49,7 +50,7 @@ export function TopBar({ manifest }: { manifest?: AssetManifest } = {}): React.J
   return (
     <header className="topbar">
       <button type="button" className="brand brand-button" onClick={() => void goHome()}>
-        <span className="brand-mark" aria-hidden="true" />
+        <BrandMark size={20} />
         <span className="brand-name">Projects</span>
       </button>
 

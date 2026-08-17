@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { BrandMark } from './BrandMark';
 import { useProjectStore } from '../store/projectStore';
 import { isHelaFilename } from '../storage/localFile';
 import { TEMPLATES } from '@helaengine/templates';
@@ -48,11 +49,11 @@ export function ProjectsScreen(): React.JSX.Element {
       <AccountBar />
       <header className="projects-header">
         <div className="brand">
-          <span className="brand-mark" aria-hidden="true" />
+          <BrandMark size={20} />
           <span className="brand-name">HelaEngine</span>
         </div>
         <p className="projects-tagline">
-          Projects live in this browser. Cloud sync arrives in Sprint 29.
+          Projects live in this browser, and sync to your account when you sign in.
         </p>
       </header>
 
