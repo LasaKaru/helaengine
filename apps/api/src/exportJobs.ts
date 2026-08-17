@@ -53,6 +53,17 @@ function toJob(row: JobRow): ExportJob {
     organizationId: row.organization_id,
     sceneVersion: row.scene_version,
     status: row.status,
+    /**
+     * Web, and truthfully so rather than as a placeholder: nothing can request a desktop build yet.
+     *
+     * The schema carries the field and the queue does not, which is deliberate sequencing — the
+     * vocabulary lands first so the worker and the dialog are written against something fixed. The
+     * columns arrive with the worker that populates them; until then every job in this table is a
+     * web export and reporting it as one is the accurate answer, not a default standing in for a
+     * missing read.
+     */
+    target: 'web',
+    desktop: null,
     stage: row.stage,
     progress: row.progress,
     attempts: row.attempts,

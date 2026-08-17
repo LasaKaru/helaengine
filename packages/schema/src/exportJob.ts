@@ -42,6 +42,18 @@ export const ExportStageSchema = z.enum([
   'queued',
   'loading',
   'building',
+  /**
+   * Fetching the Electron runtime for a desktop build.
+   *
+   * Its own stage, and it has to be: it is a ~90 MB download and by far the longest phase of a
+   * desktop export. Folded into `building` the bar would sit still for a minute on a job that is
+   * working perfectly, which is exactly how a user learns to distrust a progress bar.
+   *
+   * A web export never enters it.
+   */
+  'fetching-runtime',
+  /** Wrapping the export in the desktop shell and stamping the executable. Desktop builds only. */
+  'packaging',
   'compressing',
   'storing',
   'done',
@@ -53,10 +65,67 @@ export const STAGE_PROGRESS: Record<ExportStage, number> = {
   queued: 0,
   loading: 10,
   building: 40,
+  // The two desktop-only stages sit between building and compressing, so a web export walks
+  // 40 → 75 exactly as it always did and a desktop one has somewhere honest to report from.
+  'fetching-runtime': 50,
+  packaging: 68,
   compressing: 75,
   storing: 90,
   done: 100,
 };
+
+/**
+ * What an export is *for*: a page to host, or a program to double-click.
+ *
+ * `web` is the default and is what every job written before this existed means, so nothing about an
+ * existing export changes. `desktop` runs the same build and then wraps it — the export goes into
+ * the shell unchanged, which is what keeps the two the same game rather than near-relatives.
+ */
+export const EXPORT_TARGETS = ['web', 'desktop'] as const;
+export const ExportTargetSchema = z.enum(EXPORT_TARGETS);
+export type ExportTarget = z.infer<typeof ExportTargetSchema>;
+
+/**
+ * Platforms a desktop build can be produced for.
+ *
+ * No macOS, and it is not an oversight. A Mac build has to be signed and notarised by Apple to
+ * launch at all on a modern system, which needs an Apple developer account and either a Mac or a
+ * paid service in the build path. Offering a `.app` that refuses to open would be worse than not
+ * offering one.
+ */
+export const DESKTOP_PLATFORMS = ['win32-x64', 'win32-arm64', 'linux-x64'] as const;
+export const DesktopPlatformSchema = z.enum(DESKTOP_PLATFORMS);
+export type DesktopPlatform = z.infer<typeof DesktopPlatformSchema>;
+
+export const DESKTOP_PLATFORM_LABELS: Readonly<Record<DesktopPlatform, string>> = {
+  'win32-x64': 'Windows (Intel/AMD)',
+  'win32-arm64': 'Windows (ARM)',
+  'linux-x64': 'Linux',
+};
+
+export const DesktopOptionsSchema = z.object({
+  platform: DesktopPlatformSchema.default('win32-x64'),
+  /** Becomes the executable's name and its title bar. Defaults to the scene's name at build time. */
+  productName: z.string().max(60).default(''),
+  version: z
+    .string()
+    .regex(/^\d+\.\d+\.\d+$/, 'Use three numbers, like 1.0.0')
+    .default('1.0.0'),
+  /** Start full-screen. Off by default: a game that seizes the display on first run is alarming. */
+  fullscreen: z.boolean().default(false),
+});
+export type DesktopOptions = z.infer<typeof DesktopOptionsSchema>;
+
+/**
+ * Roughly how large a build will be, in megabytes, before anybody waits for one.
+ *
+ * Said up front rather than discovered after a five-minute job, because the number is startling and
+ * the decision it informs — link or file — is one the author should make knowing it. Almost all of
+ * a desktop build is Chromium, so the figure barely moves with the size of the game.
+ */
+export function estimatedDownloadMb(target: ExportTarget): number {
+  return target === 'desktop' ? 111 : 5;
+}
 
 export const ExportJobSchema = z.object({
   id: z.string().min(1),
@@ -65,6 +134,13 @@ export const ExportJobSchema = z.object({
   /** Which saved version was exported. A job is a snapshot, not a live view of the project. */
   sceneVersion: z.number().int().positive(),
   status: ExportJobStatusSchema,
+  /**
+   * Web or desktop. Defaults to `web`, so every job recorded before this existed reads correctly
+   * rather than needing a migration.
+   */
+  target: ExportTargetSchema.default('web'),
+  /** Only meaningful when `target` is `desktop`. Null for a web export rather than defaulted. */
+  desktop: DesktopOptionsSchema.nullable().default(null),
   stage: ExportStageSchema,
   progress: z.number().int().min(0).max(100),
   /** How many times the worker has picked it up. Retries are transparent to the user. */
@@ -149,4 +225,38 @@ export function quotaMessage(tier: PlanTier, used: number): string {
 
 export function parseExportJob(input: unknown): ExportJob {
   return ExportJobSchema.parse(input);
+}
+
+/**
+ * What an author should know before waiting for a desktop build.
+ *
+ * Warnings rather than errors: none of these stops a build, and all of them are things people
+ * discover afterwards and are annoyed by. Windows in particular will refuse to run the result
+ * without a click-through, and finding that out from a player is much worse than from this list.
+ */
+export function desktopWarnings(options: DesktopOptions): string[] {
+  const warnings: string[] = [];
+
+  if (options.platform.startsWith('win32')) {
+    warnings.push(
+      'Windows will show "Windows protected your PC" the first time a player runs this. The ' +
+        'build is unsigned, and there is no free way round it — stopping the warning needs a ' +
+        'paid code-signing certificate. Players click More info, then Run anyway.',
+    );
+  }
+
+  warnings.push(
+    `About ${estimatedDownloadMb('desktop')} MB zipped, against ` +
+      `${estimatedDownloadMb('web')} MB for the web export. Almost all of it is the browser ` +
+      'engine, so the figure hardly changes with the size of the game.',
+  );
+
+  if (options.fullscreen) {
+    warnings.push(
+      'This build starts full-screen. Players who have not been warned tend to read that as the ' +
+        'game having crashed their machine.',
+    );
+  }
+
+  return warnings;
 }

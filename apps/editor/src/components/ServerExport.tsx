@@ -18,6 +18,10 @@ const STAGE_TEXT: Record<ExportStage, string> = {
   queued: 'Waiting for a build server…',
   loading: 'Loading your project…',
   building: 'Building the game…',
+  // Its own line because it is the long one — a ~90 MB download — and a bar that sits still while
+  // saying "Building the game" for a minute is how people learn to distrust a progress bar.
+  'fetching-runtime': 'Fetching the desktop runtime… (this is the slow part)',
+  packaging: 'Making the program…',
   compressing: 'Compressing…',
   storing: 'Almost done…',
   done: 'Ready',
