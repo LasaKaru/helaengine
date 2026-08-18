@@ -8,6 +8,7 @@ import {
   type Environment,
   type LodMode,
   type Streaming,
+  type Water,
   streamingIsActive,
   type MaterialOverride,
   type Scene,
@@ -26,6 +27,7 @@ import { SurfaceTextures } from './render/surfaces.js';
 import { LodGeometries, buildLod } from './render/lod.js';
 import { FootIk, type GroundProbe } from './animation/FootIk.js';
 import { ChunkGrid } from './streaming/ChunkGrid.js';
+import { buildWater, type WaterSurface } from './render/Water.js';
 import { terrainHides, terrainRelief } from './streaming/horizon.js';
 import { buildScatter, buildScatterMeshes } from './scatter/ScatterField.js';
 import {
@@ -240,6 +242,11 @@ export class LoadedScene {
   #weatherSettings: Weather;
   /** Emitters attached to objects, by object id. */
   readonly #emitters = new Map<string, ParticleEmitter>();
+  /** The water surface, or null for a level with none. */
+  #water: WaterSurface | null = null;
+  /** Seconds since this scene loaded, which is what drives the waves. */
+  #waterClock = 0;
+
   /** Generated surface maps for this scene. Also needed after load, by `setMaterial`. */
   readonly #surfaces: SurfaceTextures;
   /** Decimated copies for this scene, shared by every object built into it. */
@@ -353,6 +360,12 @@ export class LoadedScene {
     // camera, once a frame — and a second hook would be a second thing every host has to remember
     // to call. It is throttled on camera movement, so a still camera costs one distance compare.
     this.updateStreaming(camera);
+    if (this.#water) {
+      // Its own clock rather than `performance.now()`, so a paused game holds its waves still and
+      // two runs of the pre-delivery gate see the same surface at the same frame.
+      this.#waterClock += deltaSeconds;
+      this.#water.update(this.#waterClock);
+    }
     this.#weather?.update(deltaSeconds, camera, this.#windSettings);
 
     for (const [objectId, one] of this.#emitters) {
@@ -490,6 +503,46 @@ export class LoadedScene {
       occludedChunks: this.#occludedChunks,
       objects: this.#chunks.objectCount,
     };
+  }
+
+  /**
+   * Builds, rebuilds or removes the water surface.
+   *
+   * Rebuilt rather than adjusted, because the depth of the ground beneath every vertex is baked into
+   * the geometry when the plane is made — changing the height or the terrain changes every one of
+   * those numbers, and a uniform cannot express it. It is one pass over a 97×97 grid and only
+   * happens when the setting moves.
+   *
+   * Null removes it entirely: no plane, no shader, no per-frame work. That is what makes "no water"
+   * the absence of the system rather than a surface at the bottom of the world.
+   */
+  syncWater(water: Water | null, skyColor: string): void {
+    if (this.#water) {
+      this.#water.mesh.removeFromParent();
+      const at = this.#added.indexOf(this.#water.mesh);
+      if (at >= 0) this.#added.splice(at, 1);
+      const owned = this.#disposables.indexOf(this.#water);
+      if (owned >= 0) this.#disposables.splice(owned, 1);
+      this.#water.dispose();
+      this.#water = null;
+    }
+    if (!water) return;
+
+    const field = this.terrainField;
+    // Without terrain there is no ground to be deep against, so every vertex would read the same
+    // depth and the shoreline — the whole point of this — could not exist.
+    if (!field) return;
+
+    const built = buildWater(water, field.size, (x, z) => field.sampleHeight(x, z), skyColor);
+    this.threeScene.add(built.mesh);
+    this.#added.push(built.mesh);
+    this.#disposables.push(built);
+    this.#water = built;
+  }
+
+  /** Whether this scene has water built. What a test asserts against rather than the document. */
+  get waterActive(): boolean {
+    return this.#water !== null;
   }
 
   /** Fires one emitter's burst — what a `burstEvent` on the bus resolves to. */
@@ -658,6 +711,9 @@ export class LoadedScene {
     // when the setting moves — which until this line was here it never did, and the draw distance
     // was a number that saved, exported and changed nothing you could see.
     this.buildChunks(environment.streaming);
+    // Same reason the weather is synced here: until this line existed the setting saved, exported
+    // and changed nothing you could see.
+    this.syncWater(environment.water, environment.background);
   }
 
   /**
@@ -1247,6 +1303,8 @@ export class SceneLoader {
       ),
     });
     loaded.registerEnvironment(environmentNodes, environmentDisposables);
+    // After the terrain exists, because the surface's depth is measured against it.
+    loaded.syncWater(scene.environment.water, scene.environment.background);
     return loaded;
   }
 
