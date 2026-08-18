@@ -10,6 +10,11 @@ TO START
   Your browser opens at http://localhost:5174
   Leave the black window open while you work. Close it to stop.
 
+THE FULL GUIDE
+  Open  guide\index.html  in a browser. It walks the whole thing step by
+  step - shaping ground, water, grass, animation, physics, exporting -
+  with screenshots. It needs no internet and no server.
+
 FIRST FIVE MINUTES
   1. Pick "Forest clearing" from the templates.
   2. Drag a tree or a rock from the left panel onto the ground.

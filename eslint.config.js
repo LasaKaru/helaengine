@@ -226,6 +226,28 @@ export default tseslint.config(
     },
   },
   {
+    /**
+     * The documentation guide's script.
+     *
+     * A plain browser script rather than a module, because the page it belongs to has to open by
+     * double-clicking a file — and `type="module"` is blocked by CORS over `file://`, which would
+     * make the guide's contents list stop working on exactly the offline machine it exists for.
+     *
+     * Linted rather than ignored: it ships inside the portable bundle, so it is code somebody else
+     * runs.
+     */
+    files: ['docs/guide/*.js'],
+    languageOptions: {
+      sourceType: 'script',
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        Set: 'readonly',
+        IntersectionObserver: 'readonly',
+      },
+    },
+  },
+  {
     files: ['**/*.test.ts', 'scripts/**/*.ts', '**/vite.config.ts'],
     rules: {
       'no-console': 'off',

@@ -1,0 +1,1606 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Making a game with HelaEngine</title>
+    <meta
+      name="description"
+      content="A step-by-step guide: shape a world, place and animate things, make it playable, and ship it."
+    />
+    <link rel="stylesheet" href="guide.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='43' fill='none' stroke='%2355c98a' stroke-width='7'/%3E%3Cpath d='M28 50H40L46 26L54 74L60 50H72' fill='none' stroke='%2355c98a' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <div class="shell">
+      <nav class="sidebar" aria-label="Contents">
+        <a class="brand" href="#top">
+          <svg width="30" height="30" viewBox="0 0 100 100" aria-hidden="true">
+            <circle cx="50" cy="50" r="43" fill="none" stroke="currentColor" stroke-width="7" />
+            <path d="M26 30 L38 24 L38 46 L26 46 Z" fill="currentColor" />
+            <path d="M26 54 L38 54 L38 76 L26 70 Z" fill="currentColor" />
+            <path d="M62 24 L74 30 L74 46 L62 46 Z" fill="currentColor" />
+            <path d="M62 54 L74 54 L74 70 L62 76 Z" fill="currentColor" />
+            <path
+              d="M28 50 H40 L46 26 L54 74 L60 50 H72"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="7"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <b>HelaEngine<span>Making a game</span></b>
+        </a>
+
+        <input
+          id="filter"
+          type="search"
+          placeholder="Filter chapters&hellip;  /"
+          aria-label="Filter chapters"
+        />
+
+        <ul class="toc">
+          <li class="part">Start here</li>
+          <li>
+            <a href="#what-you-need"><span class="num">1</span>What you need</a>
+          </li>
+          <li>
+            <a href="#open"><span class="num">2</span>Open the editor</a>
+          </li>
+          <li>
+            <a href="#layout"><span class="num">3</span>The three columns</a>
+          </li>
+          <li>
+            <a href="#camera"><span class="num">4</span>Moving the camera</a>
+          </li>
+
+          <li class="part">Building a world</li>
+          <li>
+            <a href="#place"><span class="num">5</span>Placing things</a>
+          </li>
+          <li>
+            <a href="#transform"><span class="num">6</span>Move, rotate, scale</a>
+          </li>
+          <li>
+            <a href="#sculpt"><span class="num">7</span>Sculpting the ground</a>
+          </li>
+          <li>
+            <a href="#paint"><span class="num">8</span>Painting the ground</a>
+          </li>
+          <li>
+            <a href="#water"><span class="num">9</span>Adding water</a>
+          </li>
+          <li>
+            <a href="#grass"><span class="num">10</span>Growing grass</a>
+          </li>
+          <li>
+            <a href="#look"><span class="num">11</span>Light, weather and wind</a>
+          </li>
+          <li>
+            <a href="#materials"><span class="num">12</span>Materials and surfaces</a>
+          </li>
+
+          <li class="part">Things that move</li>
+          <li>
+            <a href="#models"><span class="num">13</span>Your own models</a>
+          </li>
+          <li>
+            <a href="#animation"><span class="num">14</span>Animating a character</a>
+          </li>
+          <li>
+            <a href="#physics"><span class="num">15</span>Physics</a>
+          </li>
+          <li>
+            <a href="#advanced-physics"
+              ><span class="num">16</span>Joints, breakables, ragdolls, vehicles</a
+            >
+          </li>
+
+          <li class="part">Making it a game</li>
+          <li>
+            <a href="#player"><span class="num">17</span>The player</a>
+          </li>
+          <li>
+            <a href="#behaviours"><span class="num">18</span>Behaviours and triggers</a>
+          </li>
+          <li>
+            <a href="#graph"><span class="num">19</span>The node graph</a>
+          </li>
+          <li>
+            <a href="#levels"><span class="num">20</span>More than one level</a>
+          </li>
+
+          <li class="part">Finishing</li>
+          <li>
+            <a href="#play"><span class="num">21</span>Playing and testing</a>
+          </li>
+          <li>
+            <a href="#export"><span class="num">22</span>Exporting to the web</a>
+          </li>
+          <li>
+            <a href="#exe"><span class="num">23</span>Shipping a Windows .exe</a>
+          </li>
+          <li>
+            <a href="#wrong"><span class="num">24</span>When something looks wrong</a>
+          </li>
+          <li>
+            <a href="#next"><span class="num">25</span>Where to go next</a>
+          </li>
+        </ul>
+      </nav>
+
+      <main id="top">
+        <h1>Making a game with HelaEngine</h1>
+        <p class="lede">
+          Start with an empty field. Finish with something a player can download and run. Every step
+          below was carried out in the editor to take the screenshot beside it, in the order it is
+          written.
+        </p>
+
+        <div class="note">
+          <b>How to read this</b>
+          <p>
+            Chapters 1&ndash;6 are worth doing in order &mdash; they are the twenty minutes that
+            make everything after them make sense. After that, jump wherever you like. Each chapter
+            says what it needs from earlier ones.
+          </p>
+          <p>
+            Where a control lives is written like this:
+            <span class="path">Rendering <i>&rsaquo;</i> Water <i>&rsaquo;</i> Surface height</span>
+            &mdash; panel, then section, then the field itself.
+          </p>
+        </div>
+
+        <!-- ================================================================ -->
+        <section id="what-you-need">
+          <h2><span class="num">1</span>What you need</h2>
+
+          <p>
+            A computer that can run a modern browser, and about ten minutes. There is no account, no
+            install, and nothing to configure. Your work is saved in the browser on your own machine
+            until you choose to do something else with it.
+          </p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>You want to</th>
+                  <th>You need</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Build and play in the editor</td>
+                  <td>
+                    Chrome, Edge or Firefox, reasonably current. A graphics card helps but is not
+                    required.
+                  </td>
+                </tr>
+                <tr>
+                  <td>Run the portable build</td>
+                  <td>
+                    <a href="https://nodejs.org">Node.js</a>, and nothing else. No git, no package
+                    manager, no install step.
+                  </td>
+                </tr>
+                <tr>
+                  <td>Export a game and host it</td>
+                  <td>
+                    Anywhere that serves static files &mdash; GitHub Pages, Netlify, a folder on a
+                    web server.
+                  </td>
+                </tr>
+                <tr>
+                  <td>Ship a Windows <code>.exe</code></td>
+                  <td>
+                    The desktop packaging step, which downloads a runtime the first time. See
+                    chapter 23.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="note limit">
+            <b>What this is not</b>
+            <p>
+              HelaEngine does not generate a game from a description, and nothing in it asks a
+              language model anything at runtime. It is an editor that produces a document, and an
+              engine that runs that document &mdash; the same engine in the preview and in every
+              export. That is why what you see while building is what a player gets.
+            </p>
+          </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="open">
+          <h2><span class="num">2</span>Open the editor</h2>
+
+          <p>
+            However you are running it &mdash; the portable build's <code>START.bat</code>, a
+            development server, or a hosted copy &mdash; you arrive at the same screen.
+          </p>
+
+          <figure>
+            <img
+              src="shots/01-start.png"
+              alt="The HelaEngine start screen, showing template cards"
+            />
+            <figcaption>
+              The start screen. Templates on the left, your saved projects on the right.
+            </figcaption>
+          </figure>
+
+          <ol class="steps">
+            <li>
+              <p>
+                <strong>Pick a template.</strong> <em>Forest clearing</em> is the one this guide
+                uses: a ring of trees around open ground, with some rocks and a sculpted rise on one
+                side. <em>Empty field</em> gives you flat ground and nothing else.
+              </p>
+            </li>
+            <li>
+              <p>
+                <strong>Wait for the models.</strong> A few seconds the first time, while the
+                browser fetches them. They are cached afterwards.
+              </p>
+            </li>
+            <li>
+              <p>
+                <strong>Take the tour, or skip it.</strong> Five short cards point at the panels. It
+                appears once; <strong>Skip tour</strong> makes it go away for good.
+              </p>
+            </li>
+          </ol>
+
+          <div class="note">
+            <b>Where your work lives</b>
+            <p>
+              In this browser, on this machine, in IndexedDB. Nothing is uploaded. That means a
+              different browser is a different set of projects, and clearing site data clears them
+              &mdash; so when a project starts to matter, use
+              <span class="path">Save to file&hellip;</span> in the top bar, which writes a
+              <code>.hela</code> file you can keep, copy and reopen anywhere.
+            </p>
+          </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="layout">
+          <h2><span class="num">3</span>The three columns</h2>
+
+          <figure>
+            <img
+              src="shots/02-editor.png"
+              alt="The editor, with the asset library, viewport and inspector"
+            />
+            <figcaption>
+              Forest clearing, opened. Library left, viewport centre, everything about the world
+              right.
+            </figcaption>
+          </figure>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Where</th>
+                  <th>What is there</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Top bar</strong></td>
+                  <td>
+                    Project name, object count, <strong>Undo</strong> / <strong>Redo</strong>,
+                    <strong>Save</strong>, <strong>Save to file&hellip;</strong>,
+                    <strong>Graph</strong>, <strong>History</strong> and <strong>Export</strong>.
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Left</strong></td>
+                  <td>
+                    <strong>Assets</strong> &mdash; everything you can place, filtered by category.
+                    <strong>Import models</strong> &mdash; your own <code>.glb</code> files.
+                    <strong>Scene</strong> &mdash; a tree of what is in the level.
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Centre</strong></td>
+                  <td>
+                    The viewport, with the tool switch across the top:
+                    <strong>Play</strong>, <strong>Walk</strong>, <strong>Select</strong>,
+                    <strong>Sculpt</strong>, <strong>Paint</strong>.
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Right</strong></td>
+                  <td>
+                    <strong>Inspector</strong> for whatever is selected, then the panels that belong
+                    to the level as a whole &mdash; Levels, Terrain, Ground cover, Joints,
+                    Rendering, Game, Weapons, Secrets, Audio, Player and the rest.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p>
+            The right column is long, and deliberately so: it is one scrolling list rather than a
+            set of tabs, so you can see the light, the ground cover and the water without hunting
+            for them. Scroll it.
+          </p>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="camera">
+          <h2><span class="num">4</span>Moving the camera</h2>
+
+          <p>Learn these four and everything else gets easier.</p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>To</th>
+                  <th>Do</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Orbit</td>
+                  <td>Drag with the <strong>left</strong> mouse button on empty space</td>
+                </tr>
+                <tr>
+                  <td>Pan</td>
+                  <td>
+                    Drag with the <strong>middle</strong> button, or <kbd>Shift</kbd> and drag
+                  </td>
+                </tr>
+                <tr>
+                  <td>Zoom</td>
+                  <td>Scroll wheel</td>
+                </tr>
+                <tr>
+                  <td>Walk around at eye height</td>
+                  <td>
+                    The <strong>Walk</strong> tool, then <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd
+                    ><kbd>D</kbd> and the mouse
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="note">
+            <b>Walk is not Play</b>
+            <p>
+              <strong>Walk</strong> moves your view through the level with nothing else running.
+              <strong>Play</strong> starts the actual game &mdash; physics, enemies, weapons, the
+              graph. Use Walk to judge how a place feels to stand in; use Play to find out whether
+              it works.
+            </p>
+          </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="place">
+          <h2><span class="num">5</span>Placing things</h2>
+
+          <figure>
+            <img
+              class="panel-shot"
+              src="shots/03-assets.png"
+              alt="The asset library panel with category filters"
+            />
+            <figcaption>
+              The library. The number beside each category is how many models are in it.
+            </figcaption>
+          </figure>
+
+          <ol class="steps">
+            <li>
+              <p>
+                <strong>Find something.</strong> Type in
+                <span class="path">Search assets&hellip;</span>
+                or press a category &mdash; Buildings, Enemies, Logic, Props, Rocks, Terrain, Trees.
+              </p>
+            </li>
+            <li>
+              <p>
+                <strong>Drag its card into the viewport.</strong> It lands where you drop it,
+                standing on the ground.
+              </p>
+            </li>
+            <li>
+              <p>
+                <strong>Place a few more.</strong> The toolbar options above the viewport change how
+                they land: <strong>Snap to grid</strong> with a size,
+                <strong>Random rotation</strong> so a row of trees is not a row of clones, and
+                <strong>Align to surface</strong> to tilt each one to the slope it stands on.
+              </p>
+            </li>
+          </ol>
+
+          <div class="note">
+            <b>Do not place a forest by hand</b>
+            <p>
+              For grass, undergrowth, scattered rocks &mdash; anything you would place dozens of
+              &mdash; use <a href="#grass">ground cover</a> instead. It is a rule rather than a
+              list, costs a few hundred bytes rather than thousands of entries, and you can change
+              your mind about all of it at once.
+            </p>
+          </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="transform">
+          <h2><span class="num">6</span>Move, rotate, scale</h2>
+
+          <p>
+            Click a thing in the viewport, or a row in the <strong>Scene</strong> tree. A gizmo
+            appears on it and the <strong>Inspector</strong> fills in.
+          </p>
+
+          <figure>
+            <img src="shots/04-select.png" alt="A selected tree with its transform gizmo" />
+            <figcaption>
+              Selected. Drag an arrow to move along that axis, or type exact numbers in the
+              Inspector.
+            </figcaption>
+          </figure>
+
+          <figure>
+            <img
+              class="panel-shot"
+              src="shots/05-inspector.png"
+              alt="The Inspector panel showing position, rotation and scale"
+            />
+            <figcaption>
+              The Inspector. Drag across a number field to scrub it; click to type.
+            </figcaption>
+          </figure>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Key</th>
+                  <th>Does</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd></td>
+                  <td>Move, rotate, scale</td>
+                </tr>
+                <tr>
+                  <td><kbd>Delete</kbd></td>
+                  <td>Remove the selection</td>
+                </tr>
+                <tr>
+                  <td><kbd>Ctrl</kbd>+<kbd>D</kbd></td>
+                  <td>Duplicate</td>
+                </tr>
+                <tr>
+                  <td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></td>
+                  <td>Undo, redo</td>
+                </tr>
+                <tr>
+                  <td>Drag on empty space</td>
+                  <td>Marquee-select several at once</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p>
+            Press <kbd>?</kbd> at any time for the full list. Dragging one row onto another in the
+            Scene tree makes it a child, so moving the parent moves both &mdash; useful for a door
+            in a wall, or a lamp on a post.
+          </p>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="sculpt">
+          <h2><span class="num">7</span>Sculpting the ground</h2>
+
+          <p>
+            Terrain is a height field: one height per point on a grid. You paint that height with a
+            brush, and everything else &mdash; where water shows, where grass will grow, what the
+            player can climb &mdash; follows from it.
+          </p>
+
+          <figure>
+            <img
+              class="panel-shot"
+              src="shots/06-terrain-panel.png"
+              alt="The Terrain panel with sculpt tools and brush settings"
+            />
+            <figcaption>The Terrain panel, with the Sculpt tool active.</figcaption>
+          </figure>
+
+          <ol class="steps">
+            <li>
+              <p>Press <strong>Sculpt</strong> in the toolbar above the viewport.</p>
+            </li>
+            <li>
+              <p>
+                <strong>Choose a brush.</strong>
+                <strong>Raise</strong> and <strong>Lower</strong> push the ground up and down.
+                <strong>Smooth</strong> takes the lumps out of what you just did.
+                <strong>Flatten</strong>
+                pulls everything under the brush toward one height &mdash; the way to make somewhere
+                to put a building.
+              </p>
+            </li>
+            <li>
+              <p>
+                <strong>Set radius and strength</strong>, then drag on the ground. Hold and move for
+                a ridge; click repeatedly in one place for a peak.
+              </p>
+            </li>
+            <li>
+              <p>
+                <strong>Smooth afterwards.</strong> Raise leaves the edges of the brush visible. One
+                pass of Smooth at a larger radius turns a lumpy mound into a hill.
+              </p>
+            </li>
+          </ol>
+
+          <figure>
+            <img src="shots/07-sculpted.png" alt="The clearing with a hill raised on one side" />
+            <figcaption>
+              Two Raise strokes and nothing else. Note the trees standing on the new slope: they
+              follow the ground.
+            </figcaption>
+          </figure>
+
+          <h3>World size and resolution</h3>
+          <p>
+            <span class="path">Terrain <i>&rsaquo;</i> World size</span> changes how many metres
+            across the level is. Sculpting is kept and stretched to fit, and ground cover follows,
+            so a bigger world grows more grass at the same density rather than the same grass spread
+            thinner.
+          </p>
+          <p>
+            <span class="path">Terrain <i>&rsaquo;</i> Resolution</span> is how fine the height grid
+            is. Higher means you can sculpt smaller details, and costs more to draw.
+            64&nbsp;&times;&nbsp;64 is the default and is enough for hills and valleys; raise it
+            when you want paths and ditches.
+          </p>
+
+          <div class="note warn">
+            <b>Sculpting moves what stands on it</b>
+            <p>
+              Raise ground under a building and the building ends up inside the hill. Place the
+              landscape first, then the things that stand on it &mdash; or use
+              <strong>Flatten</strong>
+              to make a level pad before you build.
+            </p>
+          </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="paint">
+          <h2><span class="num">8</span>Painting the ground</h2>
+
+          <p>
+            Four layers &mdash; grass, rock, sand, whatever you set them to &mdash; blended per
+            point. Painting is how a path, a beach or a bare hilltop happens.
+          </p>
+
+          <figure>
+            <img
+              class="panel-shot"
+              src="shots/08-paint.png"
+              alt="The Terrain panel with the Paint tool active"
+            />
+            <figcaption>
+              Press <strong>Paint</strong>, pick a layer, then drag on the ground.
+            </figcaption>
+          </figure>
+
+          <ol class="steps">
+            <li>
+              <p>Press <strong>Paint</strong>.</p>
+            </li>
+            <li><p>Pick which of the four layers you are painting, and set its colour.</p></li>
+            <li>
+              <p>
+                Set radius and strength, and drag. Layers blend rather than replacing each other, so
+                the edges are soft.
+              </p>
+            </li>
+          </ol>
+
+          <div class="note">
+            <b>Painting is also a mask</b>
+            <p>
+              <a href="#grass">Ground cover</a> can be restricted to one painted layer. Paint sand
+              across a strip and the grass retreats from it, with no second mask to keep in step
+              &mdash; the brush is the only thing you touch.
+            </p>
+          </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="water">
+          <h2><span class="num">9</span>Adding water</h2>
+
+          <p>
+            Water is a level surface at a height, and the ground decides where it shows. Sculpt a
+            hollow and it fills; raise a bank and the water stops at it. You never draw the outline
+            of a lake &mdash; you dig one.
+          </p>
+
+          <figure>
+            <img
+              class="panel-shot"
+              src="shots/09-water-panel.png"
+              alt="The Water section of the Rendering panel"
+            />
+            <figcaption>
+              <span class="path">Rendering <i>&rsaquo;</i> Water</span>. Kind first, then the height
+              that decides everything else.
+            </figcaption>
+          </figure>
+
+          <ol class="steps">
+            <li>
+              <p>
+                Scroll the right column to <strong>Rendering</strong>, find <strong>Water</strong>,
+                and tick <strong>This level has water</strong>.
+              </p>
+            </li>
+            <li>
+              <p>
+                <strong>Pick a kind.</strong> <em>Pond</em> is small, still and clear enough to see
+                the bottom. <em>Lake</em> is wider with slower waves. <em>Sea</em> has long swells
+                and you cannot see a metre down. Each one sets the sliders below it to something
+                sensible.
+              </p>
+            </li>
+            <li>
+              <p>
+                <strong>Set the surface height.</strong> This is the one number that matters. Ground
+                above it is dry land; ground below it is underwater.
+              </p>
+            </li>
+            <li>
+              <p>
+                <strong>Adjust clarity and waves</strong> if you want to. Clarity is how far down
+                you can see, and it is the strongest cue that water has depth at all.
+              </p>
+            </li>
+          </ol>
+
+          <figure>
+            <img src="shots/10-water.png" alt="Water filling the low ground of the clearing" />
+            <figcaption>
+              One height, no outline drawn. The shoreline is wherever the ground crosses it.
+            </figcaption>
+          </figure>
+
+          <h3>Making it swimmable</h3>
+          <p>
+            Tick <strong>Things float and the player swims</strong>. Objects are then lifted by how
+            deep they are, and the player swims once they are chest-deep &mdash; knee-deep is still
+            walking, which is what you want at a ford.
+          </p>
+          <ul>
+            <li>
+              <strong>Buoyancy</strong> is a multiple of an object's own weight. 1 hangs still
+              wherever it is left, below that it sinks, above it floats. A stone is about 0.4.
+            </li>
+            <li>
+              <strong>Drag</strong> is how much the water slows things. At zero a crate dropped in
+              bobs forever.
+            </li>
+          </ul>
+          <p>
+            Leave it off and the surface is scenery: a moat the player never enters draws exactly
+            the same and costs nothing in the physics.
+          </p>
+
+          <div class="note warn">
+            <b>If you see no water</b>
+            <p>
+              The panel will tell you. A surface below every piece of ground in the level is
+              invisible &mdash; the commonest mistake, and it reads like a broken feature. Raise the
+              height, or sculpt a hollow for it to sit in.
+            </p>
+          </div>
+
+          <div class="note limit">
+            <b>What water cannot do</b>
+            <p>
+              A river running downhill. The surface is level by definition, so a sloped or flowing
+              one is a different feature rather than a setting. There is also no mirror reflection
+              &mdash; the surface takes a tint of the sky at glancing angles instead, which reads as
+              reflectivity and costs a fraction of a second render of the whole scene.
+            </p>
+          </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="grass">
+          <h2><span class="num">10</span>Growing grass</h2>
+
+          <p>
+            A field of grass is tens of thousands of blades. You do not place them &mdash; you write
+            the rule that puts them there, and the engine grows it the same way every time, in the
+            editor and in the export.
+          </p>
+
+          <figure>
+            <img
+              class="panel-shot"
+              src="shots/11-groundcover.png"
+              alt="The Ground cover panel with density, seed, clumping and colour variation"
+            />
+            <figcaption>
+              <span class="path">Ground cover</span>. The count under Density is what you will
+              actually get after slope and paint cut it down.
+            </figcaption>
+          </figure>
+
+          <ol class="steps">
+            <li>
+              <p>Scroll to <strong>Ground cover</strong> and press <strong>Add layer</strong>.</p>
+            </li>
+            <li>
+              <p>
+                <strong>Pick a model.</strong> <em>Grass Large</em> is the obvious start; rocks,
+                flowers and shrubs work the same way.
+              </p>
+            </li>
+            <li>
+              <p>
+                <strong>Set the density.</strong> It is per 100&nbsp;m&sup2;, and the panel tells
+                you the real number of instances underneath.
+              </p>
+            </li>
+            <li>
+              <p>
+                <strong>Restrict where it grows.</strong> <strong>Max slope</strong> keeps it off
+                cliffs. <strong>Only on</strong> ties it to a painted layer. Both stop a field
+                looking sprayed on.
+              </p>
+            </li>
+            <li>
+              <p>
+                <strong>Turn up Clumping.</strong> At zero the field is perfectly even, which is
+                right for a mown lawn and is the single strongest tell that everything else was
+                generated. Real ground is patchy. <strong>Patch size</strong> is how wide a thick
+                part is, in metres.
+              </p>
+            </li>
+            <li>
+              <p>
+                <strong>Turn up Colour variation.</strong> A field where every blade is the same
+                green reads as one object repeated, because it is. A little goes a long way.
+              </p>
+            </li>
+          </ol>
+
+          <figure>
+            <img
+              src="shots/12-grass.png"
+              alt="The clearing with grass grown across it and water in the distance"
+            />
+            <figcaption>Grass, water and a sculpted hill, all from the panels above.</figcaption>
+          </figure>
+
+          <div class="note">
+            <b>Do not like the arrangement?</b>
+            <p>
+              Change the <strong>Seed</strong>. Any number gives a different field; the same number
+              always gives the same one. That is why the level looks identical on your machine, in
+              the export and on a teammate's &mdash; the positions are never written down, only the
+              rule that produces them.
+            </p>
+          </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="look">
+          <h2><span class="num">11</span>Light, weather and wind</h2>
+
+          <figure>
+            <img
+              class="panel-shot"
+              src="shots/13-rendering.png"
+              alt="The Rendering panel showing look presets, lighting and shadows"
+            />
+            <figcaption>
+              The Rendering panel. Start with a Look, then adjust anything it set.
+            </figcaption>
+          </figure>
+
+          <h3>Start with a look</h3>
+          <p>
+            The buttons at the top of <strong>Rendering</strong> write a whole set of settings at
+            once. Nothing remembers which one you pressed &mdash; every field stays yours to edit
+            and to undo, so a preset is a starting point rather than a mode.
+          </p>
+
+          <h3>Then the parts that matter most</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Setting</th>
+                  <th>What it changes</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Sun elevation</strong></td>
+                  <td>Time of day. Low sun, long shadows, and the single biggest lever on mood.</td>
+                </tr>
+                <tr>
+                  <td><strong>Sun direction</strong></td>
+                  <td>Which way those shadows fall.</td>
+                </tr>
+                <tr>
+                  <td><strong>Sky and ground fill</strong></td>
+                  <td>
+                    Tints upward faces with the sky and downward faces with the ground. At low-poly
+                    densities it does more for a scene than any amount of shadow tuning.
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Shadow quality</strong></td>
+                  <td>Off is fastest and flat. Higher is sharper and costs more.</td>
+                </tr>
+                <tr>
+                  <td><strong>Weather</strong></td>
+                  <td>Rain or snow, with an intensity and a radius that follows the camera.</td>
+                </tr>
+                <tr>
+                  <td><strong>Wind</strong></td>
+                  <td>
+                    How far a two-metre plant leans at the top. At zero nothing sways and no shader
+                    is touched.
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Image</strong></td>
+                  <td>
+                    Tone mapping and full-screen effects. With all of them off nothing is composed
+                    at all.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="note">
+            <b>Wind is free until you use it</b>
+            <p>
+              Wind strength at zero is the absence of the system, not a wind blowing nothing &mdash;
+              no material is patched and there is no per-frame work. The same is true of weather,
+              water, image effects and ground cover. A level that does not use a feature does not
+              pay for it.
+            </p>
+          </div>
+
+          <h3>Sound</h3>
+          <p>
+            The <strong>Audio</strong> panel carries an ambient bed and the effects the game plays.
+            Ambience can follow the wind, so a gusty day sounds like one.
+          </p>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="materials">
+          <h2><span class="num">12</span>Materials and surfaces</h2>
+
+          <p>
+            Select an object and open <strong>Material</strong>. You can override its colour, and
+            how rough or metallic it is &mdash; the difference between damp stone and polished
+            steel.
+          </p>
+
+          <p>
+            <strong>Surfaces</strong> go further: brick, tile, plank, stone, plaster, concrete and
+            metal are generated rather than downloaded, at a scale you pick in words rather than
+            numbers. There is nothing to fetch, so a surface costs no download and cannot go missing
+            from an export.
+          </p>
+
+          <div class="note">
+            <b>If a pattern comes out stretched</b>
+            <p>
+              Most low-poly models carry no texture coordinates, so the engine invents them by
+              projecting from the object's own box. That works well until the object is scaled
+              unevenly &mdash; stretch a crate into a wall and the bricks stretch with it. Scale it
+              evenly, or use a model that brings its own coordinates.
+            </p>
+          </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="models">
+          <h2><span class="num">13</span>Your own models</h2>
+
+          <p>
+            <strong>Import models</strong> in the left column takes <code>.glb</code> and
+            <code>.gltf</code> files from your disk. No account, no upload &mdash; they are kept in
+            this browser beside your projects, and they travel with your game when you export,
+            exactly like any built-in asset.
+          </p>
+
+          <ol class="steps">
+            <li>
+              <p>Choose a <strong>Category</strong> so it files itself in the library.</p>
+            </li>
+            <li>
+              <p>
+                Fill in <strong>Author</strong> and <strong>Licence</strong> if the model came from
+                somebody else. These end up in the export's credits file, which is the point.
+              </p>
+            </li>
+            <li>
+              <p>
+                Press <strong>Choose Files</strong> and pick one or more models. Up to 64&nbsp;MB
+                each.
+              </p>
+            </li>
+            <li>
+              <p>
+                The editor measures the bounding box and picks a sensible collider, then the model
+                appears in the library like anything else.
+              </p>
+            </li>
+          </ol>
+
+          <div class="note warn">
+            <b>They live in this browser</b>
+            <p>
+              Which means another browser, another machine, or cleared site data means they are
+              gone. Keep the original files, and use
+              <span class="path">Save to file&hellip;</span> &mdash; a <code>.hela</code> file
+              carries your imported models inside it.
+            </p>
+          </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="animation">
+          <h2><span class="num">14</span>Animating a character</h2>
+
+          <p>
+            A scene names <em>states</em> &mdash; idle, walk, run, attack, hit, die &mdash; and each
+            state points at a clip inside the model. That indirection is the whole idea: swap the
+            model for a different one and the game keeps working, because the game asked for
+            "attack" rather than for <code>mixamo.com|Layer0.003</code>.
+          </p>
+
+          <ol class="steps">
+            <li>
+              <p>
+                <strong>Import a rigged model</strong> &mdash; any glTF or GLB with a skeleton and
+                clips. <a href="https://www.mixamo.com">Mixamo</a> is the fastest way to get one,
+                and it is free.
+              </p>
+            </li>
+            <li>
+              <p>
+                <strong>Select the object</strong> and tick <strong>Animate this object</strong> in
+                the Animation panel.
+              </p>
+            </li>
+            <li>
+              <p>
+                <strong>Check the guesses.</strong> Each state's clip is guessed from its name
+                &mdash; <code>Idle</code>, <code>Walking</code>, <code>Running</code>,
+                <code>Punching</code>, <code>Hit Reaction</code> and <code>Death</code> all match
+                &mdash; and every guess is a dropdown you can change.
+              </p>
+            </li>
+            <li>
+              <p>
+                <strong>Give it a reason to move.</strong> Attach
+                <strong>Chase on sight</strong> from the Behaviours panel and the AI drives the
+                states for you: idle until it sees the player, then run, then attack.
+              </p>
+            </li>
+          </ol>
+
+          <div class="note">
+            <b>A missing clip is skipped, not obeyed</b>
+            <p>
+              A model with only <code>idle</code> and <code>walk</code> keeps walking when the AI
+              starts an attack, rather than snapping to a rest pose. Half-rigged models are the
+              normal case in a low-poly library, and continuing to move is the graceful failure.
+            </p>
+          </div>
+
+          <h3>Feet that meet the ground</h3>
+          <p>
+            <strong>Foot placement</strong> in the panel of the same name puts a character's ankles
+            on the actual ground rather than on an imaginary flat plane, and drops the hips when one
+            foot is lower than the other. It is what stops a character on a slope looking like it is
+            skating.
+          </p>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="physics">
+          <h2><span class="num">15</span>Physics</h2>
+
+          <figure>
+            <img
+              class="panel-shot"
+              src="shots/14-physics.png"
+              alt="The Physics panel for a selected object"
+            />
+            <figcaption>
+              Every object gets this. The two dropdowns decide almost everything.
+            </figcaption>
+          </figure>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Body</th>
+                  <th>Means</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Static</strong></td>
+                  <td>
+                    Never moves. Solid. The right answer for buildings, rocks and trees, and the
+                    cheapest.
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Dynamic</strong></td>
+                  <td>
+                    Falls, is pushed, can be knocked over. Crates, barrels, anything the player
+                    should be able to disturb.
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Kinematic</strong></td>
+                  <td>
+                    Moves because something told it to, and shoves aside anything in the way.
+                    Platforms, doors, lifts.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p>
+            The <strong>Collider</strong> is the shape used for collision, which is not the shape
+            you see. <em>Auto</em> takes the manifest's choice, which is usually right. A box is
+            fastest, a capsule is right for anything roughly upright, and a mesh collider is exact
+            and expensive &mdash; worth it for a stair or an archway the player must pass through,
+            wasteful for a boulder.
+          </p>
+
+          <div class="note warn">
+            <b>An object can legitimately have no collider</b>
+            <p>
+              Assets marked <em>none</em> &mdash; grass, small decoration &mdash; are walked
+              straight through, on purpose. If something you expect to be solid is not, check the
+              collider before assuming physics is broken.
+            </p>
+          </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="advanced-physics">
+          <h2><span class="num">16</span>Joints, breakables, ragdolls, vehicles</h2>
+
+          <h3>Joints</h3>
+          <p>
+            The <strong>Joints</strong> panel constrains two objects to each other: a
+            <strong>hinge</strong> for a door or a lid, a <strong>slider</strong> for a drawer or a
+            lift, a <strong>ball</strong> for a chain link, a <strong>fixed</strong> joint for
+            things that should break apart together. Hinges and sliders have limits and a motor, so
+            a door can be driven open rather than merely allowed to swing.
+          </p>
+
+          <h3>Breakables</h3>
+          <p>
+            <strong>Breakable</strong> gives an object health and something to become when it runs
+            out. Damage arrives from weapons and from impacts &mdash; a crate dropped hard enough
+            breaks itself. Breaking raises an event, so a door that shatters can open a path in the
+            <a href="#graph">graph</a>.
+          </p>
+
+          <h3>Ragdolls</h3>
+          <p>
+            <strong>Ragdoll</strong> makes a rigged character go limp when it dies, using eleven
+            parts rather than every bone &mdash; enough to fall convincingly, few enough to stay
+            fast. The binder guesses which bone is which from its name, and shows you what it
+            picked.
+          </p>
+
+          <h3>Vehicles</h3>
+          <p>
+            <strong>Vehicle</strong> turns an object into a raycast car the player can drive: engine
+            force, brakes, steering angle, suspension and grip. The player's own capsule is switched
+            off while they are inside it, because a character standing in the middle of a car is a
+            character the solver spends the whole journey trying to push out.
+          </p>
+
+          <div class="note">
+            <b>The panels tell you when a setup cannot work</b>
+            <p>
+              A joint between an object and itself, a hinge on something with no body, a breakable
+              with no fragments &mdash; each is reported in the panel rather than silently doing
+              nothing. Read the warnings; they are the difference between five minutes and an
+              afternoon.
+            </p>
+          </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="player">
+          <h2><span class="num">17</span>The player</h2>
+
+          <p>
+            The <strong>Player</strong> panel is where the game stops being a diorama. Spawn point,
+            height, walk and sprint speed, jump height, how steep a slope can be climbed, how tall a
+            step can be walked up.
+          </p>
+
+          <p>
+            Three settings are worth understanding because they are what makes movement feel fair
+            rather than precise:
+          </p>
+          <ul>
+            <li>
+              <strong>Coyote time</strong> &mdash; a jump still works for a moment after walking off
+              an edge.
+            </li>
+            <li>
+              <strong>Jump buffering</strong> &mdash; a jump pressed just before landing fires on
+              landing instead of being dropped.
+            </li>
+            <li>
+              <strong>Air control</strong> &mdash; how far you may steer after leaving the ground. 1
+              is full control, 0 commits you to the direction you jumped.
+            </li>
+          </ul>
+          <p>
+            All three default to the behaviour that existed before them, so an old level plays
+            identically until you change one.
+          </p>
+
+          <p>
+            <strong>Weapons</strong>, <strong>Game UI</strong>, <strong>Progress</strong> and
+            <strong>Secrets</strong> build out from there: what the player carries, what they see,
+            what counts as winning, and what is hidden until they find it.
+          </p>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="behaviours">
+          <h2><span class="num">18</span>Behaviours and triggers</h2>
+
+          <p>
+            A <strong>behaviour</strong> is a bundle of movement or logic you attach to an object
+            and configure with a form &mdash; patrol a route, chase on sight, spin, float, open as a
+            door. They are real code inside the engine, not a script in your document, which is why
+            they run identically in an export.
+          </p>
+
+          <p>
+            A <strong>trigger</strong> is a volume that notices things. Drop a
+            <em>Trigger box</em> or <em>Trigger sphere</em> from the Logic category, size it, and
+            say what it listens for &mdash; the player entering, an object leaving. It raises an
+            event, and the <a href="#graph">graph</a> decides what that event means.
+          </p>
+
+          <p>
+            Every behaviour and every one of its parameters is listed in the
+            <a href="../BEHAVIOURS.md">behaviour reference</a>, which is generated from the engine's
+            own definitions and therefore cannot disagree with them.
+          </p>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="graph">
+          <h2><span class="num">19</span>The node graph</h2>
+
+          <p>
+            <strong>Graph</strong> in the top bar opens a canvas where you wire up what happens in
+            the level. It is how a lever opens a gate, how collecting three keys ends the level, how
+            a boss spawns when a room is entered &mdash; without writing code.
+          </p>
+
+          <figure>
+            <img src="shots/15-graph.png" alt="The node graph editor with its palette" />
+            <figcaption>
+              The graph. Nodes are grouped by what they are for, and the colours carry onto the
+              canvas.
+            </figcaption>
+          </figure>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Group</th>
+                  <th>What it is</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>When&hellip;</strong> (blue)</td>
+                  <td>
+                    Where a chain starts, and nothing connects into one. <em>On start</em> runs as
+                    the level loads, <em>On event</em> every time an event of that name is raised,
+                    <em>On timer</em> after N seconds.
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Flow</strong> (amber)</td>
+                  <td>
+                    <em>Branch</em> picks between <code>true</code> and <code>false</code>,
+                    <em>Wait</em> continues on a later frame, <em>Sequence</em> runs its outputs in
+                    order.
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Actions</strong> (green)</td>
+                  <td>
+                    Everything else &mdash; set a variable, spawn or destroy an object, show or hide
+                    it, move it, damage or heal the player, emit an event, show a message.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <ol class="steps">
+            <li>
+              <p>
+                <strong>Drag a start node</strong> onto the canvas &mdash; <em>On event</em> if a
+                trigger is going to drive it.
+              </p>
+            </li>
+            <li>
+              <p><strong>Drag the action</strong> you want beneath it.</p>
+            </li>
+            <li>
+              <p><strong>Wire them.</strong> Drag from the output dot to the input dot.</p>
+            </li>
+            <li>
+              <p>
+                <strong>Read the problems list.</strong> A node wired to nothing, an event nothing
+                raises, a loop with no wait in it &mdash; the canvas finds them before you play.
+              </p>
+            </li>
+          </ol>
+
+          <div class="note">
+            <b>Why a graph and not a scripting language</b>
+            <p>
+              Because a document that could name a function to call would be a document that could
+              run code nobody shipped &mdash; and levels get shared. The graph is a closed
+              vocabulary: the engine knows every node that exists, so a level from a stranger cannot
+              do anything the engine did not already contain.
+            </p>
+          </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="levels">
+          <h2><span class="num">20</span>More than one level</h2>
+
+          <p>
+            The <strong>Levels</strong> panel adds levels to a project and marks which one starts. A
+            <em>Load level</em> node in the graph sends the player between them, carrying their
+            health, weapons and the graph's variables across &mdash; so a key found in level one is
+            still in hand in level two.
+          </p>
+          <p>
+            Each level has its own terrain, objects, ground cover, water and lighting. They share
+            the asset library and the player.
+          </p>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="play">
+          <h2><span class="num">21</span>Playing and testing</h2>
+
+          <figure>
+            <img src="shots/16-play.png" alt="Play preview running in the editor" />
+            <figcaption>
+              Play. The same engine that runs in the export, in the editor's viewport.
+            </figcaption>
+          </figure>
+
+          <ol class="steps">
+            <li>
+              <p>
+                Press <strong>Play</strong>. Physics starts, behaviours run, the graph fires,
+                weapons work.
+              </p>
+            </li>
+            <li>
+              <p>
+                <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to move, mouse to look,
+                <kbd>Shift</kbd> to sprint, <kbd>Space</kbd> to jump, <kbd>C</kbd> to crouch, click
+                to fire, <kbd>R</kbd> to reload, <kbd>V</kbd> to change camera.
+              </p>
+            </li>
+            <li>
+              <p><kbd>Esc</kbd> stops and puts you back where you were.</p>
+            </li>
+          </ol>
+
+          <h3>Play From Here</h3>
+          <p>
+            Testing the far corner of a level by walking to it every time is how a level stops
+            getting tested. <strong>Play From Here</strong> starts the game at the spot you are
+            looking at instead of at the spawn point. <strong>Eject</strong> hands control back to
+            the editor camera without stopping the simulation, so you can watch an enemy patrol from
+            above while it is still running.
+          </p>
+
+          <div class="note">
+            <b>Test in Play, not in the viewport</b>
+            <p>
+              The viewport shows you the document. Play shows you the game. A setting that looks
+              right in the panel and does nothing in Play is the failure worth catching, and it is
+              the only one that matters to a player.
+            </p>
+          </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="export">
+          <h2><span class="num">22</span>Exporting to the web</h2>
+
+          <figure>
+            <img src="shots/17-export.png" alt="The Export dialog" />
+            <figcaption>
+              Export. What comes out is a folder of real files, not a package only this tool can
+              open.
+            </figcaption>
+          </figure>
+
+          <p>
+            <strong>Export</strong> gives you a zip containing <code>index.html</code>, the engine,
+            your assets, <code>scene.json</code> and a credits file. It is an ordinary static site:
+            no build step, no server code, no dependency to install.
+          </p>
+
+          <ol class="steps">
+            <li>
+              <p>
+                Press <strong>Export</strong> and choose a mode. <em>Game</em> includes physics and
+                gameplay; <em>Static</em> is a scene to look at and is much smaller.
+              </p>
+            </li>
+            <li><p>Download the zip and unzip it.</p></li>
+            <li>
+              <p>
+                <strong>Serve it.</strong> Opening <code>index.html</code> from your file manager
+                will not work &mdash; browsers refuse to fetch models over <code>file://</code> and
+                you get a black screen. From the folder, run any one of these:
+              </p>
+              <pre><code>python3 -m http.server 8000
+npx serve .
+php -S localhost:8000</code></pre>
+              <p>Then open <code>http://localhost:8000</code>.</p>
+            </li>
+            <li>
+              <p>
+                <strong>Host it</strong> by uploading the same folder to GitHub Pages, Netlify, or
+                any web server.
+              </p>
+            </li>
+          </ol>
+
+          <div class="note">
+            <b>Export can refuse</b>
+            <p>
+              If something in the level would produce a build that does not run &mdash; a spawn
+              point off the edge of the terrain, a model that is not there &mdash; you are told
+              which object and why, rather than being handed a broken zip. That is the check doing
+              its job.
+            </p>
+          </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="exe">
+          <h2><span class="num">23</span>Shipping a Windows .exe</h2>
+
+          <p>
+            An export can be wrapped in a desktop shell so players double-click a program instead of
+            finding a web host. The packaging step takes a folder that has already been exported
+            &mdash; it never rebuilds it, so it cannot introduce a broken game, only fail loudly to
+            produce a build.
+          </p>
+
+          <div class="note warn">
+            <b>Three things to know first</b>
+            <ul>
+              <li>
+                <strong>It is big.</strong> Around 270&nbsp;MB unpacked, because the browser engine
+                that draws your game ships inside it. Your game is a few megabytes of that.
+              </li>
+              <li>
+                <strong>Windows will warn on first run.</strong> "Windows protected your PC" is
+                SmartScreen, and it says that about any program that has not been signed with a
+                paid-for certificate. Players click <em>More info</em> then <em>Run anyway</em>. The
+                README beside the executable says so.
+              </li>
+              <li>
+                <strong>There is no macOS build.</strong> A <code>.app</code> that will not open
+                without Apple notarisation is worse than no <code>.app</code>, so the option does
+                not exist rather than failing later.
+              </li>
+            </ul>
+          </div>
+
+          <p>
+            See <a href="../DESKTOP-EXPORT.md">the desktop export guide</a> for the full
+            walkthrough.
+          </p>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="wrong">
+          <h2><span class="num">24</span>When something looks wrong</h2>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>What you see</th>
+                  <th>What it usually is</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>The exported game is a blank page</td>
+                  <td>
+                    It is being opened from <code>file://</code>. Serve it &mdash; see chapter 22.
+                  </td>
+                </tr>
+                <tr>
+                  <td>Everything is a grey box</td>
+                  <td>
+                    The models did not load. Check the asset folder came across with the rest of the
+                    export.
+                  </td>
+                </tr>
+                <tr>
+                  <td>Nothing happens when you press Walk</td>
+                  <td>The viewport has not got keyboard focus. Click in it once.</td>
+                </tr>
+                <tr>
+                  <td>Your project list says nothing is saved</td>
+                  <td>
+                    A different browser or profile, or site data was cleared. Projects live in the
+                    browser until you <span class="path">Save to file&hellip;</span>.
+                  </td>
+                </tr>
+                <tr>
+                  <td>Imported models are not in the library</td>
+                  <td>
+                    Check the category filter, and check the file is <code>.glb</code> or
+                    <code>.gltf</code> under 64&nbsp;MB.
+                  </td>
+                </tr>
+                <tr>
+                  <td>The editor is slow with a big scene</td>
+                  <td>
+                    Turn on a draw distance, lower shadow quality, and check whether ground cover
+                    density is higher than it needs to be.
+                  </td>
+                </tr>
+                <tr>
+                  <td>A setting saves but changes nothing</td>
+                  <td>
+                    Test it in <strong>Play</strong>, not the viewport &mdash; and if it still does
+                    nothing, that is a bug worth reporting rather than something you are doing
+                    wrong.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p>
+            Longer answers, including how to get at the actual error, are in
+            <a href="../TROUBLESHOOTING.md">Troubleshooting</a>.
+          </p>
+        </section>
+
+        <!-- ================================================================ -->
+        <section id="next">
+          <h2><span class="num">25</span>Where to go next</h2>
+
+          <p>This guide walks the path once. These go deep on one thing each.</p>
+
+          <div class="cards">
+            <a href="../WORLD.md"
+              ><b>Making a world feel alive</b
+              ><span>Wind, ground cover, world size, look presets and ambient sound.</span></a
+            >
+            <a href="../RENDERING.md"
+              ><b>Lighting and materials</b
+              ><span>Every setting in the Rendering panel, and what each one costs.</span></a
+            >
+            <a href="../ANIMATION.md"
+              ><b>Rigged characters</b
+              ><span
+                >Skeletal animation, importing from Mixamo, and why states beat clip names.</span
+              ></a
+            >
+            <a href="../PHYSICS.md"
+              ><b>Physics</b
+              ><span>Colliders, movement feel, joints, breakables, ragdolls and vehicles.</span></a
+            >
+            <a href="../GRAPH.md"
+              ><b>The node graph</b
+              ><span>Every node, variables, conditions, and the checks a canvas can make.</span></a
+            >
+            <a href="../BEHAVIOURS.md"
+              ><b>Behaviour reference</b
+              ><span
+                >Every behaviour and parameter, generated from the engine's own schemas.</span
+              ></a
+            >
+            <a href="../IMPORTING-MODELS.md"
+              ><b>Using your own models</b
+              ><span>What gets measured on import, and where the files live.</span></a
+            >
+            <a href="../PACKS.md"
+              ><b>Skill packs</b
+              ><span>Recipes as markdown, and why a pack can never bring code with it.</span></a
+            >
+            <a href="../EXPORTING.md"
+              ><b>Exporting and hosting</b
+              ><span>What comes out, how to run it, and where to put it.</span></a
+            >
+            <a href="../DESKTOP-EXPORT.md"
+              ><b>Shipping a Windows .exe</b
+              ><span>Turning an export into a program players double-click.</span></a
+            >
+            <a href="../TROUBLESHOOTING.md"
+              ><b>Troubleshooting</b
+              ><span>Things that go wrong, and what they actually mean.</span></a
+            >
+            <a href="../README.md"
+              ><b>All documentation</b
+              ><span>The full index, including the notes for people building the engine.</span></a
+            >
+          </div>
+
+          <hr />
+          <p style="color: var(--text-faint); font-size: 0.88rem; margin-top: 1.5rem">
+            The screenshots on this page were captured by carrying out the steps beside them in the
+            editor. If the interface has moved on and a picture no longer matches, the picture is
+            wrong &mdash; trust the editor.
+          </p>
+        </section>
+      </main>
+    </div>
+
+    <div id="lightbox" role="dialog" aria-label="Enlarged screenshot" aria-modal="true">
+      <img alt="" />
+    </div>
+
+    <script src="guide.js"></script>
+  </body>
+</html>

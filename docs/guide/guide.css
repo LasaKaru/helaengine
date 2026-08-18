@@ -1,0 +1,588 @@
+/*
+ * The guide's styling.
+ *
+ * Plain CSS in one file, no build step and no CDN, because this page has to open two ways: from a
+ * clone of the repository, and by double-clicking `index.html` inside a folder somebody unzipped
+ * with no network at all. Anything fetched from elsewhere is a page that is blank exactly when the
+ * reader most needs it.
+ *
+ * The palette is the editor's, so a screenshot sits on the page rather than on top of it.
+ */
+
+:root {
+  --bg: #161c27;
+  --bg-raised: #1d2532;
+  --bg-sunken: #121722;
+  --line: #2c3646;
+  --text: #e4eaf2;
+  --text-dim: #93a1b5;
+  --text-faint: #6b7889;
+  --accent: #55c98a;
+  --accent-dim: #2f7b53;
+  --warn: #d98b3a;
+  --danger: #e0715f;
+  --radius: 8px;
+  --sidebar: 264px;
+  --measure: 44rem;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f7f8fa;
+    --bg-raised: #ffffff;
+    --bg-sunken: #eceef2;
+    --line: #d8dde5;
+    --text: #1b2330;
+    --text-dim: #56637a;
+    --text-faint: #7d8899;
+    --accent: #1f8a53;
+    --accent-dim: #9ed7b8;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  /* Anchors land below the sticky heading rather than under it. */
+  scroll-padding-top: 1.5rem;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    16px/1.65 -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------------------------------------------------------------- layout */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar) minmax(0, 1fr);
+  gap: 0;
+  max-width: 1500px;
+  margin: 0 auto;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 1.5rem 1rem 3rem 1.5rem;
+  border-right: 1px solid var(--line);
+  background: var(--bg-sunken);
+}
+
+main {
+  padding: 2.5rem clamp(1rem, 4vw, 3.5rem) 6rem;
+  min-width: 0;
+}
+
+main > * {
+  max-width: var(--measure);
+}
+
+/* Screenshots and tables earn more room than prose does. */
+main > figure,
+main > .table-wrap,
+main > .cards {
+  max-width: 62rem;
+}
+
+/* ---------------------------------------------------------------- brand */
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.brand svg {
+  flex: none;
+  color: var(--accent);
+}
+
+.brand b {
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+}
+
+.brand span {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-faint);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ---------------------------------------------------------------- nav */
+
+#filter {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  margin-bottom: 1rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+#filter:focus {
+  outline: 2px solid var(--accent-dim);
+  outline-offset: 1px;
+}
+
+.toc {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.875rem;
+}
+
+.toc li {
+  margin: 0;
+}
+
+.toc a {
+  display: flex;
+  gap: 0.55rem;
+  padding: 0.28rem 0.5rem 0.28rem 0.4rem;
+  color: var(--text-dim);
+  text-decoration: none;
+  border-radius: 5px;
+  border-left: 2px solid transparent;
+}
+
+.toc a:hover {
+  color: var(--text);
+  background: var(--bg-raised);
+}
+
+.toc a.current {
+  color: var(--text);
+  background: var(--bg-raised);
+  border-left-color: var(--accent);
+}
+
+.toc .num {
+  flex: none;
+  min-width: 1.3rem;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.toc a.current .num {
+  color: var(--accent);
+}
+
+.toc .part {
+  margin: 1.1rem 0 0.35rem;
+  padding-left: 0.4rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.toc li.hidden {
+  display: none;
+}
+
+/* ---------------------------------------------------------------- type */
+
+h1 {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.9rem, 4vw, 2.6rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.lede {
+  font-size: 1.1rem;
+  color: var(--text-dim);
+}
+
+section {
+  scroll-margin-top: 1.5rem;
+  padding-top: 2.75rem;
+}
+
+section > h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.55rem;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+
+section > h2 .num {
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  margin-right: 0.5rem;
+}
+
+h3 {
+  margin: 2rem 0 0.4rem;
+  font-size: 1.08rem;
+}
+
+h4 {
+  margin: 1.5rem 0 0.3rem;
+  font-size: 0.95rem;
+  color: var(--text-dim);
+}
+
+p {
+  margin: 0.75rem 0;
+}
+
+a {
+  color: var(--accent);
+  text-underline-offset: 2px;
+}
+
+strong {
+  color: var(--text);
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 3rem 0 0;
+}
+
+/* ---------------------------------------------------------------- steps */
+
+ol.steps {
+  counter-reset: step;
+  list-style: none;
+  margin: 1.25rem 0;
+  padding: 0;
+}
+
+ol.steps > li {
+  counter-increment: step;
+  position: relative;
+  padding: 0 0 1.1rem 2.6rem;
+  border-left: 1px solid var(--line);
+  margin-left: 0.85rem;
+}
+
+ol.steps > li:last-child {
+  border-left-color: transparent;
+  padding-bottom: 0;
+}
+
+ol.steps > li::before {
+  content: counter(step);
+  position: absolute;
+  left: -0.85rem;
+  top: -0.1rem;
+  width: 1.7rem;
+  height: 1.7rem;
+  display: grid;
+  place-items: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--bg);
+  background: var(--accent);
+  border-radius: 50%;
+}
+
+ol.steps > li > :first-child {
+  margin-top: 0;
+}
+
+ul {
+  padding-left: 1.15rem;
+}
+
+li {
+  margin: 0.3rem 0;
+}
+
+/* ---------------------------------------------------------------- notes */
+
+.note {
+  margin: 1.25rem 0;
+  padding: 0.85rem 1rem;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: var(--bg-raised);
+  font-size: 0.94rem;
+}
+
+.note > :first-child {
+  margin-top: 0;
+}
+
+.note > :last-child {
+  margin-bottom: 0;
+}
+
+.note b {
+  display: block;
+  margin-bottom: 0.15rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.note.warn {
+  border-left-color: var(--warn);
+}
+
+.note.warn b {
+  color: var(--warn);
+}
+
+.note.limit {
+  border-left-color: var(--danger);
+}
+
+.note.limit b {
+  color: var(--danger);
+}
+
+/* ---------------------------------------------------------------- keys and code */
+
+kbd {
+  display: inline-block;
+  padding: 0.05em 0.4em;
+  font:
+    600 0.82em/1.5 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+  color: var(--text);
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+code {
+  padding: 0.1em 0.35em;
+  font:
+    0.87em/1.5 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+  background: var(--bg-sunken);
+  border-radius: 4px;
+}
+
+pre {
+  margin: 1rem 0;
+  padding: 0.85rem 1rem;
+  overflow-x: auto;
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+pre code {
+  padding: 0;
+  background: none;
+  font-size: 0.85rem;
+}
+
+/* The path a control lives at, written the way the guide says it aloud. */
+.path {
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.path i {
+  font-style: normal;
+  color: var(--text-faint);
+  padding: 0 0.15em;
+}
+
+/* ---------------------------------------------------------------- figures */
+
+figure {
+  margin: 1.5rem 0;
+}
+
+figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-sunken);
+  cursor: zoom-in;
+}
+
+figure img.panel-shot {
+  width: auto;
+  max-width: 100%;
+}
+
+figcaption {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-faint);
+}
+
+/* ---------------------------------------------------------------- tables */
+
+.table-wrap {
+  overflow-x: auto;
+  margin: 1.25rem 0;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.92rem;
+}
+
+th,
+td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+th {
+  font-size: 0.72rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* ---------------------------------------------------------------- cards */
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.85rem;
+  margin: 1.25rem 0;
+}
+
+.cards a {
+  display: block;
+  padding: 0.85rem 1rem;
+  color: inherit;
+  text-decoration: none;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.cards a:hover {
+  border-color: var(--accent-dim);
+}
+
+.cards b {
+  display: block;
+  color: var(--accent);
+  font-size: 0.95rem;
+}
+
+.cards span {
+  font-size: 0.86rem;
+  color: var(--text-dim);
+}
+
+/* ---------------------------------------------------------------- lightbox */
+
+#lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: none;
+  place-items: center;
+  padding: 2rem;
+  background: rgba(0, 0, 0, 0.86);
+  cursor: zoom-out;
+}
+
+#lightbox.open {
+  display: grid;
+}
+
+#lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: var(--radius);
+}
+
+/* ---------------------------------------------------------------- small screens */
+
+@media (max-width: 860px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 1.5rem;
+  }
+
+  .toc {
+    columns: 2;
+    column-gap: 1rem;
+  }
+}
+
+/* ---------------------------------------------------------------- print */
+
+@media print {
+  .sidebar,
+  #lightbox {
+    display: none;
+  }
+
+  .shell {
+    display: block;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  section {
+    page-break-inside: avoid;
+    padding-top: 1.5rem;
+  }
+
+  figure img {
+    max-width: 15cm;
+  }
+}

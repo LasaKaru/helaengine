@@ -60,6 +60,23 @@ cpSync(join(HERE, 'files'), OUT, { recursive: true });
 rmSync(join(OUT, '.vite'), { recursive: true, force: true });
 
 /**
+ * The step-by-step guide, beside the thing it describes.
+ *
+ * Somebody who unzips this has an editor and no idea what to do with it, and the answer being "read
+ * it on GitHub" is the answer that loses them — the whole point of a portable build is that it
+ * works on a machine with nothing set up, which sometimes means a machine with no network either.
+ * The guide is one HTML file, a stylesheet, a script and its screenshots, and it opens by
+ * double-clicking.
+ */
+const GUIDE = join(ROOT, 'docs', 'guide');
+if (existsSync(GUIDE)) {
+  cpSync(GUIDE, join(OUT, 'guide'), { recursive: true });
+  console.log('  guide included — open guide/index.html');
+} else {
+  console.warn('Warning: docs/guide is missing, so the bundle ships without the walkthrough.');
+}
+
+/**
  * A Windows Node runtime, when one has been fetched.
  *
  * With it, the bundle has **no prerequisites at all** — unzip, double-click, use it. Without it the

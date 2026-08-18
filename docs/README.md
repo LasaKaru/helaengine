@@ -1,5 +1,12 @@
 # HelaEngine documentation
 
+## Start here
+
+- [**Making a game with HelaEngine**](guide/index.html) — the step-by-step walkthrough, from an
+  empty field to something a player can download. Open `docs/guide/index.html` in a browser; it
+  needs no server and fetches nothing. Every other page below goes deep on one thing this one
+  passes through.
+
 ## If you are using it
 
 - [**Using your own models**](IMPORTING-MODELS.md) — importing `.glb` files from disk, what gets
