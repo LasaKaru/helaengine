@@ -93,6 +93,18 @@ export function terrainHides(
  * values to walk for a number that decides whether to show a sentence.
  */
 export function terrainRelief(terrain: TerrainField): number {
+  const { lowest, highest } = terrainRange(terrain);
+  return Number.isFinite(highest - lowest) ? highest - lowest : 0;
+}
+
+/**
+ * The lowest and highest ground in the level, on the same coarse lattice.
+ *
+ * Separate from the relief because water wants the *absolute* heights rather than the difference: a
+ * surface below every piece of ground is invisible and one above all of it drowns the level, and
+ * neither can be told from a span. Same walk, two answers, so the panel does not sample twice.
+ */
+export function terrainRange(terrain: TerrainField): { lowest: number; highest: number } {
   const [sizeX, sizeZ] = terrain.size;
   let lowest = Infinity;
   let highest = -Infinity;
@@ -107,5 +119,5 @@ export function terrainRelief(terrain: TerrainField): number {
       highest = Math.max(highest, height);
     }
   }
-  return Number.isFinite(highest - lowest) ? highest - lowest : 0;
+  return { lowest, highest };
 }

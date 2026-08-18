@@ -65,3 +65,15 @@ export function objectHasProjectedUvs(objectId: string): boolean {
 export function liveTerrainRelief(): number {
   return current?.terrainRelief ?? 0;
 }
+
+/**
+ * The lowest and highest ground in the level, or null where the viewport has built no terrain.
+ *
+ * Water's warnings need the absolute heights rather than the span: a surface under all the ground
+ * shows nothing at all, and one over all of it drowns the level. Both read to an author as the
+ * feature being broken rather than as their own number, which is exactly the case worth catching in
+ * the panel rather than in the viewport.
+ */
+export function liveTerrainRange(): { lowest: number; highest: number } | null {
+  return current?.terrainRange ?? null;
+}

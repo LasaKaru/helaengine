@@ -9,7 +9,12 @@ import type {
   PlayerController,
 } from '@helaengine/engine';
 import { activeLodLevel } from '@helaengine/engine';
-import { SceneObjectSchema, type AssetManifestEntry, type Vec3 } from '@helaengine/schema';
+import {
+  SceneObjectSchema,
+  defaultWater,
+  type AssetManifestEntry,
+  type Vec3,
+} from '@helaengine/schema';
 import type { AssetLibrary } from './engine/assetLibrary';
 import { collabPeers, collabStatus, currentSession } from './collab/current';
 import { useEditorStore } from './store/editorStore';
@@ -49,6 +54,26 @@ export interface DevApi {
    * answer there is "no wind" — a test reading `environment.wind.strength` would call that a bug.
    */
   windActive(): boolean;
+  /**
+   * Whether the viewport has actually built a water surface.
+   *
+   * Read live from the loader rather than snapshotted at load, because water is synced
+   * incrementally — toggling it must not rebuild the scene, so a value captured at load time would
+   * report the state of a document two edits ago.
+   *
+   * The loader can also legitimately disagree with the document: water over a level with no terrain
+   * builds nothing, because the depth every pixel is shaded by comes from the heightfield.
+   */
+  waterActive(): boolean;
+  /**
+   * The schema's own starting point for a kind of water.
+   *
+   * Exposed because a browser test that wrote the fields by hand once left `waveScale` out, and one
+   * missing divisor turns every vertex of the surface into NaN and makes the whole plane vanish with
+   * nothing logged. A test should be able to write a *valid* document without restating the
+   * schema's constants and letting the two drift apart.
+   */
+  defaultWater(kind?: 'pond' | 'lake' | 'sea'): unknown;
   /**
    * Starts Play Preview at a world point, the way right-clicking the ground does.
    *
@@ -553,6 +578,10 @@ export function exposeDevApi(library: AssetLibrary): void {
     setPossessed: (possessed) => useEditorStore.getState().setPossessed(possessed),
 
     windActive: () => windActive,
+
+    waterActive: () => currentLoadedScene?.waterActive ?? false,
+
+    defaultWater: (kind) => defaultWater(kind),
 
     scatterCount: () => scatterCount,
 

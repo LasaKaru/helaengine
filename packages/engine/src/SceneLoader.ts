@@ -28,7 +28,7 @@ import { LodGeometries, buildLod } from './render/lod.js';
 import { FootIk, type GroundProbe } from './animation/FootIk.js';
 import { ChunkGrid } from './streaming/ChunkGrid.js';
 import { buildWater, type WaterSurface } from './render/Water.js';
-import { terrainHides, terrainRelief } from './streaming/horizon.js';
+import { terrainHides, terrainRange, terrainRelief } from './streaming/horizon.js';
 import { buildScatter, buildScatterMeshes } from './scatter/ScatterField.js';
 import {
   applyWindToObject,
@@ -478,6 +478,18 @@ export class LoadedScene {
   get terrainRelief(): number {
     const field = this.terrainField;
     return field ? terrainRelief(field) : 0;
+  }
+
+  /**
+   * The lowest and highest ground in this level, or null where there is no terrain.
+   *
+   * Null rather than a zero range: water sitting at 0 over a level with no ground at all is not
+   * "level with the terrain", it is a question nobody can answer, and the panel says nothing rather
+   * than warning about a hill that does not exist.
+   */
+  get terrainRange(): { lowest: number; highest: number } | null {
+    const field = this.terrainField;
+    return field ? terrainRange(field) : null;
   }
 
   #setChunkVisible(key: string, visible: boolean): void {

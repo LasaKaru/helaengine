@@ -13,10 +13,17 @@ import {
   LOD_MODE_LABELS,
   type LodMode,
   type WeatherKind,
+  WATER_HINTS,
+  WATER_KINDS,
+  WATER_LABELS,
+  defaultWater,
+  waterColor,
+  waterProblems,
+  type WaterKind,
 } from '@helaengine/schema';
 import { useSceneStore } from '../store/sceneStore';
 import { LOOKS, LOOK_DESCRIPTION, LOOK_LABEL, SWAY_GROUPS, applyLook } from '@helaengine/schema';
-import { liveTerrainRelief } from '../engine/liveScene';
+import { liveTerrainRange, liveTerrainRelief } from '../engine/liveScene';
 import { NumberField } from './NumberField';
 
 /**
@@ -425,6 +432,8 @@ export function RenderingPanel(): React.JSX.Element {
         </>
       )}
 
+      <WaterSection />
+
       <h3>Detail</h3>
 
       <label className="param-row">
@@ -709,5 +718,221 @@ export function RenderingPanel(): React.JSX.Element {
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * Water: whether the level has any, and what kind.
+ *
+ * Its own component rather than more lines in the panel, for the same reason `SurfaceSection` is:
+ * it subscribes to one slice of the document, so dragging a wave-height slider does not re-render
+ * every lighting control above it.
+ *
+ * The order of the controls is the order somebody thinks in. Kind first — pond, lake, sea — because
+ * it sets everything else to something sensible and most authors never go further. Height second,
+ * because it is the one number that decides whether the water is visible at all. The rest are
+ * adjustments, and physics is last because it is the only part that changes how the level plays.
+ */
+function WaterSection(): React.JSX.Element {
+  const water = useSceneStore((state) => state.scene.environment.water);
+  const setEnvironment = useSceneStore((state) => state.setEnvironment);
+
+  // Sampled per render rather than subscribed to, like the terrain relief above: it changes when
+  // somebody sculpts, which already re-renders this panel through the document.
+  const range = liveTerrainRange();
+  const problems = water ? waterProblems(water, range) : [];
+
+  return (
+    <>
+      <h3>Water</h3>
+
+      <label className="param-check">
+        <input
+          type="checkbox"
+          aria-label="Water"
+          checked={water !== null}
+          onChange={(event) =>
+            setEnvironment({ water: event.target.checked ? defaultWater() : null })
+          }
+        />
+        This level has water
+      </label>
+
+      {water === null ? (
+        <p className="panel-hint">
+          Off. No surface is built and no shader is compiled — a level without water costs nothing
+          for it.
+        </p>
+      ) : (
+        <>
+          <label className="param-row">
+            <span>Kind</span>
+            <select
+              aria-label="Water kind"
+              value={water.kind}
+              title={WATER_HINTS[water.kind]}
+              onChange={(event) => {
+                /**
+                 * Changing the kind takes its whole preset, keeping only the height and the physics.
+                 *
+                 * Keeping the sliders and changing the label would make "Sea" mean nothing — the
+                 * kind *is* the constants. Keeping the height is the other half: it is where the
+                 * author put the waterline, and a preset has no business moving it.
+                 */
+                const kind = event.target.value as WaterKind;
+                setEnvironment({
+                  water: {
+                    ...defaultWater(kind),
+                    height: water.height,
+                    color: null,
+                    buoyancy: water.buoyancy,
+                    buoyancyStrength: water.buoyancyStrength,
+                    drag: water.drag,
+                  },
+                });
+              }}
+            >
+              {WATER_KINDS.map((kind) => (
+                <option key={kind} value={kind}>
+                  {WATER_LABELS[kind]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="panel-hint">{WATER_HINTS[water.kind]}</p>
+
+          <NumberField
+            label="Surface height"
+            value={water.height}
+            step={0.25}
+            suffix="m"
+            onChange={(height) =>
+              setEnvironment({ water: { ...water, height: clamp(height, -500, 500) } })
+            }
+          />
+          <p className="panel-hint">
+            Ground above this is dry land and below it is underwater, so the shoreline follows
+            whatever you sculpt. Sculpt a hollow and it fills.
+          </p>
+
+          {problems.length > 0 && (
+            <div className="joint-problems" role="status" aria-label="Water problems">
+              {problems.map((problem) => (
+                <p key={problem}>{problem}</p>
+              ))}
+            </div>
+          )}
+
+          <NumberField
+            label="Clarity"
+            value={water.clarity}
+            step={0.25}
+            suffix="m"
+            onChange={(clarity) =>
+              setEnvironment({ water: { ...water, clarity: clamp(clarity, 0.1, 30) } })
+            }
+          />
+          <p className="panel-hint">
+            How far down you can see. It is the strongest cue that water has any depth at all — a
+            pond you can see the bottom of reads quite differently from a sea you cannot.
+          </p>
+
+          <NumberField
+            label="Wave height"
+            value={water.waveHeight}
+            step={0.01}
+            suffix="m"
+            onChange={(waveHeight) =>
+              setEnvironment({ water: { ...water, waveHeight: clamp(waveHeight, 0, 2) } })
+            }
+          />
+          <NumberField
+            label="Wave length"
+            value={water.waveScale}
+            step={0.5}
+            suffix="m"
+            onChange={(waveScale) =>
+              setEnvironment({ water: { ...water, waveScale: clamp(waveScale, 0.2, 60) } })
+            }
+          />
+          <NumberField
+            label="Wave speed"
+            value={water.waveSpeed}
+            step={0.05}
+            onChange={(waveSpeed) =>
+              setEnvironment({ water: { ...water, waveSpeed: clamp(waveSpeed, 0, 4) } })
+            }
+          />
+
+          <label className="param-row">
+            <span>Colour</span>
+            <input
+              type="color"
+              aria-label="Water colour"
+              value={waterColor(water)}
+              onChange={(event) =>
+                setEnvironment({ water: { ...water, color: event.target.value } })
+              }
+            />
+          </label>
+          {water.color !== null && (
+            <button
+              type="button"
+              onClick={() => setEnvironment({ water: { ...water, color: null } })}
+            >
+              Back to the {WATER_LABELS[water.kind].toLowerCase()} colour
+            </button>
+          )}
+
+          <label className="param-check">
+            <input
+              type="checkbox"
+              aria-label="Water buoyancy"
+              checked={water.buoyancy}
+              onChange={(event) =>
+                setEnvironment({ water: { ...water, buoyancy: event.target.checked } })
+              }
+            />
+            Things float and the player swims
+          </label>
+          <p className="panel-hint">
+            {water.buoyancy
+              ? 'Objects are lifted by how deep they are, and the player swims once they are chest-deep.'
+              : 'Off — the surface is scenery. A moat the player never enters costs nothing in the solver.'}
+          </p>
+
+          {water.buoyancy && (
+            <>
+              <NumberField
+                label="Buoyancy"
+                value={water.buoyancyStrength}
+                step={0.05}
+                onChange={(buoyancyStrength) =>
+                  setEnvironment({
+                    water: { ...water, buoyancyStrength: clamp(buoyancyStrength, 0, 4) },
+                  })
+                }
+              />
+              <p className="panel-hint">
+                A multiple of an object&rsquo;s own weight. 1 hangs still wherever it is left, below
+                that it sinks, above it floats — a stone is about 0.4.
+              </p>
+
+              <NumberField
+                label="Drag"
+                value={water.drag}
+                step={0.25}
+                onChange={(drag) =>
+                  setEnvironment({ water: { ...water, drag: clamp(drag, 0, 10) } })
+                }
+              />
+              <p className="panel-hint">
+                How much water slows what moves through it. At zero a crate dropped in bobs forever.
+              </p>
+            </>
+          )}
+        </>
+      )}
+    </>
   );
 }

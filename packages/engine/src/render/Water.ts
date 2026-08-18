@@ -35,6 +35,23 @@ import { waterColor, type Water } from '@helaengine/schema';
 /** How many segments across the plane. Depth is interpolated between vertices, so this is the resolution of the shoreline. */
 const SEGMENTS = 96;
 
+/**
+ * A number, or the default where one did not arrive.
+ *
+ * The schema guarantees every field is present and finite, and this is not a second opinion about
+ * that — it is insurance against the one failure mode this surface has. A single non-finite uniform
+ * makes `sin(x / NaN)` NaN, every vertex of the plane NaN, and the whole surface disappear with no
+ * error logged anywhere: no shader warning, no exception, no console output at all. It cost most of
+ * an afternoon to find, working backwards from a plane that was in the scene, visible, correctly
+ * positioned, with the right attributes and a compiled material, and drew nothing.
+ *
+ * The value that did it arrived from a partial environment patch that never went through the
+ * schema. Anything that can produce silence rather than a message deserves a floor.
+ */
+function number(value: number, fallback: number): number {
+  return Number.isFinite(value) ? value : fallback;
+}
+
 export interface WaterSurface {
   mesh: THREE.Mesh;
   /** Advances the waves. Called once a frame with the elapsed time. */
@@ -78,10 +95,12 @@ export function buildWater(
     uTime: { value: 0 },
     uColor: { value: new THREE.Color(waterColor(water)) },
     uSky: { value: new THREE.Color(skyColor) },
-    uClarity: { value: water.clarity },
-    uWaveHeight: { value: water.waveHeight },
-    uWaveScale: { value: Math.max(0.2, water.waveScale) },
-    uWaveSpeed: { value: water.waveSpeed },
+    uClarity: { value: number(water.clarity, 3.5) },
+    uWaveHeight: { value: number(water.waveHeight, 0.06) },
+    // Floored, because the wave length is a divisor: at zero every vertex is `sin(x / 0)`, which is
+    // `sin(inf)`, which is NaN — and a NaN position is not a wrong wave, it is a plane that vanishes.
+    uWaveScale: { value: Math.max(0.2, number(water.waveScale, 4)) },
+    uWaveSpeed: { value: number(water.waveSpeed, 0.7) },
   };
 
   const material = new THREE.ShaderMaterial({

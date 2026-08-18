@@ -21,9 +21,9 @@ function depths(mesh: THREE.Mesh): Float32Array {
   return (mesh.geometry.getAttribute('aDepth') as THREE.BufferAttribute).array as Float32Array;
 }
 
-describe('buildWater', () => {
-  const water = WaterSchema.parse({ height: 0, kind: 'pond' });
+const water = WaterSchema.parse({ height: 0, kind: 'pond' });
 
+describe('buildWater', () => {
   it('bakes a signed depth against the ground under each vertex', () => {
     const surface = buildWater(water, [100, 100], bowl, '#a0c8ff');
     const values = depths(surface.mesh);
@@ -100,5 +100,36 @@ describe('buildWater', () => {
 
     surface.dispose();
     expect(freed.sort()).toEqual(['geometry', 'material']);
+  });
+});
+
+describe('a setting that did not arrive', () => {
+  it('still builds a surface when a wave value is missing', () => {
+    /**
+     * The failure this guards against is the worst shape a bug can take here, and it happened: a
+     * partial environment patch that never went through the schema left `waveScale` undefined, the
+     * shader divided by it, and every vertex of the plane became NaN. Nothing was logged — no
+     * shader warning, no exception, no console output. The plane was in the scene, visible,
+     * positioned correctly, with the right attributes and a compiled material, and drew nothing.
+     *
+     * A document like this cannot come out of the schema, which is why the assertion is about the
+     * *symptom* rather than the value: whatever arrives, the geometry must stay finite.
+     */
+    const broken = { ...water, waveScale: undefined } as unknown as typeof water;
+    const surface = buildWater(broken, [100, 100], bowl, '#a0c8ff');
+    const material = surface.mesh.material as THREE.ShaderMaterial;
+
+    expect(Number.isFinite(material.uniforms['uWaveScale']?.value as number)).toBe(true);
+    expect((material.uniforms['uWaveScale']?.value as number) > 0).toBe(true);
+    surface.dispose();
+  });
+
+  it('keeps the author’s value when there is one — the control', () => {
+    // Without this the guard could be "always use the default", which would silently ignore every
+    // wave setting anybody ever typed.
+    const surface = buildWater(WaterSchema.parse({ waveScale: 17 }), [100, 100], bowl, '#a0c8ff');
+    const material = surface.mesh.material as THREE.ShaderMaterial;
+    expect(material.uniforms['uWaveScale']?.value).toBe(17);
+    surface.dispose();
   });
 });
