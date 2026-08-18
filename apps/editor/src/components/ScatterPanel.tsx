@@ -167,6 +167,48 @@ function LayerCard({ layer, area, assets, onChange, onRemove }: LayerCardProps):
         hillside. On for rocks and debris.
       </p>
 
+      <NumberField
+        label={`${layer.name} clumping`}
+        scrubLabel="Clumping"
+        value={layer.clumping}
+        step={0.05}
+        onChange={(clumping) => onChange({ clumping: clamp(clumping, 0, 1) })}
+      />
+      <p className="panel-hint">
+        {layer.clumping === 0
+          ? 'Evenly spread. Right for a mown lawn, and the strongest tell that everything else was generated.'
+          : 'Gathers into patches, the way ground that grows things actually is. The amount of grass stays the same — it just moves.'}
+      </p>
+
+      {layer.clumping > 0 && (
+        <>
+          <NumberField
+            label={`${layer.name} patch size`}
+            scrubLabel="Patch size"
+            value={layer.clumpSize}
+            step={0.5}
+            suffix="m"
+            onChange={(clumpSize) => onChange({ clumpSize: clamp(clumpSize, 0.5, 40) })}
+          />
+          <p className="panel-hint">
+            Across from the middle of a thick part to the middle of a thin one.
+          </p>
+        </>
+      )}
+
+      <NumberField
+        label={`${layer.name} colour variation`}
+        scrubLabel="Colour variation"
+        value={layer.colorJitter}
+        step={0.05}
+        onChange={(colorJitter) => onChange({ colorJitter: clamp(colorJitter, 0, 1) })}
+      />
+      <p className="panel-hint">
+        {layer.colorJitter === 0
+          ? 'Every one the same shade — which is what makes a field read as one object repeated.'
+          : 'A different shade per plant. A few percent is enough; more starts to look like a different species.'}
+      </p>
+
       {problems.map((problem) => (
         <p className="scatter-problem" key={problem}>
           {problem}

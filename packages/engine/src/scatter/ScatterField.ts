@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import {
   DENSITY_UNIT_AREA,
   MAX_SCATTER_INSTANCES,
+  cellHash,
+  clumpAccepts,
+  clumpDensityScale,
   makeRandom,
   type ScatterLayer,
 } from '@helaengine/schema';
@@ -36,6 +39,13 @@ export interface ScatterInstance {
   /** Y rotation in radians, plus any tilt if the layer asks for it. */
   quaternion: THREE.Quaternion;
   scale: number;
+  /**
+   * A multiplier on this instance's colour, or null where the layer asks for no variation.
+   *
+   * Null rather than 1: with no jitter no instance colour is written at all, so the batch stays
+   * the batch it was — no extra attribute uploaded, no per-instance tint multiplying the material.
+   */
+  tint: number | null;
 }
 
 export interface ScatterContext {
@@ -91,9 +101,16 @@ export function buildScatter(layer: ScatterLayer, context: ScatterContext): Scat
 
   const [width, depth] = context.size;
   const area = width * depth;
+  /**
+   * Clumping rejects candidates, so it is planned around rather than paid for.
+   *
+   * An author sliding clumping up expects the same amount of grass gathered differently, not half
+   * as much of it. The cap still applies afterwards, because the over-planning is exactly the sort
+   * of multiplication that turns a safe density into a tab that never loads.
+   */
   const wanted = Math.min(
     MAX_SCATTER_INSTANCES,
-    Math.floor((layer.density * area) / DENSITY_UNIT_AREA),
+    Math.floor((layer.density * area * clumpDensityScale(layer)) / DENSITY_UNIT_AREA),
   );
   if (wanted <= 0) return [];
 
@@ -145,6 +162,15 @@ export function buildScatter(layer: ScatterLayer, context: ScatterContext): Scat
       const y = context.terrain.sampleHeight(x, z);
       if (y < layer.heightMin || y > layer.heightMax) continue;
 
+      /**
+       * Patchiness, from a hash of the cell rather than from the random sequence.
+       *
+       * Drawing a sixth number here would shift every candidate after it, and every meadow in every
+       * existing project would rearrange itself on the first load after this shipped. The hash
+       * consumes nothing, so a layer with clumping at zero is byte-for-byte the field it was.
+       */
+      if (!clumpAccepts(layer, x, z, cellHash(layer.seed, cx, cz, 7))) continue;
+
       const normal = groundNormal(context.terrain, x, z);
       if (normal.y < slopeLimit) continue;
 
@@ -170,6 +196,21 @@ export function buildScatter(layer: ScatterLayer, context: ScatterContext): Scat
         position: new THREE.Vector3(x, y, z),
         quaternion: spin.clone(),
         scale: layer.scaleMin + scaleRoll * scaleSpan,
+        /**
+         * A different salt from the clumping hash, and that matters more than it looks.
+         *
+         * Sharing one would make every plant in a thick patch the same shade as the patch — the
+         * field would gain colour variation and lose it again to a second, larger pattern, which
+         * is a worse look than no variation at all.
+         *
+         * Centred on 1 and spread by a third, so full jitter is roughly two-thirds to four-thirds
+         * of the model's own colour: enough to break up a repeated object, not enough to make one
+         * plant look like a different species.
+         */
+        tint:
+          layer.colorJitter > 0
+            ? 1 + (cellHash(layer.seed, cx, cz, 31) - 0.5) * 0.66 * layer.colorJitter
+            : null,
       });
     }
   }
@@ -197,6 +238,7 @@ export function buildScatterMeshes(
   const local = new THREE.Matrix4();
   const composed = new THREE.Matrix4();
   const scale = new THREE.Vector3();
+  const tint = new THREE.Color();
 
   template.traverse((child) => {
     const mesh = child as THREE.Mesh;
@@ -217,8 +259,21 @@ export function buildScatterMeshes(
       composed.compose(instance.position, instance.quaternion, scale);
       composed.multiply(local);
       batch.setMatrixAt(index, composed);
+      /**
+       * A per-instance tint, only where the layer asked for one.
+       *
+       * `setColorAt` allocates an instance colour buffer on first use and three multiplies the
+       * material's colour by it — so writing white for every instance would not be a no-op, it
+       * would be an extra attribute uploaded and an extra multiply per fragment to achieve nothing.
+       * A layer with no jitter never touches this.
+       */
+      if (instance.tint !== null) {
+        tint.setScalar(instance.tint);
+        batch.setColorAt(index, tint);
+      }
     }
     batch.instanceMatrix.needsUpdate = true;
+    if (batch.instanceColor) batch.instanceColor.needsUpdate = true;
     // Computed once from the instances rather than left at the template's bounds, or the whole
     // field is culled the moment the template's origin leaves the frustum.
     batch.computeBoundingSphere();

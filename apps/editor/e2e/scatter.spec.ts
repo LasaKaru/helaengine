@@ -144,3 +144,77 @@ test.describe('ground cover', () => {
     expect(windyA.equals(windyB)).toBe(false);
   });
 });
+
+test.describe('a field that reads as grown', () => {
+  test.setTimeout(120_000);
+
+  test.beforeEach(async ({ page }) => {
+    await openEditor(page);
+    // Looking down at the field, where the *arrangement* is what fills the frame. From ground
+    // level a patch and an even spread look much the same, which is the wrong question to ask a
+    // screenshot.
+    await page.evaluate(() => window.helaengine!.setCameraPose([0, 30, 30], [0, 0, 0]));
+    await page.getByRole('button', { name: 'Add layer' }).click();
+    await page.getByRole('combobox', { name: /model$/i }).selectOption('grass_large');
+    await grownCount(page);
+    await page.waitForTimeout(600);
+  });
+
+  const patch = async (page: Page, values: Record<string, number>): Promise<void> => {
+    await page.evaluate((next) => {
+      const store = window.helaengine!.store.getState();
+      store.updateScatterLayer(store.scene.scatter[0]!.id, next as never);
+    }, values);
+    await page.waitForTimeout(1200);
+  };
+
+  test('clumping rearranges the field without emptying it', async ({ page }) => {
+    const canvas = page.locator('canvas').first();
+    const even = await canvas.screenshot();
+    const spread = await page.evaluate(() => window.helaengine!.scatterCount());
+
+    await patch(page, { clumping: 1, clumpSize: 8 });
+
+    const patchy = await canvas.screenshot();
+    expect(patchy.equals(even)).toBe(false);
+
+    /**
+     * And the count barely moved. This is the half that makes the first assertion mean something:
+     * "the image changed" is also satisfied by a clumping slider that simply deleted half the
+     * grass, which is not patchiness — it is a density control with a misleading name.
+     */
+    const gathered = await page.evaluate(() => window.helaengine!.scatterCount());
+    expect(gathered).toBeGreaterThan(spread * 0.75);
+    expect(gathered).toBeLessThan(spread * 1.25);
+  });
+
+  test('a layer with clumping at zero is the field it always was — the control', async ({
+    page,
+  }) => {
+    /**
+     * Writing the default back explicitly has to be a no-op, down to the byte.
+     *
+     * This is the guard on the thing that would have been worst to get wrong: clumping and colour
+     * both need a per-candidate number, and taking one from the random sequence would have
+     * rearranged every existing meadow on the first load after this shipped. The unit test pins
+     * the positions; this pins that nothing downstream of them noticed either.
+     */
+    const canvas = page.locator('canvas').first();
+    const before = await canvas.screenshot();
+
+    await patch(page, { clumping: 0, colorJitter: 0 });
+
+    expect((await canvas.screenshot()).equals(before)).toBe(true);
+  });
+
+  test('colour variation changes the image', async ({ page }) => {
+    // Instance colours are an attribute the batch does not otherwise carry, so this is exactly the
+    // shape of feature that saves, exports and never reaches a fragment.
+    const canvas = page.locator('canvas').first();
+    const flat = await canvas.screenshot();
+
+    await patch(page, { colorJitter: 1 });
+
+    expect((await canvas.screenshot()).equals(flat)).toBe(false);
+  });
+});

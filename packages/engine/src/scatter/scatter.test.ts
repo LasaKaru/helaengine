@@ -236,7 +236,12 @@ describe('buildScatterMeshes', () => {
 
   it('keeps each part at its offset inside the model', () => {
     const instances = [
-      { position: new THREE.Vector3(0, 0, 0), quaternion: new THREE.Quaternion(), scale: 1 },
+      {
+        position: new THREE.Vector3(0, 0, 0),
+        quaternion: new THREE.Quaternion(),
+        scale: 1,
+        tint: null,
+      },
     ];
     const meshes = buildScatterMeshes(twoPartPlant(), instances);
 
@@ -264,5 +269,157 @@ describe('buildScatterMeshes', () => {
 
   it('makes nothing from no instances', () => {
     expect(buildScatterMeshes(twoPartPlant(), [])).toEqual([]);
+  });
+});
+
+/**
+ * How evenly the field covers the ground.
+ *
+ * Counts instances per bucket over a coarse grid and returns the spread relative to the mean. A
+ * jittered grid is nearly uniform, so its spread is small; a clumped field has thick and thin parts
+ * by construction, so its spread is large. That ratio is what "patchy" means as a number.
+ */
+function unevenness(instances: readonly { position: THREE.Vector3 }[], buckets = 8): number {
+  const counts = new Array<number>(buckets * buckets).fill(0);
+  for (const instance of instances) {
+    const bx = Math.min(
+      buckets - 1,
+      Math.max(0, Math.floor(((instance.position.x + SIZE[0] / 2) / SIZE[0]) * buckets)),
+    );
+    const bz = Math.min(
+      buckets - 1,
+      Math.max(0, Math.floor(((instance.position.z + SIZE[1] / 2) / SIZE[1]) * buckets)),
+    );
+    counts[bz * buckets + bx] = (counts[bz * buckets + bx] ?? 0) + 1;
+  }
+
+  const mean = instances.length / counts.length;
+  if (mean === 0) return 0;
+  const variance = counts.reduce((total, count) => total + (count - mean) ** 2, 0) / counts.length;
+  return Math.sqrt(variance) / mean;
+}
+
+describe('clumping', () => {
+  it('leaves a layer that does not use it exactly as it was', () => {
+    /**
+     * The assertion that had to hold before any of this could ship. Clumping and colour both need
+     * a per-candidate value, and taking it from the random sequence would have shifted every
+     * meadow in every existing project on the first load — silently, with nothing in the document
+     * changed. Both take theirs from a hash of the cell instead, which consumes nothing.
+     *
+     * Written as an exact position match rather than a count, because a count can survive a
+     * complete rearrangement.
+     */
+    const before = buildScatter(layerOf({ density: 40, seed: 3 }), context(hillTerrain()));
+    const after = buildScatter(
+      layerOf({ density: 40, seed: 3, clumping: 0, colorJitter: 0 }),
+      context(hillTerrain()),
+    );
+
+    expect(after).toHaveLength(before.length);
+    for (const [index, instance] of after.entries()) {
+      expect(instance.position.x).toBe(before[index]!.position.x);
+      expect(instance.position.z).toBe(before[index]!.position.z);
+      expect(instance.tint).toBeNull();
+    }
+  });
+
+  it('gathers the field into patches', () => {
+    const even = buildScatter(layerOf({ density: 60, seed: 5 }), context(flatTerrain()));
+    const patchy = buildScatter(
+      layerOf({ density: 60, seed: 5, clumping: 1, clumpSize: 8 }),
+      context(flatTerrain()),
+    );
+
+    // The control is the first line: a jittered grid is nearly uniform by design, so if the two
+    // spreads were similar the clumping would be doing nothing but thinning at random.
+    expect(unevenness(even)).toBeLessThan(0.15);
+    expect(unevenness(patchy)).toBeGreaterThan(unevenness(even) * 2);
+  });
+
+  it('keeps roughly as much grass as it started with', () => {
+    /**
+     * What an author expects from the slider: the same meadow, gathered differently. Clumping
+     * rejects candidates, so without the planning compensation a field would lose half its plants
+     * on the way to looking patchy, and the author would put the density back up and undo the
+     * effect.
+     */
+    const even = buildScatter(layerOf({ density: 60, seed: 5 }), context(flatTerrain()));
+    const patchy = buildScatter(
+      layerOf({ density: 60, seed: 5, clumping: 1, clumpSize: 8 }),
+      context(flatTerrain()),
+    );
+
+    expect(patchy.length).toBeGreaterThan(even.length * 0.75);
+    expect(patchy.length).toBeLessThan(even.length * 1.25);
+  });
+
+  it('makes patches the size it was asked for', () => {
+    // Small patches spread the unevenness across more buckets than large ones do, so at a fixed
+    // bucket size a coarser clump reads as more uneven. Without this the clump size could be
+    // ignored entirely and the test above would still pass.
+    const fine = buildScatter(
+      layerOf({ density: 60, seed: 5, clumping: 1, clumpSize: 2 }),
+      context(flatTerrain()),
+    );
+    const coarse = buildScatter(
+      layerOf({ density: 60, seed: 5, clumping: 1, clumpSize: 24 }),
+      context(flatTerrain()),
+    );
+
+    expect(unevenness(coarse)).toBeGreaterThan(unevenness(fine));
+  });
+});
+
+describe('colour variation', () => {
+  it('gives neighbours different shades', () => {
+    const instances = buildScatter(
+      layerOf({ density: 40, seed: 9, colorJitter: 1 }),
+      context(flatTerrain()),
+    );
+
+    const tints = instances.map((instance) => instance.tint!);
+    expect(tints.every((tint) => tint !== null)).toBe(true);
+    expect(Math.max(...tints) - Math.min(...tints)).toBeGreaterThan(0.3);
+    // Centred on the model's own colour, so a field with jitter is not a field that got darker.
+    const mean = tints.reduce((total, tint) => total + tint, 0) / tints.length;
+    expect(mean).toBeCloseTo(1, 1);
+  });
+
+  it('writes no colour at all when it is off — the control', () => {
+    // Not "writes 1": an instance colour buffer is an attribute uploaded and a multiply per
+    // fragment, and a layer that does not use variation must not pay for it.
+    const instances = buildScatter(layerOf({ density: 40, seed: 9 }), context(flatTerrain()));
+    expect(instances.every((instance) => instance.tint === null)).toBe(true);
+
+    const meshes = buildScatterMeshes(new THREE.Mesh(new THREE.BoxGeometry()), instances);
+    expect(meshes[0]?.instanceColor).toBeFalsy();
+  });
+
+  it('does not follow the patches', () => {
+    /**
+     * The trap this arrangement exists to avoid. Clumping and colour ask a question about the same
+     * cell, and if they shared a hash every plant in a thick patch would be the same shade — the
+     * field would gain variation and immediately lose it again to a second, coarser pattern.
+     *
+     * Measured as: the shades inside the field are no more organised than the clumping is. If the
+     * two shared a salt, the tint's own unevenness would track the patch layout exactly.
+     */
+    const instances = buildScatter(
+      layerOf({ density: 60, seed: 5, clumping: 1, clumpSize: 8, colorJitter: 1 }),
+      context(flatTerrain()),
+    );
+
+    // Neighbouring instances differ as much as distant ones do: a tint that followed the patches
+    // would make the first number far smaller than the second.
+    let adjacent = 0;
+    let distant = 0;
+    for (let index = 1; index < instances.length; index += 1) {
+      adjacent += Math.abs(instances[index]!.tint! - instances[index - 1]!.tint!);
+      distant += Math.abs(
+        instances[index]!.tint! - instances[(index * 37) % instances.length]!.tint!,
+      );
+    }
+    expect(adjacent / instances.length).toBeGreaterThan((distant / instances.length) * 0.7);
   });
 });
