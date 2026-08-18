@@ -1,5 +1,11 @@
 import * as THREE from 'three';
 import type { Player } from '@helaengine/schema';
+import {
+  isSwimming,
+  submergedFraction,
+  swimSpeedFactor,
+  swimVerticalVelocity,
+} from './buoyancy.js';
 import type { PhysicsWorld, RapierRigidBody } from './PhysicsWorld.js';
 import type { RapierModule } from './rapier.js';
 
@@ -50,6 +56,9 @@ export class PlayerController {
   readonly #position = new THREE.Vector3();
   #verticalVelocity = 0;
   #grounded = false;
+  #swimming = false;
+  /** How much of the character is under water, 0 to 1. Drives the swim state and the speed penalty. */
+  #submersion = 0;
   #disposed = false;
   #crouched = false;
   #speed = 0;
@@ -152,6 +161,16 @@ export class PlayerController {
     return this.#verticalVelocity;
   }
 
+  /** Whether the character is swimming rather than walking. What a swim animation and an audio bed want. */
+  get swimming(): boolean {
+    return this.#swimming;
+  }
+
+  /** How much of the character is under water, 0 to 1. Above zero while wading, before swimming starts. */
+  get submersion(): number {
+    return this.#submersion;
+  }
+
   /**
    * Integrates one fixed step of movement.
    *
@@ -171,6 +190,22 @@ export class PlayerController {
     desired.addScaledVector(strafe, input.right);
     if (desired.lengthSq() > 1) desired.normalize();
 
+    /**
+     * How deep the character is, and whether that counts as swimming.
+     *
+     * Read from the body's own height against the water plane rather than from a trigger volume
+     * somebody has to remember to place: the surface is level-wide and the terrain decides where it
+     * shows, so a character is in water exactly when the ground under them is below it. There is
+     * nothing to keep in step and nothing to forget.
+     */
+    const water = this.#world.water;
+    const submersion = water
+      ? submergedFraction(this.#position.y, this.#player.height, water.height)
+      : 0;
+    const swimming = water !== null && isSwimming(submersion);
+    this.#submersion = submersion;
+    this.#swimming = swimming;
+
     // Crouching wins over sprinting: a player holding both is trying to sneak, and a sprint-crouch
     // that moved at full speed would be a exploit rather than a feature.
     const speed =
@@ -179,7 +214,10 @@ export class PlayerController {
         ? this.#player.crouchMultiplier
         : input.sprint === true
           ? this.#player.sprintMultiplier
-          : 1);
+          : 1) *
+      // Sprinting through chest-deep water at full speed is the single thing that makes water read
+      // as a painted decal rather than as water.
+      (water && submersion > 0 ? swimSpeedFactor(submersion, water) : 1);
 
     /**
      * Air control: how far the player may steer away from the direction they left the ground in.
@@ -229,10 +267,35 @@ export class PlayerController {
     const jumping = wantsJump && mayJump;
 
     // A mantle is offered on the same press as a jump, and only when a plain jump would not clear
-    // the ledge anyway — so it never takes a jump the player meant to make.
-    const mantle = wantsJump ? this.#mantleBoost(heading) : 0;
+    // the ledge anyway — so it never takes a jump the player meant to make. Never while swimming:
+    // a swimmer next to a bank is always beside a ledge they cannot reach, and the mantle would fire
+    // on every stroke.
+    const mantle = wantsJump && !swimming ? this.#mantleBoost(heading) : 0;
 
-    if (mantle > 0) {
+    if (swimming && water) {
+      /**
+       * Swimming: buoyancy and drag replace the fall, and jump becomes a stroke upward.
+       *
+       * Replace rather than add. Leaving the fall running and adding lift on top means two systems
+       * integrating the same axis, and the result is a character who sinks in water whose buoyancy
+       * is set to float and floats in water set to sink — the sign of the outcome decided by which
+       * of the two happened to be larger.
+       */
+      this.#verticalVelocity = swimVerticalVelocity(
+        this.#verticalVelocity,
+        submersion,
+        this.#player.gravity,
+        water,
+        step,
+        input.jump,
+      );
+      // Neither window means anything in water: there is no edge to have walked off, and a jump
+      // remembered from the bank would fire the moment the player's feet found the bottom.
+      this.#coyoteLeft = 0;
+      this.#bufferLeft = 0;
+      this.#takeoff.copy(desired).setY(0);
+      if (this.#takeoff.lengthSq() > 1e-6) this.#takeoff.normalize();
+    } else if (mantle > 0) {
       this.#verticalVelocity = mantle;
       this.#coyoteLeft = 0;
       this.#bufferLeft = 0;

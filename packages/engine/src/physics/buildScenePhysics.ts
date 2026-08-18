@@ -59,6 +59,11 @@ export function buildScenePhysics(options: ScenePhysicsOptions): ScenePhysicsRep
   const field = loaded.terrainField;
   if (field) world.addTerrain(field);
 
+  // Here rather than in the loader, because the surface being drawn and things floating in it are
+  // separate settings: a decorative moat draws and does not float, and the solver must be told
+  // which of the two this is before the first body lands in it.
+  world.setWater(scene.environment.water);
+
   for (const object of scene.objects) {
     const node = loaded.objects.get(object.id);
     if (!node) {

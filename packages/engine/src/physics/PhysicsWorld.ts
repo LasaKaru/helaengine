@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import type { BodyType, ColliderType, Joint, Player, Vehicle } from '@helaengine/schema';
+import type { BodyType, ColliderType, Joint, Player, Vehicle, Water } from '@helaengine/schema';
 import type { TerrainField } from '../TerrainField.js';
 
 /** Straight down. Reused rather than allocated: the foot placer asks twice per character per frame. */
 const DOWN = new THREE.Vector3(0, -1, 0);
+import { submergedFraction } from './buoyancy.js';
 import { colliderDescFor } from './colliders.js';
 import { jointDataFor, jointIsDriveable } from './joints.js';
 import { PlayerController } from './PlayerController.js';
@@ -50,6 +51,8 @@ export interface BodyRecord {
   node: THREE.Object3D;
   body: RapierRigidBody;
   type: BodyType;
+  /** Bounding height in metres, kept so buoyancy can ask how much of the body is under water. */
+  height: number;
 }
 
 const position = new THREE.Vector3();
@@ -88,11 +91,15 @@ export class PhysicsWorld {
   #terrain: RapierRigidBody | null = null;
   #accumulator = 0;
   #disposed = false;
+  readonly #gravity: number;
+  /** The water bodies float in, or null for a level with none — which is every level by default. */
+  #water: Water | null = null;
 
   constructor(rapier: RapierModule, options: PhysicsWorldOptions = {}) {
     this.rapier = rapier;
     this.#fixedTimestep = options.fixedTimestep ?? 1 / 60;
     this.#maxSubsteps = options.maxSubsteps ?? 5;
+    this.#gravity = options.gravity ?? 9.81;
     this.world = new rapier.World({ x: 0, y: -(options.gravity ?? 9.81), z: 0 });
     this.world.timestep = this.#fixedTimestep;
   }
@@ -196,7 +203,13 @@ export class PhysicsWorld {
     if (spec.mass !== undefined && spec.body === 'dynamic') descriptor.setMass(spec.mass);
     this.world.createCollider(descriptor, body);
 
-    const record: BodyRecord = { objectId: spec.objectId, node: spec.node, body, type: spec.body };
+    const record: BodyRecord = {
+      objectId: spec.objectId,
+      node: spec.node,
+      body,
+      type: spec.body,
+      height: spec.size[1],
+    };
     this.#bodies.set(spec.objectId, record);
     this.#objectByBody.set(body.handle, spec.objectId);
     // Only bodies the solver can move are worth reading back every frame.
@@ -462,6 +475,80 @@ export class PhysicsWorld {
   }
 
   /**
+   * Tells the world what it is floating in.
+   *
+   * Null, and every line of `applyWater` is skipped — not "a water with no effect", the absence of
+   * the system. Water with `buoyancy` off is also null here: an author who wants a decorative moat
+   * the player never enters gets the surface drawn and pays nothing for it in the solver.
+   */
+  setWater(water: Water | null): void {
+    this.#water = water !== null && water.buoyancy ? water : null;
+  }
+
+  /** The water bodies float in, or null. Null covers both "no water" and "water that is only scenery". */
+  get water(): Water | null {
+    return this.#water;
+  }
+
+  /**
+   * Lift and drag on every dynamic body, once per solver step.
+   *
+   * Before `world.step()`, so the depth each impulse was computed from is the depth the step is
+   * about to integrate. Afterwards would work too — an impulse changes the velocity there and then
+   * — but every body would be acting on where it was a step ago, which is a lag nobody can see and
+   * nobody has a reason to accept.
+   *
+   * Bodies are woken only when there is actually something to apply. A crate resting on dry ground
+   * far from the pond must be allowed to stay asleep; waking everything every step would turn the
+   * solver's cheapest optimisation off for the whole level in exchange for nothing.
+   */
+  applyWater(): void {
+    const water = this.#water;
+    if (!water) return;
+
+    for (const record of this.#dynamic) {
+      if (record.type !== 'dynamic') continue;
+
+      const at = record.body.translation();
+      const submersion = submergedFraction(at.y, record.height, water.height);
+      if (submersion <= 0) continue;
+
+      const mass = record.body.mass();
+      if (mass <= 0) continue;
+
+      const velocity = record.body.linvel();
+      /**
+       * The lift alone, with no gravity term.
+       *
+       * `buoyantAcceleration` returns the *net* figure, weight already subtracted, because the
+       * character controller integrates its own gravity and wants exactly that. Rapier does not:
+       * it applies weight to every dynamic body itself, so handing it the net figure would
+       * subtract the weight a second time and a floating crate would sink at 1g.
+       */
+      const lift = this.#gravity * water.buoyancyStrength * submersion * mass;
+      const resistance = water.drag * submersion * mass;
+      /**
+       * An impulse for this step, not a force.
+       *
+       * Rapier's force accumulator persists until something calls `resetForces` — it is meant for
+       * a thruster you switch on and leave on. Adding drag to it every step accumulates a
+       * coefficient that grows without bound, and the first thing it did was throw a crate
+       * *faster* than it was pushed: at 8 m/s in, 12 m/s out after half a second. An impulse is
+       * spent by the step it is given to, which is what a per-step recalculation wants.
+       */
+      const dt = this.#fixedTimestep;
+      record.body.applyImpulse(
+        {
+          x: -velocity.x * resistance * dt,
+          y: (lift - velocity.y * resistance) * dt,
+          z: -velocity.z * resistance * dt,
+        },
+        true,
+      );
+    }
+  }
+
+  /**
    * Advances the simulation by a frame's worth of time.
    *
    * `onFixedStep` runs once per solver step, before it — that is where a character controller
@@ -480,6 +567,7 @@ export class PhysicsWorld {
     let steps = 0;
     while (this.#accumulator >= this.#fixedTimestep && steps < this.#maxSubsteps) {
       onFixedStep?.(this.#fixedTimestep);
+      this.applyWater();
       this.world.step();
       this.#accumulator -= this.#fixedTimestep;
       steps += 1;
