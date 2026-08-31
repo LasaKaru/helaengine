@@ -13,17 +13,17 @@
   },
   "dependencies": {
     "@helaengine/schema": "workspace:*",
-    "bullmq": "^6.0.8",
+    "bullmq": "^6.3.1",
     "ioredis": "^5.4.1",
-    "pg": "^8.13.1",
+    "pg": "^8.23.0",
     "zod": "^3.24.1",
     "@helaengine/telemetry": "workspace:*",
     "@opentelemetry/api": "^1.9.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
-    "@types/pg": "^8.11.10",
-    "tsx": "^4.23.1",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.23.12",
     "typescript": "^5.9.3",
     "vitest": "^2.1.9"
   },
