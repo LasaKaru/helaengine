@@ -47,7 +47,7 @@ jobs:
       # Two platforms' distributions, ~200 MB, keyed on the pinned version. Without this every run
       # spends two minutes downloading the same two files from GitHub releases.
       - name: Cache the Electron distributions
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/helaengine/electron
           key: electron-${{ runner.os }}-${{ hashFiles('tools/desktop/src/plan.ts') }}
