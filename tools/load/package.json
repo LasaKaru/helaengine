@@ -12,13 +12,13 @@
   },
   "dependencies": {
     "@helaengine/schema": "workspace:*",
-    "ws": "^8.18.0",
-    "y-websocket": "^3.0.0",
+    "ws": "^8.21.3",
+    "y-websocket": "^3.1.0",
     "yjs": "^13.6.20"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
-    "tsx": "^4.19.2",
+    "tsx": "^4.23.13",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8",
     "@types/ws": "^8.5.13"
