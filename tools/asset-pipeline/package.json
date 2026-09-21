@@ -17,14 +17,14 @@
     "@gltf-transform/functions": "^4.4.1",
     "@helaengine/schema": "workspace:*",
     "draco3dgltf": "^1.5.7",
-    "three": "^0.172.0",
+    "three": "^0.186.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
-    "@types/three": "^0.172.0",
-    "playwright": "^1.62.0",
-    "tsx": "^4.19.2",
+    "@types/three": "^0.186.0",
+    "playwright": "^1.63.0",
+    "tsx": "^4.23.13",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
   }
