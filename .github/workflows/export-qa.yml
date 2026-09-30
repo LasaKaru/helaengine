@@ -78,7 +78,7 @@ jobs:
       # Uploaded on failure and only then: the attachments are the editor frame, the export frame
       # and the pixel diff between them, which is the only way to tell a real regression from a
       # tolerance that needs arguing about.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: export-qa-${{ matrix.browser }}
