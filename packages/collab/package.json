@@ -32,7 +32,7 @@
   },
   "dependencies": {
     "@helaengine/schema": "workspace:*",
-    "yjs": "^13.6.20",
+    "yjs": "^13.6.33",
     "zod": "^3.24.1"
   },
   "devDependencies": {
