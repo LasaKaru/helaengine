@@ -32,7 +32,7 @@
   },
   "dependencies": {
     "@helaengine/schema": "workspace:*",
-    "jszip": "3.10.1",
+    "jszip": "3.10.2",
     "zod": "^3.24.1"
   },
   "devDependencies": {
